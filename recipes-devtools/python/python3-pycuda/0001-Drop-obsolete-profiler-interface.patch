@@ -1,0 +1,153 @@
+From 2b628e105cc78b9f76262d59e573ec6f163e3441 Mon Sep 17 00:00:00 2001
+From: Matt Madison <matt@madison.systems>
+Date: Fri, 24 Sep 2021 10:00:47 -0700
+Subject: [PATCH] Drop obsolete profiler interface
+
+Signed-off-by: Matt Madison <matt@madison.systems>
+---
+ doc/source/driver.rst        | 29 -----------------------------
+ src/cpp/cuda.hpp             | 34 ----------------------------------
+ src/wrapper/wrap_cudadrv.cpp | 15 ---------------
+ 3 files changed, 78 deletions(-)
+
+diff --git a/doc/source/driver.rst b/doc/source/driver.rst
+index ce98354..d486bf9 100644
+--- a/doc/source/driver.rst
++++ b/doc/source/driver.rst
+@@ -343,15 +343,6 @@ Constants
+ 
+     .. versionadded:: 2011.1
+ 
+-.. class:: profiler_output_mode
+-
+-    .. attribute:: KEY_VALUE_PAIR
+-        CSV
+-
+-    CUDA 4.0 and above.
+-
+-    .. versionadded:: 2011.1
+-
+ .. class:: function_attribute
+ 
+     Flags for :meth:`Function.get_attribute`. CUDA 2.2 and newer.
+@@ -1980,26 +1971,6 @@ Code on the Device: Modules and Functions
+     *array* should be copied both onto the compute device before invoking
+     the kernel, and off it afterwards.
+ 
+-Profiler Control
+-================
+-
+-CUDA 4.0 and newer.
+-
+-
+-.. function:: initialize_profiler(config_file, output_file, output_mode)
+-
+-    *output_mode* is one of the attributes of :class:`profiler_output_mode`.
+-
+-    .. versionadded:: 2011.1
+-
+-.. function:: start_profiler()
+-
+-    .. versionadded:: 2011.1
+-
+-.. function:: stop_profiler()
+-
+-    .. versionadded:: 2011.1
+-
+ Just-in-time Compilation
+ ========================
+ 
+diff --git a/src/cpp/cuda.hpp b/src/cpp/cuda.hpp
+index 78f49a7..f8fa8cd 100644
+--- a/src/cpp/cuda.hpp
++++ b/src/cpp/cuda.hpp
+@@ -19,10 +19,6 @@
+ #define CUDAPP_CUDA_VERSION CUDA_VERSION
+ #endif
+ 
+-#if CUDAPP_CUDA_VERSION >= 4000
+-#include <cudaProfiler.h>
+-#endif
+-
+ #ifndef _MSC_VER
+ #include <stdint.h>
+ #endif
+@@ -254,12 +250,6 @@ namespace pycuda
+ #if CUDAPP_CUDA_VERSION >= 2000
+           case CUDA_ERROR_DEINITIALIZED: return "deinitialized";
+ #endif
+-#if CUDAPP_CUDA_VERSION >= 4000
+-          case CUDA_ERROR_PROFILER_DISABLED: return "profiler disabled";
+-          case CUDA_ERROR_PROFILER_NOT_INITIALIZED: return "profiler not initialized";
+-          case CUDA_ERROR_PROFILER_ALREADY_STARTED: return "profiler already started";
+-          case CUDA_ERROR_PROFILER_ALREADY_STOPPED: return "profiler already stopped";
+-#endif
+ 
+           case CUDA_ERROR_NO_DEVICE: return "no device";
+           case CUDA_ERROR_INVALID_DEVICE: return "invalid device";
+@@ -2211,32 +2201,8 @@ namespace pycuda
+ #endif
+ 
+   // }}}
+-
+-  // {{{ profiler
+-#if CUDAPP_CUDA_VERSION >= 4000
+-  inline void initialize_profiler(
+-      const char *config_file,
+-      const char *output_file,
+-      CUoutput_mode output_mode)
+-  {
+-    CUDAPP_CALL_GUARDED(cuProfilerInitialize, (config_file, output_file, output_mode));
+-  }
+-
+-  inline void start_profiler()
+-  {
+-    CUDAPP_CALL_GUARDED(cuProfilerStart, ());
+-  }
+-
+-  inline void stop_profiler()
+-  {
+-    CUDAPP_CALL_GUARDED(cuProfilerStop, ());
+-  }
+-#endif
+-  // }}}
+ }
+ 
+ 
+-
+-
+ #endif
+ // vim: foldmethod=marker
+diff --git a/src/wrapper/wrap_cudadrv.cpp b/src/wrapper/wrap_cudadrv.cpp
+index a27b836..70278ef 100644
+--- a/src/wrapper/wrap_cudadrv.cpp
++++ b/src/wrapper/wrap_cudadrv.cpp
+@@ -908,13 +908,6 @@ BOOST_PYTHON_MODULE(_driver)
+     ;
+ #endif
+ 
+-#if CUDAPP_CUDA_VERSION >= 4000
+-  py::enum_<CUoutput_mode>("profiler_output_mode")
+-    .value("KEY_VALUE_PAIR", CU_OUT_KEY_VALUE_PAIR)
+-    .value("CSV", CU_OUT_CSV)
+-    ;
+-#endif
+-
+ #if CUDAPP_CUDA_VERSION >= 3000 && defined(CUDAPP_POST_30_BETA)
+   py::enum_<CUfunc_cache_enum>("func_cache")
+     .value("PREFER_NONE", CU_FUNC_CACHE_PREFER_NONE)
+@@ -1651,14 +1644,6 @@ BOOST_PYTHON_MODULE(_driver)
+ #endif
+   // }}}
+ 
+-  // {{{ profiler control
+-#if CUDAPP_CUDA_VERSION >= 4000
+-  DEF_SIMPLE_FUNCTION(initialize_profiler);
+-  DEF_SIMPLE_FUNCTION(start_profiler);
+-  DEF_SIMPLE_FUNCTION(stop_profiler);
+-#endif
+-  // }}}
+-
+   py::scope().attr("TRSA_OVERRIDE_FORMAT") = CU_TRSA_OVERRIDE_FORMAT;
+   py::scope().attr("TRSF_READ_AS_INTEGER") = CU_TRSF_READ_AS_INTEGER;
+   py::scope().attr("TRSF_NORMALIZED_COORDINATES") = CU_TRSF_NORMALIZED_COORDINATES;
