@@ -2,6 +2,8 @@ SUMMARY = "Easy to use Python camera interface for NVIDIA Jetson"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://LICENSE.md;md5=295ba21d3c8eb4396383d735495fbe6e"
 
+COMPATIBLE_MACHINE = "(tegra)"
+
 inherit setuptools3
 
 SRC_URI = "git://github.com/NVIDIA-AI-IOT/jetcam.git"
@@ -10,7 +12,7 @@ PV = "git${SRCPV}"
 
 S = "${WORKDIR}/git"
 
-RDEPENDS_${PN} += "python3-numpy \
+RDEPENDS:${PN} += "python3-numpy \
                    python3-traitlets \
                    python3-opencv \
                    gstreamer1.0-plugins-nvvidconv \
