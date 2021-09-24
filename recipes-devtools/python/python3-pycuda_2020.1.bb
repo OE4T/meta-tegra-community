@@ -12,7 +12,7 @@ S = "${WORKDIR}/pycuda-${PV}"
 
 inherit pypi cuda distutils3
 
-RDEPENDS_${PN} += "\
+RDEPENDS:${PN} += "\
     python3-appdirs \
     python3-decorator \
     python3-mako \

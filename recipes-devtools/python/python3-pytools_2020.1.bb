@@ -8,7 +8,7 @@ SRC_URI[sha256sum] = "c132d17855584ad61c6e00f3ff11146499755944afc400cce9eae0ecf0
 
 S = "${WORKDIR}/pytools-${PV}"
 
-RDEPENDS_${PN} += "\
+RDEPENDS:${PN} += "\
     python3-decorator \
     python3-appdirs \
     python3-six \
