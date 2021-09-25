@@ -2,6 +2,8 @@ SUMMARY = "Easy to use Python camera interface for NVIDIA Jetson"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://LICENSE.md;md5=295ba21d3c8eb4396383d735495fbe6e"
 
+COMPATIBLE_MACHINE = "(tegra)"
+
 inherit setuptools3
 
 SRC_URI = "git://github.com/NVIDIA-AI-IOT/jetcam.git"
