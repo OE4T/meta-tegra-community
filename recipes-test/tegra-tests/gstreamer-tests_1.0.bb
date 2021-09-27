@@ -13,6 +13,8 @@ SRC_URI = "\
 SRC_URI[md5sum] = "bfd19c4e7ad04c72bfb327cf7e6b9576"
 SRC_URI[sha256sum] = "34bbd52a4b89fdf63c8ace50b268da26653a59508288100cd3c23de276db7931"
 
+COMPATIBLE_MACHINE = "(tegra)"
+
 S = "${WORKDIR}"
 B = "${WORKDIR}/build"
 
