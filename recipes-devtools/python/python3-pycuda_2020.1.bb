@@ -9,6 +9,8 @@ SRC_URI += "file://0001-Drop-obsolete-profiler-interface.patch"
 SRC_URI[md5sum] = "b8ef6b246f04ad431a6df61e1af0319f"
 SRC_URI[sha256sum] = "effa3b99b55af67f3afba9b0d1b64b4a0add4dd6a33bdd6786df1aa4cc8761a5"
 
+COMPATIBLE_MACHINE = "(tegra)"
+
 S = "${WORKDIR}/pycuda-${PV}"
 
 inherit pypi cuda distutils3
