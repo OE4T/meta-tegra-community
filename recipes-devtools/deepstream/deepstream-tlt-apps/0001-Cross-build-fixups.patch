@@ -1,0 +1,179 @@
+From eb264af15d2e1e304fdc358f38442bedbf8ede43 Mon Sep 17 00:00:00 2001
+From: Matt Madison <matt@madison.systems>
+Date: Tue, 28 Sep 2021 04:51:42 -0700
+Subject: [PATCH] Cross build fixups
+
+Signed-off-by: Matt Madison <matt@madison.systems>
+---
+ Makefile                       |  8 ++++----
+ apps/Makefile                  | 12 ++++++------
+ apps/tlt_classifier/Makefile   |  6 +++---
+ apps/tlt_detection/Makefile    |  4 ++--
+ apps/tlt_segmentation/Makefile |  4 ++--
+ post_processor/Makefile        |  8 ++++----
+ 6 files changed, 21 insertions(+), 21 deletions(-)
+
+Index: git/Makefile
+===================================================================
+--- git.orig/Makefile
++++ git/Makefile
+@@ -21,8 +21,8 @@
+ ################################################################################
+ 
+ all:
+-	make -C post_processor
+-	make -C apps
++	$(MAKE) -C post_processor
++	$(MAKE) -C apps
+ %:
+-	make -C post_processor $@
+-	make -C apps $@
++	$(MAKE) -C post_processor $@
++	$(MAKE) -C apps $@
+Index: git/apps/Makefile
+===================================================================
+--- git.orig/apps/Makefile
++++ git/apps/Makefile
+@@ -21,10 +21,10 @@
+ ################################################################################
+ 
+ all:
+-	make -C tlt_detection
+-	make -C tlt_segmentation
+-	make -C tlt_classifier
++	$(MAKE) -C tlt_detection
++	$(MAKE) -C tlt_segmentation
++	$(MAKE) -C tlt_classifier
+ %:
+-	make -C tlt_detection $@
+-	make -C tlt_segmentation $@
+-	make -C tlt_classifier $@
++	$(MAKE) -C tlt_detection $@
++	$(MAKE) -C tlt_segmentation $@
++	$(MAKE) -C tlt_classifier $@
+Index: git/apps/tlt_classifier/Makefile
+===================================================================
+--- git.orig/apps/tlt_classifier/Makefile
++++ git/apps/tlt_classifier/Makefile
+@@ -37,11 +37,11 @@ DS_VER = $(shell deepstream-app -v | awk
+ DS_SRC_PATH := /opt/nvidia/deepstream/deepstream-$(DS_VER)
+ 
+ ifeq ($(TARGET_DEVICE),aarch64)
+-  CFLAGS:= -DPLATFORM_TEGRA
++  CFLAGS+= -DPLATFORM_TEGRA
+ endif
+ 
+ # Change to your deepstream SDK includes
+-CFLAGS+= -I$(DS_SRC_PATH)/sources/includes
++CFLAGS+= -I=$(DS_SRC_PATH)/sources/includes
+ LIB_INSTALL_DIR?=$(DS_SRC_PATH)/lib/
+ 
+ SRCS:= $(wildcard *.c)
+@@ -57,7 +57,7 @@ CFLAGS+= -std=c++14
+ 
+ LIBS:= `pkg-config --libs $(PKGS)`
+ 
+-LIBS+= -L$(LIB_INSTALL_DIR) -lnvdsgst_meta -lnvds_meta -lnvdsgst_helper\
++LIBS+= -L=$(LIB_INSTALL_DIR) -lnvdsgst_meta -lnvds_meta -lnvdsgst_helper\
+        -Wl,-rpath,$(LIB_INSTALL_DIR)
+ 
+ all: $(APP)
+@@ -66,7 +66,7 @@ all: $(APP)
+ 	$(CC) -c -o $@ $(CFLAGS) $<
+ 
+ $(APP): $(OBJS) Makefile
+-	$(CC) -o $(APP) $(OBJS) $(LIBS)
++	$(CC) $(LDFLAGS) -o $(APP) $(OBJS) $(LIBS)
+ 
+ clean:
+ 	rm -rf $(OBJS) $(APP)
+Index: git/apps/tlt_detection/Makefile
+===================================================================
+--- git.orig/apps/tlt_detection/Makefile
++++ git/apps/tlt_detection/Makefile
+@@ -37,11 +37,11 @@ DS_VER = $(shell deepstream-app -v | awk
+ DS_SRC_PATH := /opt/nvidia/deepstream/deepstream-$(DS_VER)
+ 
+ ifeq ($(TARGET_DEVICE),aarch64)
+-  CFLAGS:= -DPLATFORM_TEGRA
++  CFLAGS+= -DPLATFORM_TEGRA
+ endif
+ 
+ # Change to your deepstream SDK includes
+-CFLAGS+= -I$(DS_SRC_PATH)/sources/includes
++CFLAGS+= -I=$(DS_SRC_PATH)/sources/includes
+ LIB_INSTALL_DIR?=$(DS_SRC_PATH)/lib/
+ 
+ SRCS:= $(wildcard *.c)
+@@ -57,7 +57,7 @@ CFLAGS+= -std=c++14
+ 
+ LIBS:= `pkg-config --libs $(PKGS)`
+ 
+-LIBS+= -L$(LIB_INSTALL_DIR) -lnvdsgst_meta -lnvds_meta -lnvdsgst_helper\
++LIBS+= -L=$(LIB_INSTALL_DIR) -lnvdsgst_meta -lnvds_meta -lnvdsgst_helper\
+        -Wl,-rpath,$(LIB_INSTALL_DIR)
+ 
+ all: $(APP)
+@@ -66,7 +66,7 @@ all: $(APP)
+ 	$(CC) -c -o $@ $(CFLAGS) $<
+ 
+ $(APP): $(OBJS) Makefile
+-	$(CC) -o $(APP) $(OBJS) $(LIBS)
++	$(CC) $(LDFLAGS) -o $(APP) $(OBJS) $(LIBS)
+ 
+ clean:
+ 	rm -rf $(OBJS) $(APP)
+Index: git/apps/tlt_segmentation/Makefile
+===================================================================
+--- git.orig/apps/tlt_segmentation/Makefile
++++ git/apps/tlt_segmentation/Makefile
+@@ -37,7 +37,7 @@ DS_VER = $(shell deepstream-app -v | awk
+ DS_SRC_PATH := /opt/nvidia/deepstream/deepstream-$(DS_VER)
+ 
+ ifeq ($(TARGET_DEVICE),aarch64)
+-  CFLAGS:= -DPLATFORM_TEGRA
++  CFLAGS+= -DPLATFORM_TEGRA
+ endif
+ 
+ # Change to your deepstream SDK includes
+@@ -57,7 +57,7 @@ CFLAGS+= -std=c++14
+ 
+ LIBS:= `pkg-config --libs $(PKGS)`
+ 
+-LIBS+= -L$(LIB_INSTALL_DIR) -lnvdsgst_meta -lnvds_meta -lnvdsgst_helper\
++LIBS+= -L=$(LIB_INSTALL_DIR) -lnvdsgst_meta -lnvds_meta -lnvdsgst_helper\
+        -Wl,-rpath,$(LIB_INSTALL_DIR)
+ 
+ all: $(APP)
+@@ -66,7 +66,7 @@ all: $(APP)
+ 	$(CC) -c -o $@ $(CFLAGS) $<
+ 
+ $(APP): $(OBJS) Makefile
+-	$(CC) -o $(APP) $(OBJS) $(LIBS)
++	$(CC) $(LDFLAGS) -o $(APP) $(OBJS) $(LIBS)
+ 
+ clean:
+ 	rm -rf $(OBJS) $(APP)
+Index: git/post_processor/Makefile
+===================================================================
+--- git.orig/post_processor/Makefile
++++ git/post_processor/Makefile
+@@ -31,14 +31,14 @@ DS_SRC_PATH := /opt/nvidia/deepstream/de
+ CC:= g++
+ 
+ # Change to your deepstream SDK includes
+-CFLAGS+= -I$(DS_SRC_PATH)/sources/includes \
+-	  -I/usr/local/cuda-$(CUDA_VER)/include
++CFLAGS+= -I=$(DS_SRC_PATH)/sources/includes \
++	  -I=/usr/local/cuda-$(CUDA_VER)/include
+ 
+ CFLAGS+= -Wall -std=c++11 -shared -fPIC
+ 
+-LIBS+= -lnvinfer -lnvparsers -L/usr/local/cuda-$(CUDA_VER)/lib64 -lcudart -lcublas
++LIBS+= -lnvinfer -lnvparsers -L=/usr/local/cuda-$(CUDA_VER)/lib64 -lcudart -lcublas
+ 
+-LFLAGS:= -Wl,--start-group $(LIBS) -Wl,--end-group
++LFLAGS:= $(LDFLAGS) -Wl,--start-group $(LIBS) -Wl,--end-group
+ 
+ SRCFILES:= nvdsinfer_custombboxparser_tlt.cpp
+ TARGET_LIB:= libnvds_infercustomparser_tlt.so
