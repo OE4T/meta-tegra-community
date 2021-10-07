@@ -1,11 +1,8 @@
-python () {
-    if 'tegra' not in d.getVar('MACHINEOVERRIDES').split(':'):
-        return
+def faad2_license_ok(d):
     if bb.data.inherits_class('license', d):
         license_allowedlist = (d.getVar('LICENSE_FLAGS_WHITELIST') or '').split()
-        if 'commercial' not in license_allowedlist and 'commercial_faad2' not in license_allowedlist:
-            return
+        return 'commercial' in license_allowedlist or 'commercial_faad2' in license_allowedlist
+    return True
 
-    d.appendVar('PACKAGECONFIG', ' faad')
-    d.setVar('PACKAGE_ARCH', '${TEGRA_PKGARCH}')
-}
+PACKAGECONFIG_append_tegra = "${@' faad' if faad2_license_ok(d) else ''}"
+PACKAGE_ARCH_tegra = "${@'${TEGRA_PKGARCH}' if faad2_license_ok(d) else '${TUNE_PKGARCH}'}"
