@@ -13,7 +13,7 @@ SRCREV = "16405b1a725a888cf6473cdd4fd0cb7effbf393f"
 
 S = "${WORKDIR}/git"
 
-inherit pkgconfig cuda
+inherit pkgconfig cuda container-runtime-csv
 COMPATIBLE_MACHINE = "(tegra)"
 
 EXTRA_OEMAKE += "CC='${CXX}' CUDA_VER=${CUDA_VERSION} DS_VER=${DS_VERSION} TARGET_DEVICE=${TARGET_ARCH}"
@@ -35,4 +35,5 @@ FILES_${PN} = ""
 ALLOW_EMPTY_${PN} = "1"
 FILES_${PN}-custom-parser = "${libdir}"
 FILES_${PN}-samples = "${TLT_SAMPLES_PATH}"
+RDEPENDS_${PN}-custom-parser_append = " ${@bb.utils.contains('DISTRO_FEATURES', 'virtualization', '${PN}-container-cs:', '', d)}"
 RDEPENDS_${PN} += "${PN}-samples ${PN}-custom-parser"
