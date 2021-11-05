@@ -6,7 +6,7 @@ COMPATIBLE_MACHINE = "(tegra)"
 
 inherit setuptools3
 
-SRC_URI = "git://github.com/NVIDIA-AI-IOT/jetcam.git;protocol=https"
+SRC_URI = "git://github.com/NVIDIA-AI-IOT/jetcam.git;protocol=https;branch=master"
 SRCREV = "508ff3a402c5a0449a8d5776c05d2d17d6a87f46"
 PV = "git${SRCPV}"
 
