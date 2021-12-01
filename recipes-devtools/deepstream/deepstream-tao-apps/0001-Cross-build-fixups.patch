@@ -1,0 +1,184 @@
+From 546700706d69c6efdd4b5cc1dff497e9851fc59a Mon Sep 17 00:00:00 2001
+From: Bryan Cisneros <bcisneros@sighthound.com>
+Date: Thu, 30 Sep 2021 12:41:00 -0700
+Subject: [PATCH] Cross build fixups
+
+Signed-off-by: Bryan Cisneros <bcisneros@sighthound.com>
+---
+ Makefile                       |  8 ++++----
+ apps/Makefile                  | 12 ++++++------
+ apps/tao_classifier/Makefile   |  8 ++++----
+ apps/tao_detection/Makefile    |  8 ++++----
+ apps/tao_segmentation/Makefile |  8 ++++----
+ post_processor/Makefile        |  8 ++++----
+ 6 files changed, 26 insertions(+), 26 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index b84057b..9a2b95b 100644
+--- a/Makefile
++++ b/Makefile
+@@ -21,8 +21,8 @@
+ ################################################################################
+ 
+ all:
+-	make -C post_processor
+-	make -C apps
++	$(MAKE) -C post_processor
++	$(MAKE) -C apps
+ %:
+-	make -C post_processor $@
+-	make -C apps $@
++	$(MAKE) -C post_processor $@
++	$(MAKE) -C apps $@
+diff --git a/apps/Makefile b/apps/Makefile
+index f0d0b4c..ea3e937 100644
+--- a/apps/Makefile
++++ b/apps/Makefile
+@@ -21,10 +21,10 @@
+ ################################################################################
+ 
+ all:
+-	make -C tao_detection
+-	make -C tao_segmentation
+-	make -C tao_classifier
++	$(MAKE) -C tao_detection
++	$(MAKE) -C tao_segmentation
++	$(MAKE) -C tao_classifier
+ %:
+-	make -C tao_detection $@
+-	make -C tao_segmentation $@
+-	make -C tao_classifier $@
++	$(MAKE) -C tao_detection $@
++	$(MAKE) -C tao_segmentation $@
++	$(MAKE) -C tao_classifier $@
+diff --git a/apps/tao_classifier/Makefile b/apps/tao_classifier/Makefile
+index 2b1cd0a..9f899bf 100644
+--- a/apps/tao_classifier/Makefile
++++ b/apps/tao_classifier/Makefile
+@@ -37,11 +37,11 @@ DS_VER = $(shell deepstream-app -v | awk '$$1~/DeepStreamSDK/ {print substr($$2,
+ DS_SRC_PATH := /opt/nvidia/deepstream/deepstream-$(DS_VER)
+ 
+ ifeq ($(TARGET_DEVICE),aarch64)
+-  CFLAGS:= -DPLATFORM_TEGRA
++  CFLAGS+= -DPLATFORM_TEGRA
+ endif
+ 
+ # Change to your deepstream SDK includes
+-CFLAGS+= -I$(DS_SRC_PATH)/sources/includes
++CFLAGS+= -I=$(DS_SRC_PATH)/sources/includes
+ LIB_INSTALL_DIR?=$(DS_SRC_PATH)/lib/
+ 
+ SRCS:= $(wildcard *.c)
+@@ -57,7 +57,7 @@ CFLAGS+= -std=c++14
+ 
+ LIBS:= `pkg-config --libs $(PKGS)`
+ 
+-LIBS+= -L$(LIB_INSTALL_DIR) -lnvdsgst_meta -lnvds_meta -lnvdsgst_helper\
++LIBS+= -L=$(LIB_INSTALL_DIR) -lnvdsgst_meta -lnvds_meta -lnvdsgst_helper\
+        -Wl,-rpath,$(LIB_INSTALL_DIR)
+ 
+ all: $(APP)
+@@ -66,7 +66,7 @@ all: $(APP)
+ 	$(CC) -c -o $@ $(CFLAGS) $<
+ 
+ $(APP): $(OBJS) Makefile
+-	$(CC) -o $(APP) $(OBJS) $(LIBS)
++	$(CC) $(LDFLAGS) -o $(APP) $(OBJS) $(LIBS)
+ 
+ clean:
+ 	rm -rf $(OBJS) $(APP)
+diff --git a/apps/tao_detection/Makefile b/apps/tao_detection/Makefile
+index 9fa540c..16c142c 100644
+--- a/apps/tao_detection/Makefile
++++ b/apps/tao_detection/Makefile
+@@ -37,11 +37,11 @@ DS_VER = $(shell deepstream-app -v | awk '$$1~/DeepStreamSDK/ {print substr($$2,
+ DS_SRC_PATH := /opt/nvidia/deepstream/deepstream-$(DS_VER)
+ 
+ ifeq ($(TARGET_DEVICE),aarch64)
+-  CFLAGS:= -DPLATFORM_TEGRA
++  CFLAGS+= -DPLATFORM_TEGRA
+ endif
+ 
+ # Change to your deepstream SDK includes
+-CFLAGS+= -I$(DS_SRC_PATH)/sources/includes
++CFLAGS+= -I=$(DS_SRC_PATH)/sources/includes
+ LIB_INSTALL_DIR?=$(DS_SRC_PATH)/lib/
+ 
+ SRCS:= $(wildcard *.c)
+@@ -57,7 +57,7 @@ CFLAGS+= -std=c++14
+ 
+ LIBS:= `pkg-config --libs $(PKGS)`
+ 
+-LIBS+= -L$(LIB_INSTALL_DIR) -lnvdsgst_meta -lnvds_meta -lnvdsgst_helper\
++LIBS+= -L=$(LIB_INSTALL_DIR) -lnvdsgst_meta -lnvds_meta -lnvdsgst_helper\
+        -Wl,-rpath,$(LIB_INSTALL_DIR)
+ 
+ all: $(APP)
+@@ -66,7 +66,7 @@ all: $(APP)
+ 	$(CC) -c -o $@ $(CFLAGS) $<
+ 
+ $(APP): $(OBJS) Makefile
+-	$(CC) -o $(APP) $(OBJS) $(LIBS)
++	$(CC) $(LDFLAGS) -o $(APP) $(OBJS) $(LIBS)
+ 
+ clean:
+ 	rm -rf $(OBJS) $(APP)
+diff --git a/apps/tao_segmentation/Makefile b/apps/tao_segmentation/Makefile
+index 88574c4..dcc15ff 100644
+--- a/apps/tao_segmentation/Makefile
++++ b/apps/tao_segmentation/Makefile
+@@ -37,11 +37,11 @@ DS_VER = $(shell deepstream-app -v | awk '$$1~/DeepStreamSDK/ {print substr($$2,
+ DS_SRC_PATH := /opt/nvidia/deepstream/deepstream-$(DS_VER)
+ 
+ ifeq ($(TARGET_DEVICE),aarch64)
+-  CFLAGS:= -DPLATFORM_TEGRA
++  CFLAGS+= -DPLATFORM_TEGRA
+ endif
+ 
+ # Change to your deepstream SDK includes
+-CFLAGS+= -I$(DS_SRC_PATH)/sources/includes
++CFLAGS+= -I=$(DS_SRC_PATH)/sources/includes
+ LIB_INSTALL_DIR?=$(DS_SRC_PATH)/lib/
+ 
+ SRCS:= $(wildcard *.c)
+@@ -57,7 +57,7 @@ CFLAGS+= -std=c++14
+ 
+ LIBS:= `pkg-config --libs $(PKGS)`
+ 
+-LIBS+= -L$(LIB_INSTALL_DIR) -lnvdsgst_meta -lnvds_meta -lnvdsgst_helper\
++LIBS+= -L=$(LIB_INSTALL_DIR) -lnvdsgst_meta -lnvds_meta -lnvdsgst_helper\
+        -Wl,-rpath,$(LIB_INSTALL_DIR)
+ 
+ all: $(APP)
+@@ -66,7 +66,7 @@ all: $(APP)
+ 	$(CC) -c -o $@ $(CFLAGS) $<
+ 
+ $(APP): $(OBJS) Makefile
+-	$(CC) -o $(APP) $(OBJS) $(LIBS)
++	$(CC) $(LDFLAGS) -o $(APP) $(OBJS) $(LIBS)
+ 
+ clean:
+ 	rm -rf $(OBJS) $(APP)
+diff --git a/post_processor/Makefile b/post_processor/Makefile
+index 1107575..77ec03c 100644
+--- a/post_processor/Makefile
++++ b/post_processor/Makefile
+@@ -31,14 +31,14 @@ DS_SRC_PATH := /opt/nvidia/deepstream/deepstream-$(DS_VER)
+ CC:= g++
+ 
+ # Change to your deepstream SDK includes
+-CFLAGS+= -I$(DS_SRC_PATH)/sources/includes \
+-	  -I/usr/local/cuda-$(CUDA_VER)/include
++CFLAGS+= -I=$(DS_SRC_PATH)/sources/includes \
++	  -I=/usr/local/cuda-$(CUDA_VER)/include
+ 
+ CFLAGS+= -Wall -std=c++11 -shared -fPIC
+ 
+-LIBS+= -lnvinfer -lnvparsers -L/usr/local/cuda-$(CUDA_VER)/lib64 -lcudart -lcublas
++LIBS+= -lnvinfer -lnvparsers -L=/usr/local/cuda-$(CUDA_VER)/lib64 -lcudart -lcublas
+ 
+-LFLAGS:= -Wl,--start-group $(LIBS) -Wl,--end-group
++LFLAGS:= $(LDFLAGS) -Wl,--start-group $(LIBS) -Wl,--end-group
+ 
+ SRCFILES:= nvdsinfer_custombboxparser_tao.cpp
+ TARGET_LIB:= libnvds_infercustomparser_tao.so
