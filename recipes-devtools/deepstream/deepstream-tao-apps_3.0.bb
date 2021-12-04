@@ -1,6 +1,7 @@
 DESCRIPTION = "NVIDIA Train, Adapt, and Optimize (TAO) Toolkit sample applications"
-LICENSE = "Apache-2.0"
+LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://LICENSE.md;md5=dbef1fb16cd9e5c5249a8e0c5e639fb0"
+HOMEPAGE = "https://github.com/NVIDIA-AI-IOT/deepstream_tao_apps"
 
 DS_VERSION = "6.0"
 DEPENDS = " deepstream-${DS_VERSION}"
@@ -10,6 +11,7 @@ SRC_URI = " \
     file://0001-Cross-build-fixups.patch \
 "
 SRCREV = "2022175c07b7c76437f1e7a10ae90eb8517baf73"
+PV .= "+g${SRCPV}"
 
 S = "${WORKDIR}/git"
 
