@@ -11,7 +11,7 @@ Branch names in this repository correspond to the branch names in meta-tegra.
 Contributing
 ------------
 
-Please see the contributor wiki page at
-[this link](https://github.com/OE4T/meta-tegra/wiki/OE4T-Contributor-Guide).
+Please see the [README for meta-tegra](https://github.com/OE4T/meta-tegra/blob/master/README.md)
+for information on contributing to the project.
 
 Contributions are welcome!
