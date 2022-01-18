@@ -13,7 +13,7 @@ COMPATIBLE_MACHINE = "(tegra)"
 
 S = "${WORKDIR}/pycuda-${PV}"
 
-inherit pypi cuda distutils3
+inherit pypi cuda setuptools3
 
 RDEPENDS:${PN} += "\
     python3-appdirs \
