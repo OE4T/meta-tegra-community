@@ -1,17 +1,17 @@
-From 1dba00d3bef3f5b3dfb51fd7a4f86fcb493c2652 Mon Sep 17 00:00:00 2001
+From 4b6e083fda09a390fe597186a6f7f537333a0e50 Mon Sep 17 00:00:00 2001
 From: Matt Madison <matt@madison.systems>
 Date: Mon, 2 Nov 2020 08:24:14 -0800
-Subject: [PATCH] Reduce env size on p3450-0000 to 64KiB
+Subject: [PATCH 13/16] Reduce env size on p3450-0000 to 64KiB
 
 Signed-off-by: Matt Madison <matt@madison.systems>
 ---
  configs/p3450-0000_defconfig | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-Index: git/configs/p3450-0000_defconfig
-===================================================================
---- git.orig/configs/p3450-0000_defconfig
-+++ git/configs/p3450-0000_defconfig
+diff --git a/configs/p3450-0000_defconfig b/configs/p3450-0000_defconfig
+index 32f5aff921..8bed4aafef 100644
+--- a/configs/p3450-0000_defconfig
++++ b/configs/p3450-0000_defconfig
 @@ -61,9 +61,9 @@ CONFIG_USB_STORAGE=y
  CONFIG_DOS_PARTITION=y
  CONFIG_CMD_CACHE=y
@@ -24,3 +24,6 @@ Index: git/configs/p3450-0000_defconfig
  CONFIG_SYS_REDUNDAND_ENVIRONMENT=y
  # CONFIG_ENV_IS_NOWHERE is not set
  # CONFIG_ENV_IS_IN_EEPROM is not set
+-- 
+2.32.0
+

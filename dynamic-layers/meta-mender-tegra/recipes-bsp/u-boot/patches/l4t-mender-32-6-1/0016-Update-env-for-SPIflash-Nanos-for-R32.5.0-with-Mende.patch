@@ -1,7 +1,7 @@
-From 05f033868f7e8fdece13fa2861a5bda1f433ed23 Mon Sep 17 00:00:00 2001
+From 8594f2beccd0ce6e780858e868e898798dc41c4e Mon Sep 17 00:00:00 2001
 From: Matt Madison <matt@madison.systems>
-Date: Sun, 7 Feb 2021 08:45:33 -0800
-Subject: [PATCH] Update env for SPIflash Nanos for R32.5.0 with Mender
+Date: Thu, 3 Feb 2022 12:34:15 -0800
+Subject: [PATCH 15/16] Update env for SPIflash Nanos for R32.5.0 with Mender
 
 Need to move the environment area and reduce its
 size in order to fit redundant copies between RP4
@@ -13,11 +13,11 @@ Signed-off-by: Matt Madison <matt@madison.systems>
  configs/p3541-0000_defconfig | 6 +++---
  2 files changed, 6 insertions(+), 6 deletions(-)
 
-Index: git/configs/p3450-0000_defconfig
-===================================================================
---- git.orig/configs/p3450-0000_defconfig
-+++ git/configs/p3450-0000_defconfig
-@@ -60,9 +60,9 @@ CONFIG_USB_STORAGE=y
+diff --git a/configs/p3450-0000_defconfig b/configs/p3450-0000_defconfig
+index 8bed4aafef..97e7d70fb7 100644
+--- a/configs/p3450-0000_defconfig
++++ b/configs/p3450-0000_defconfig
+@@ -61,9 +61,9 @@ CONFIG_USB_STORAGE=y
  CONFIG_DOS_PARTITION=y
  CONFIG_CMD_CACHE=y
  CONFIG_OF_LIBFDT_OVERLAY=y
@@ -30,22 +30,23 @@ Index: git/configs/p3450-0000_defconfig
  CONFIG_SYS_REDUNDAND_ENVIRONMENT=y
  # CONFIG_ENV_IS_NOWHERE is not set
  # CONFIG_ENV_IS_IN_EEPROM is not set
-Index: git/configs/p3541-0000_defconfig
-===================================================================
---- git.orig/configs/p3541-0000_defconfig
-+++ git/configs/p3541-0000_defconfig
-@@ -1,11 +1,11 @@
- CONFIG_ARM=y
- CONFIG_ARCH_TEGRA=y
+diff --git a/configs/p3541-0000_defconfig b/configs/p3541-0000_defconfig
+index fe3f00a30e..d9c161483a 100644
+--- a/configs/p3541-0000_defconfig
++++ b/configs/p3541-0000_defconfig
+@@ -3,9 +3,9 @@ CONFIG_ARCH_TEGRA=y
  CONFIG_SYS_TEXT_BASE=0x80080000
+ CONFIG_SYS_MALLOC_LEN=0x2500000
+ CONFIG_NR_DRAM_BANKS=16
 -CONFIG_ENV_SIZE=0x10000
-+CONFIG_ENV_SIZE=0x8000
- CONFIG_ENV_SECT_SIZE=0x1000
- CONFIG_DEFAULT_DEVICE_TREE="tegra210-p3541-0000"
 -CONFIG_ENV_OFFSET=0x3b0000
 -CONFIG_ENV_OFFSET_REDUND=0x3c0000
++CONFIG_ENV_SIZE=0x8000
 +CONFIG_ENV_OFFSET=0x3d0000
 +CONFIG_ENV_OFFSET_REDUND=0x3d8000
  CONFIG_SYS_REDUNDAND_ENVIRONMENT=y
- CONFIG_NR_DRAM_BANKS=16
- CONFIG_TEGRA210=y
+ CONFIG_ENV_SECT_SIZE=0x1000
+ CONFIG_DEFAULT_DEVICE_TREE="tegra210-p3541-0000"
+-- 
+2.32.0
+

@@ -15,7 +15,7 @@ Index: git/include/env_default.h
 ===================================================================
 --- git.orig/include/env_default.h
 +++ git/include/env_default.h
-@@ -35,8 +35,8 @@ const uchar default_environment[] = {
+@@ -37,8 +37,8 @@ const char default_environment[] = {
  #ifdef	CONFIG_USE_BOOTARGS
  	"bootargs="	CONFIG_BOOTARGS			"\0"
  #endif
