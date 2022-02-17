@@ -1,0 +1,448 @@
+From 5bfe057191189cc5eace310bea48289dd06db09c Mon Sep 17 00:00:00 2001
+From: Matt Madison <matt@madison.systems>
+Date: Fri, 18 Feb 2022 05:05:34 -0800
+Subject: [PATCH] Allow apps to be run from other working directories
+
+Signed-off-by: Matt Madison <matt@madison.systems>
+---
+ apps/common/is_aarch_64.py                        |  4 ----
+ apps/common/utils.py                              |  2 --
+ .../deepstream_imagedata-multistream_redaction.py |  8 ++++----
+ .../deepstream_imagedata-multistream.py           |  8 ++++----
+ .../deepstream_nvdsanalytics.py                   | 11 ++++++-----
+ .../deepstream-opticalflow.py                     |  3 ++-
+ .../deepstream_test1_rtsp_in_rtsp_out.py          |  9 +++++----
+ .../deepstream_segmentation.py                    |  6 +++---
+ .../deepstream_ssd_parser.py                      | 11 ++++++-----
+ .../deepstream_test1_rtsp_out.py                  |  6 +++---
+ .../deepstream_test_1_usb.py                      |  7 ++++---
+ apps/deepstream-test1/deepstream_test_1.py        |  7 ++++---
+ apps/deepstream-test2/deepstream_test_2.py        | 15 ++++++++-------
+ apps/deepstream-test3/deepstream_test_3.py        |  7 ++++---
+ apps/deepstream-test4/deepstream_test_4.py        | 10 +++++-----
+ .../deepstream_rt_src_add_del.py                  | 15 ++++++++-------
+ 16 files changed, 66 insertions(+), 63 deletions(-)
+
+diff --git a/apps/common/is_aarch_64.py b/apps/common/is_aarch_64.py
+index 26276c3..b287613 100644
+--- a/apps/common/is_aarch_64.py
++++ b/apps/common/is_aarch_64.py
+@@ -16,10 +16,6 @@
+ ################################################################################
+ 
+ import platform
+-import sys
+-
+ 
+ def is_aarch64():
+     return platform.uname()[4] == 'aarch64'
+-
+-sys.path.append('/opt/nvidia/deepstream/deepstream/lib')
+diff --git a/apps/common/utils.py b/apps/common/utils.py
+index f0e9e17..de91166 100644
+--- a/apps/common/utils.py
++++ b/apps/common/utils.py
+@@ -16,8 +16,6 @@
+ ################################################################################
+ 
+ import ctypes
+-import sys
+-sys.path.append('/opt/nvidia/deepstream/deepstream/lib')
+ 
+ def long_to_uint64(l):
+     value = ctypes.c_uint64(l & 0xffffffffffffffff).value
+diff --git a/apps/deepstream-imagedata-multistream-redaction/deepstream_imagedata-multistream_redaction.py b/apps/deepstream-imagedata-multistream-redaction/deepstream_imagedata-multistream_redaction.py
+index e6f52bd..b44c3c5 100644
+--- a/apps/deepstream-imagedata-multistream-redaction/deepstream_imagedata-multistream_redaction.py
++++ b/apps/deepstream-imagedata-multistream-redaction/deepstream_imagedata-multistream_redaction.py
+@@ -18,9 +18,9 @@
+ ################################################################################
+ 
+ import argparse
+-import sys
+-
+-sys.path.append('../')
++import sys, os
++HERE = os.path.dirname(__file__)
++sys.path.append(os.path.dirname(HERE))
+ import gi
+ import configparser
+ 
+@@ -381,7 +381,7 @@ def main(uri_inputs,codec,bitrate ):
+     streammux.set_property('height', 1080)
+     streammux.set_property('batch-size', number_sources)
+     streammux.set_property('batched-push-timeout', 4000000)
+-    pgie.set_property('config-file-path', "config_infer_primary_peoplenet.txt")
++    pgie.set_property('config-file-path', os.path.join(HERE, "config_infer_primary_peoplenet.txt"))
+     pgie_batch_size = pgie.get_property("batch-size")
+     if (pgie_batch_size != number_sources):
+         print("WARNING: Overriding infer-config batch-size", pgie_batch_size, " with number of sources ",
+diff --git a/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py b/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py
+index 24f90f5..b3a5934 100644
+--- a/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py
++++ b/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py
+@@ -17,9 +17,9 @@
+ # limitations under the License.
+ ################################################################################
+ 
+-import sys
+-
+-sys.path.append('../')
++import sys, os
++HERE = os.path.dirname(__file__)
++sys.path.append(os.path.dirname(HERE))
+ import gi
+ import configparser
+ 
+@@ -354,7 +354,7 @@ def main(args):
+     streammux.set_property('height', 1080)
+     streammux.set_property('batch-size', number_sources)
+     streammux.set_property('batched-push-timeout', 4000000)
+-    pgie.set_property('config-file-path', "dstest_imagedata_config.txt")
++    pgie.set_property('config-file-path', os.path.join(HERE, "dstest_imagedata_config.txt"))
+     pgie_batch_size = pgie.get_property("batch-size")
+     if (pgie_batch_size != number_sources):
+         print("WARNING: Overriding infer-config batch-size", pgie_batch_size, " with number of sources ",
+diff --git a/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py b/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py
+index 8270de3..9982098 100644
+--- a/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py
++++ b/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py
+@@ -17,8 +17,9 @@
+ # limitations under the License.
+ ################################################################################
+ 
+-import sys
+-sys.path.append('../')
++import sys, os
++HERE = os.path.dirname(__file__)
++sys.path.append(os.path.dirname(HERE))
+ import gi
+ import configparser
+ gi.require_version('Gst', '1.0')
+@@ -292,7 +293,7 @@ def main(args):
+     nvanalytics = Gst.ElementFactory.make("nvdsanalytics", "analytics")
+     if not nvanalytics:
+         sys.stderr.write(" Unable to create nvanalytics \n")
+-    nvanalytics.set_property("config-file", "config_nvdsanalytics.txt")
++    nvanalytics.set_property("config-file", os.path.join(HERE, "config_nvdsanalytics.txt"))
+ 
+     print("Creating tiler \n ")
+     tiler=Gst.ElementFactory.make("nvmultistreamtiler", "nvtiler")
+@@ -330,7 +331,7 @@ def main(args):
+     streammux.set_property('height', 1080)
+     streammux.set_property('batch-size', number_sources)
+     streammux.set_property('batched-push-timeout', 4000000)
+-    pgie.set_property('config-file-path', "dsnvanalytics_pgie_config.txt")
++    pgie.set_property('config-file-path', os.path.join(HERE, "dsnvanalytics_pgie_config.txt"))
+     pgie_batch_size=pgie.get_property("batch-size")
+     if(pgie_batch_size != number_sources):
+         print("WARNING: Overriding infer-config batch-size",pgie_batch_size," with number of sources ", number_sources," \n")
+@@ -345,7 +346,7 @@ def main(args):
+ 
+     #Set properties of tracker
+     config = configparser.ConfigParser()
+-    config.read('dsnvanalytics_tracker_config.txt')
++    config.read(os.path.join(HERE, 'dsnvanalytics_tracker_config.txt'))
+     config.sections()
+ 
+     for key in config['tracker']:
+diff --git a/apps/deepstream-opticalflow/deepstream-opticalflow.py b/apps/deepstream-opticalflow/deepstream-opticalflow.py
+index be7233f..3bacf9b 100644
+--- a/apps/deepstream-opticalflow/deepstream-opticalflow.py
++++ b/apps/deepstream-opticalflow/deepstream-opticalflow.py
+@@ -22,7 +22,8 @@ import os
+ from os import path
+ import sys
+ 
+-sys.path.append('../')
++HERE = os.path.dirname(__file__)
++sys.path.append(os.path.dirname(HERE))
+ import cv2
+ import numpy as np
+ 
+diff --git a/apps/deepstream-rtsp-in-rtsp-out/deepstream_test1_rtsp_in_rtsp_out.py b/apps/deepstream-rtsp-in-rtsp-out/deepstream_test1_rtsp_in_rtsp_out.py
+index a7de46d..88b3edc 100644
+--- a/apps/deepstream-rtsp-in-rtsp-out/deepstream_test1_rtsp_in_rtsp_out.py
++++ b/apps/deepstream-rtsp-in-rtsp-out/deepstream_test1_rtsp_in_rtsp_out.py
+@@ -16,8 +16,9 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ ################################################################################
+-import sys
+-sys.path.append("../")
++import sys, os
++HERE = os.path.dirname(__file__)
++sys.path.append(os.path.dirname(HERE))
+ import pyds
+ from common.bus_call import bus_call
+ from common.is_aarch_64 import is_aarch64
+@@ -311,9 +312,9 @@ def main(args):
+     streammux.set_property("batched-push-timeout", 4000000)
+ 
+     if gie=="nvinfer":
+-        pgie.set_property("config-file-path", "dstest1_pgie_config.txt")
++        pgie.set_property("config-file-path", os.path.join(HERE, "dstest1_pgie_config.txt"))
+     else:
+-        pgie.set_property("config-file-path", "dstest1_pgie_inferserver_config.txt")
++        pgie.set_property("config-file-path", os.path.join(HERE, "dstest1_pgie_inferserver_config.txt"))
+ 
+ 
+     pgie_batch_size = pgie.get_property("batch-size")
+diff --git a/apps/deepstream-segmentation/deepstream_segmentation.py b/apps/deepstream-segmentation/deepstream_segmentation.py
+index 27f1ea5..8440e5b 100644
+--- a/apps/deepstream-segmentation/deepstream_segmentation.py
++++ b/apps/deepstream-segmentation/deepstream_segmentation.py
+@@ -17,9 +17,9 @@
+ # limitations under the License.
+ ################################################################################
+ 
+-import sys
+-
+-sys.path.append('../')
++import sys, os
++HERE = os.path.dirname(__file__)
++sys.path.append(os.path.dirname(HERE))
+ import gi
+ import math
+ 
+diff --git a/apps/deepstream-ssd-parser/deepstream_ssd_parser.py b/apps/deepstream-ssd-parser/deepstream_ssd_parser.py
+index f231d30..1ef2ea2 100644
+--- a/apps/deepstream-ssd-parser/deepstream_ssd_parser.py
++++ b/apps/deepstream-ssd-parser/deepstream_ssd_parser.py
+@@ -19,9 +19,10 @@
+ 
+ """ Example of deepstream using SSD neural network and parsing SSD's outputs. """
+ 
+-import sys
++import sys, os
++HERE = os.path.dirname(__file__)
++sys.path.append(os.path.dirname(HERE))
+ import io
+-sys.path.append("../")
+ import gi
+ gi.require_version("Gst", "1.0")
+ from gi.repository import GObject, Gst
+@@ -122,7 +123,7 @@ def osd_sink_pad_buffer_probe(pad, info, u_data):
+         # allocated string. Use pyds.get_string() to get the string content.
+         id_dict = {
+             val: index
+-            for index, val in enumerate(get_label_names_from_file("labels.txt"))
++            for index, val in enumerate(get_label_names_from_file(os.path.join(HERE, "labels.txt")))
+         }
+         disp_string = "Frame Number={} Number of Objects={} Vehicle_count={} Person_count={}"
+         py_nvosd_text_params.display_text = disp_string.format(
+@@ -236,7 +237,7 @@ def pgie_src_pad_buffer_probe(pad, info, u_data):
+                                   MIN_BOX_WIDTH, MIN_BOX_HEIGHT)
+     nms_param = NmsParam(TOP_K, IOU_THRESHOLD)
+ 
+-    label_names = get_label_names_from_file("labels.txt")
++    label_names = get_label_names_from_file(os.path.join(HERE, "labels.txt"))
+ 
+     while l_frame is not None:
+         try:
+@@ -373,7 +374,7 @@ def main(args):
+     streammux.set_property("height", IMAGE_HEIGHT)
+     streammux.set_property("batch-size", 1)
+     streammux.set_property("batched-push-timeout", 4000000)
+-    pgie.set_property("config-file-path", "dstest_ssd_nopostprocess.txt")
++    pgie.set_property("config-file-path", os.path.join(HERE, "dstest_ssd_nopostprocess.txt"))
+ 
+     print("Adding elements to Pipeline \n")
+     pipeline.add(source)
+diff --git a/apps/deepstream-test1-rtsp-out/deepstream_test1_rtsp_out.py b/apps/deepstream-test1-rtsp-out/deepstream_test1_rtsp_out.py
+index ccd5b25..5d2657a 100644
+--- a/apps/deepstream-test1-rtsp-out/deepstream_test1_rtsp_out.py
++++ b/apps/deepstream-test1-rtsp-out/deepstream_test1_rtsp_out.py
+@@ -18,8 +18,8 @@
+ ################################################################################
+ 
+ import argparse
+-import sys
+-sys.path.append('../')
++HERE = os.path.dirname(__file__)
++sys.path.append(os.path.dirname(HERE))
+ 
+ import gi
+ gi.require_version('Gst', '1.0')
+@@ -222,7 +222,7 @@ def main(args):
+     streammux.set_property('batch-size', 1)
+     streammux.set_property('batched-push-timeout', 4000000)
+     
+-    pgie.set_property('config-file-path', "dstest1_pgie_config.txt")
++    pgie.set_property('config-file-path', os.path.join(HERE, "dstest1_pgie_config.txt"))
+     
+     print("Adding elements to Pipeline \n")
+     pipeline.add(source)
+diff --git a/apps/deepstream-test1-usbcam/deepstream_test_1_usb.py b/apps/deepstream-test1-usbcam/deepstream_test_1_usb.py
+index 39cf842..188dbd4 100644
+--- a/apps/deepstream-test1-usbcam/deepstream_test_1_usb.py
++++ b/apps/deepstream-test1-usbcam/deepstream_test_1_usb.py
+@@ -17,8 +17,9 @@
+ # limitations under the License.
+ ################################################################################
+ 
+-import sys
+-sys.path.append('../')
++import sys, os
++HERE = os.path.dirname(__file__)
++sys.path.append(os.path.dirname(HERE))
+ import gi
+ gi.require_version('Gst', '1.0')
+ from gi.repository import GObject, Gst
+@@ -212,7 +213,7 @@ def main(args):
+     streammux.set_property('height', 1080)
+     streammux.set_property('batch-size', 1)
+     streammux.set_property('batched-push-timeout', 4000000)
+-    pgie.set_property('config-file-path', "dstest1_pgie_config.txt")
++    pgie.set_property('config-file-path', os.path.join(HERE, "dstest1_pgie_config.txt"))
+     # Set sync = false to avoid late frame drops at the display-sink
+     sink.set_property('sync', False)
+ 
+diff --git a/apps/deepstream-test1/deepstream_test_1.py b/apps/deepstream-test1/deepstream_test_1.py
+index 67be84b..e0d28e6 100644
+--- a/apps/deepstream-test1/deepstream_test_1.py
++++ b/apps/deepstream-test1/deepstream_test_1.py
+@@ -17,8 +17,9 @@
+ # limitations under the License.
+ ################################################################################
+ 
+-import sys
+-sys.path.append('../')
++import sys, os
++HERE = os.path.dirname(__file__)
++sys.path.append(os.path.dirname(HERE))
+ import gi
+ gi.require_version('Gst', '1.0')
+ from gi.repository import GObject, Gst
+@@ -195,7 +196,7 @@ def main(args):
+     streammux.set_property('height', 1080)
+     streammux.set_property('batch-size', 1)
+     streammux.set_property('batched-push-timeout', 4000000)
+-    pgie.set_property('config-file-path', "dstest1_pgie_config.txt")
++    pgie.set_property('config-file-path', os.path.join(HERE, "dstest1_pgie_config.txt"))
+ 
+     print("Adding elements to Pipeline \n")
+     pipeline.add(source)
+diff --git a/apps/deepstream-test2/deepstream_test_2.py b/apps/deepstream-test2/deepstream_test_2.py
+index 91970fa..131155b 100644
+--- a/apps/deepstream-test2/deepstream_test_2.py
++++ b/apps/deepstream-test2/deepstream_test_2.py
+@@ -17,8 +17,9 @@
+ # limitations under the License.
+ ################################################################################
+ 
+-import sys
+-sys.path.append('../')
++import sys, os
++HERE = os.path.dirname(__file__)
++sys.path.append(os.path.dirname(HERE))
+ import platform
+ import configparser
+ 
+@@ -255,14 +256,14 @@ def main(args):
+     streammux.set_property('batched-push-timeout', 4000000)
+ 
+     #Set properties of pgie and sgie
+-    pgie.set_property('config-file-path', "dstest2_pgie_config.txt")
+-    sgie1.set_property('config-file-path', "dstest2_sgie1_config.txt")
+-    sgie2.set_property('config-file-path', "dstest2_sgie2_config.txt")
+-    sgie3.set_property('config-file-path', "dstest2_sgie3_config.txt")
++    pgie.set_property('config-file-path', os.path.join(HERE, "dstest2_pgie_config.txt"))
++    sgie1.set_property('config-file-path', os.path.join(HERE, "dstest2_sgie1_config.txt"))
++    sgie2.set_property('config-file-path', os.path.join(HERE, "dstest2_sgie2_config.txt"))
++    sgie3.set_property('config-file-path', os.path.join(HERE, "dstest2_sgie3_config.txt"))
+ 
+     #Set properties of tracker
+     config = configparser.ConfigParser()
+-    config.read('dstest2_tracker_config.txt')
++    config.read(os.path.join(HERE, 'dstest2_tracker_config.txt'))
+     config.sections()
+ 
+     for key in config['tracker']:
+diff --git a/apps/deepstream-test3/deepstream_test_3.py b/apps/deepstream-test3/deepstream_test_3.py
+index e5dd35d..c368ee2 100644
+--- a/apps/deepstream-test3/deepstream_test_3.py
++++ b/apps/deepstream-test3/deepstream_test_3.py
+@@ -17,8 +17,9 @@
+ # limitations under the License.
+ ################################################################################
+ 
+-import sys
+-sys.path.append('../')
++import sys, os
++HERE = os.path.dirname(__file__)
++sys.path.append(os.path.dirname(HERE))
+ import gi
+ import configparser
+ gi.require_version('Gst', '1.0')
+@@ -270,7 +271,7 @@ def main(args):
+     streammux.set_property('height', 1080)
+     streammux.set_property('batch-size', number_sources)
+     streammux.set_property('batched-push-timeout', 4000000)
+-    pgie.set_property('config-file-path', "dstest3_pgie_config.txt")
++    pgie.set_property('config-file-path', os.path.join(HERE, "dstest3_pgie_config.txt"))
+     pgie_batch_size=pgie.get_property("batch-size")
+     if(pgie_batch_size != number_sources):
+         print("WARNING: Overriding infer-config batch-size",pgie_batch_size," with number of sources ", number_sources," \n")
+diff --git a/apps/deepstream-test4/deepstream_test_4.py b/apps/deepstream-test4/deepstream_test_4.py
+index aa0b5a6..7f08b20 100644
+--- a/apps/deepstream-test4/deepstream_test_4.py
++++ b/apps/deepstream-test4/deepstream_test_4.py
+@@ -17,9 +17,9 @@
+ # limitations under the License.
+ ################################################################################
+ 
+-import sys
+-
+-sys.path.append('../')
++import sys, os
++HERE = os.path.dirname(__file__)
++sys.path.append(os.path.dirname(HERE))
+ import gi
+ 
+ gi.require_version('Gst', '1.0')
+@@ -48,8 +48,8 @@ cfg_file = None
+ topic = None
+ no_display = False
+ 
+-PGIE_CONFIG_FILE = "dstest4_pgie_config.txt"
+-MSCONV_CONFIG_FILE = "dstest4_msgconv_config.txt"
++PGIE_CONFIG_FILE = os.path.join(HERE, "dstest4_pgie_config.txt")
++MSCONV_CONFIG_FILE = os.phat.join(HERE, "dstest4_msgconv_config.txt")
+ 
+ pgie_classes_str = ["Vehicle", "TwoWheeler", "Person", "Roadsign"]
+ 
+diff --git a/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py b/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py
+index fbee687..faa5b0f 100644
+--- a/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py
++++ b/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py
+@@ -17,8 +17,9 @@
+ # limitations under the License.
+ ################################################################################
+ 
+-import sys
+-sys.path.append('../')
++import sys, os
++HERE = os.path.dirname(__file__)
++sys.path.append(os.path.dirname(HERE))
+ import gi
+ import configparser
+ gi.require_version('Gst', '1.0')
+@@ -47,12 +48,12 @@ TILED_OUTPUT_HEIGHT=720
+ GPU_ID = 0
+ MAX_NUM_SOURCES = 4
+ SINK_ELEMENT = "nveglglessink"
+-PGIE_CONFIG_FILE = "dstest_pgie_config.txt"
+-TRACKER_CONFIG_FILE = "dstest_tracker_config.txt"
++PGIE_CONFIG_FILE = os.path.join(HERE, "dstest_pgie_config.txt")
++TRACKER_CONFIG_FILE = os.path.join(HERE, "dstest_tracker_config.txt")
+ 
+-SGIE1_CONFIG_FILE = "dstest_sgie1_config.txt"
+-SGIE2_CONFIG_FILE = "dstest_sgie2_config.txt"
+-SGIE3_CONFIG_FILE = "dstest_sgie3_config.txt"
++SGIE1_CONFIG_FILE = os.path.join(HERE, "dstest_sgie1_config.txt")
++SGIE2_CONFIG_FILE = os.path.join(HERE, "dstest_sgie2_config.txt")
++SGIE3_CONFIG_FILE = os.path.join(HERE, "dstest_sgie3_config.txt")
+ 
+ CONFIG_GPU_ID = "gpu-id"
+ CONFIG_GROUP_TRACKER = "tracker"

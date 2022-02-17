@@ -1,0 +1,129 @@
+From d41999a9463a57f9ac48e182fe323e255c3d3f6d Mon Sep 17 00:00:00 2001
+From: Matt Madison <matt@madison.systems>
+Date: Thu, 17 Feb 2022 08:06:47 -0800
+Subject: [PATCH] Fixes for cross building
+
+Signed-off-by: Matt Madison <matt@madison.systems>
+---
+ bindings/CMakeLists.txt | 64 +++++++++++++----------------------------
+ 1 file changed, 20 insertions(+), 44 deletions(-)
+
+Index: git/bindings/CMakeLists.txt
+===================================================================
+--- git.orig/bindings/CMakeLists.txt
++++ git/bindings/CMakeLists.txt
+@@ -13,7 +13,8 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
++cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
++project(pyds DESCRIPTION "Python bindings for Deepstream")
+ 
+ # Setting values not set by user
+ function(check_variable_set variable_name default_value)
+@@ -23,9 +24,9 @@ function(check_variable_set variable_nam
+ endfunction()
+ 
+ check_variable_set(DS_VERSION 6.0)
+-check_variable_set(PYTHON_MAJOR_VERSION 3)
+-check_variable_set(PYTHON_MINOR_VERSION 6)
+-check_variable_set(PIP_PLATFORM linux_x86_64)
++find_package(Python MODULE REQUIRED COMPONENTS Development)
++check_variable_set(PYTHON_MAJOR_VERSION ${Python_VERSION_MAJOR})
++check_variable_set(PYTHON_MINOR_VERSION ${Python_VERSION_MINOR})
+ check_variable_set(DS_PATH "/opt/nvidia/deepstream/deepstream-${DS_VERSION}")
+ 
+ 
+@@ -39,21 +40,22 @@ set(PYTHON_MAJVERS_ALLOWED 3)
+ check_variable_allowed(PYTHON_MAJOR_VERSION PYTHON_MAJVERS_ALLOWED)
+ set(PYTHON_MINVERS_ALLOWED 6 8)
+ check_variable_allowed(PYTHON_MINOR_VERSION PYTHON_MINVERS_ALLOWED)
+-set(PIP_PLATFORM_ALLOWED linux_x86_64 linux_aarch64)
+-check_variable_allowed(PIP_PLATFORM PIP_PLATFORM_ALLOWED)
+ 
+ # Setting C++ values
+ set(CMAKE_CXX_STANDARD 17)
+ set(CMAKE_CXX_STANDARD_REQUIRED True)
+ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+-set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
+ 
+ # Setting python build versions
+-set(PYTHON_VERSION ${PYTHON_MAJOR_VERSION}.${PYTHON_MINOR_VERSION})
+-set(PIP_WHEEL pyds-1.1.0-py3-none-${PIP_PLATFORM}.whl)
++set(PYTHON_VERSION ${Python_VERSION})
++
++find_package(PkgConfig REQUIRED)
++pkg_check_modules(GLIB REQUIRED IMPORTED_TARGET glib-2.0)
++pkg_check_modules(GSTREAMER REQUIRED IMPORTED_TARGET gstreamer-1.0)
++list(TRANSFORM Python_INCLUDE_DIRS APPEND /pybind11 OUTPUT_VARIABLE PYBIND_INCLUDE_DIR_CANDIDATES)
++find_file(PYBIND_HEADER pybind11.h PATHS ${PYBIND_INCLUDE_DIR_CANDIDATES} REQUIRED)
++get_filename_component(PYBIND_INCLUDE_DIR ${PYBIND_HEADER} DIRECTORY)
+ 
+-# Describing pyds build
+-project(pyds DESCRIPTION "Python bindings for Deepstream")
+ add_compile_options(-Wall -Wextra -pedantic -O3)
+ 
+ include_directories(
+@@ -61,13 +63,7 @@ include_directories(
+         ${DS_PATH}/sources/includes/
+         include/bind
+         include/nvds
+-        ../3rdparty/pybind11/include/pybind11/
+-        ../3rdparty/pybind11/include/
+-        /usr/include/python${PYTHON_VERSION}
+-        /usr/include/gstreamer-1.0
+-        /usr/include/glib-2.0
+-        /usr/lib/aarch64-linux-gnu/glib-2.0/include/
+-        /usr/lib/x86_64-linux-gnu/glib-2.0/include
++	${PYBIND_INCLUDE_DIR}
+         )
+ 
+ add_library(pyds SHARED src/pyds.cpp src/utils.cpp src/bindanalyticsmeta.cpp
+@@ -78,38 +74,18 @@ add_library(pyds SHARED src/pyds.cpp src
+ 
+ set_target_properties(pyds PROPERTIES PREFIX "")
+ set_target_properties(pyds PROPERTIES OUTPUT_NAME "pyds")
++set_target_properties(pyds PROPERTIES INSTALL_RPATH ${DS_PATH}/lib)
+ 
+-set(PYTHON_LIB python${PYTHON_VERSION})
+-if(${PYTHON_MINOR_VERSION} EQUAL 6)
+-        set(PYTHON_LIB python${PYTHON_VERSION}m)
+-endif()
+-
+-target_link_libraries(pyds pthread dl ${PYTHON_LIB} gstreamer-1.0 glib-2.0)
+-
++target_link_libraries(pyds pthread dl Python::Python PkgConfig::GSTREAMER PkgConfig::GLIB)
++target_link_options(pyds PRIVATE -L=${DS_PATH}/lib)
++target_link_options(pyds PUBLIC "-Wl,--no-undefined")
+ # Checking deepstream shared libraries and linking them
+ function(add_ds_lib libname)
+-        set(libpath "${DS_PATH}/lib/lib${libname}.so")
+-        if(NOT EXISTS ${libpath})
+-                message(FATAL_ERROR "Missing lib${libname}.so at ${libpath}\n"
+-                        "please make sure that deepstream is installed")
+-        endif()
+-        add_library(${libname} SHARED IMPORTED)
+-        set_target_properties(${libname} PROPERTIES
+-                IMPORTED_LOCATION ${libpath})
+-        target_link_libraries(pyds ${libname})
++  find_library(${libname} NAMES ${libname} PATHS ${DS_PATH}/lib REQUIRED NO_DEFAULT_PATH)
++  target_link_libraries(pyds ${libname})
+ endfunction()
+ 
+-foreach(nvds_lib nvds_osd nvds_meta nvds_infer nvdsgst_meta nvbufsurface nvbufsurftransform)
++foreach(nvds_lib nvds_osd nvds_meta nvds_infer nvdsgst_meta)
+         add_ds_lib(${nvds_lib})
+ endforeach()
+-
+-# Pip wheel build
+-add_custom_command(
+-        OUTPUT ${PIP_WHEEL}
+-        DEPENDS pyds
+-        COMMAND python${PYTHON_VERSION} ${CMAKE_SOURCE_DIR}/packaging/setup.py bdist_wheel --plat-name ${PIP_PLATFORM}
+-        COMMAND mv -f dist/${PIP_WHEEL} ${PIP_WHEEL}
+-        COMMAND rmdir dist
+-)
+-
+-add_custom_target(pip_wheel ALL DEPENDS ${PIP_WHEEL})
++target_link_libraries(pyds nvbufsurface nvbufsurftransform)
