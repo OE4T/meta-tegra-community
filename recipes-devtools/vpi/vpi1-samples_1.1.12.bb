@@ -16,7 +16,7 @@ SRC_URI += "file://CMakeLists.txt;subdir=vpi1-samples/opt/nvidia/vpi1/samples"
 VPI_PREFIX = "/opt/nvidia/vpi1"
 EXTRA_OECMAKE = "-DCMAKE_INSTALL_PREFIX:PATH=${VPI_PREFIX}"
 
-PACKAGECONFIG ??= "${@bb.utils.contains('LICENSE_FLAGS_WHITELIST', 'commercial', 'video', bb.utils.contains('LICENSE_FLAGS_WHITELIST', 'commercial_ffmpeg', 'video', '', d), d)}"
+PACKAGECONFIG ??= "${@bb.utils.contains('LICENSE_FLAGS_ACCEPTED', 'commercial', 'video', bb.utils.contains('LICENSE_FLAGS_ACCEPTED', 'commercial_ffmpeg', 'video', '', d), d)}"
 PACKAGECONFIG[video] = "-DBUILD_VIDEO_SAMPLES=ON,-DBUILD_VIDEO_SAMPLES=OFF,"
 
 S = "${WORKDIR}/vpi1-samples/opt/nvidia/vpi1/samples"

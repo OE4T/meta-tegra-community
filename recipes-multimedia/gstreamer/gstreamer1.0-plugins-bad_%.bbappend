@@ -1,6 +1,6 @@
 def faad2_license_ok(d):
     if bb.data.inherits_class('license', d):
-        license_allowedlist = (d.getVar('LICENSE_FLAGS_WHITELIST') or '').split()
+        license_allowedlist = (d.getVar('LICENSE_FLAGS_ACCEPTED') or '').split()
         return 'commercial' in license_allowedlist or 'commercial_faad2' in license_allowedlist
     return True
 
