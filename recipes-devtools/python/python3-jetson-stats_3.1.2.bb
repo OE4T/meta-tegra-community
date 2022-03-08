@@ -1,7 +1,7 @@
 SUMMARY = "Interactive system-monitor process viewer for NVIDIA Jetson Nano, AGX Xavier, TX2, TX1"
 HOMEPAGE = "https://pypi.org/project/jetson-stats/"
 SECTION = "devel/python"
-LICENSE = "AGPL-3.0"
+LICENSE = "AGPL-3.0-only"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=8763b57f0092c337eb12c354870a324a"
 
 SRC_URI[sha256sum] = "afab3db7da554ad14df7b7eee4d0bc3338c827625c690dda0ac4ddd6051d315a"
