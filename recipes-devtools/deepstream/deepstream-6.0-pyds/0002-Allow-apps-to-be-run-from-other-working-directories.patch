@@ -1,9 +1,8 @@
-From 5bfe057191189cc5eace310bea48289dd06db09c Mon Sep 17 00:00:00 2001
+From 13e8b521c506587fb8fb6f4317107c3fc47049f7 Mon Sep 17 00:00:00 2001
 From: Matt Madison <matt@madison.systems>
-Date: Fri, 18 Feb 2022 05:05:34 -0800
-Subject: [PATCH] Allow apps to be run from other working directories
+Date: Tue, 15 Mar 2022 04:50:42 -0700
+Subject: [PATCH 2/2] Allow apps to be run from other working directories
 
-Signed-off-by: Matt Madison <matt@madison.systems>
 ---
  apps/common/is_aarch_64.py                        |  4 ----
  apps/common/utils.py                              |  2 --
@@ -52,7 +51,7 @@ index f0e9e17..de91166 100644
  def long_to_uint64(l):
      value = ctypes.c_uint64(l & 0xffffffffffffffff).value
 diff --git a/apps/deepstream-imagedata-multistream-redaction/deepstream_imagedata-multistream_redaction.py b/apps/deepstream-imagedata-multistream-redaction/deepstream_imagedata-multistream_redaction.py
-index e6f52bd..b44c3c5 100644
+index e6f52bd..ceda023 100644
 --- a/apps/deepstream-imagedata-multistream-redaction/deepstream_imagedata-multistream_redaction.py
 +++ b/apps/deepstream-imagedata-multistream-redaction/deepstream_imagedata-multistream_redaction.py
 @@ -18,9 +18,9 @@
@@ -63,7 +62,7 @@ index e6f52bd..b44c3c5 100644
 -
 -sys.path.append('../')
 +import sys, os
-+HERE = os.path.dirname(__file__)
++HERE = os.path.normpath(os.path.dirname(__file__))
 +sys.path.append(os.path.dirname(HERE))
  import gi
  import configparser
@@ -78,7 +77,7 @@ index e6f52bd..b44c3c5 100644
      if (pgie_batch_size != number_sources):
          print("WARNING: Overriding infer-config batch-size", pgie_batch_size, " with number of sources ",
 diff --git a/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py b/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py
-index 24f90f5..b3a5934 100644
+index 24f90f5..22391a3 100755
 --- a/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py
 +++ b/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py
 @@ -17,9 +17,9 @@
@@ -89,7 +88,7 @@ index 24f90f5..b3a5934 100644
 -
 -sys.path.append('../')
 +import sys, os
-+HERE = os.path.dirname(__file__)
++HERE = os.path.normpath(os.path.dirname(__file__))
 +sys.path.append(os.path.dirname(HERE))
  import gi
  import configparser
@@ -104,7 +103,7 @@ index 24f90f5..b3a5934 100644
      if (pgie_batch_size != number_sources):
          print("WARNING: Overriding infer-config batch-size", pgie_batch_size, " with number of sources ",
 diff --git a/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py b/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py
-index 8270de3..9982098 100644
+index 8270de3..0d4eea2 100755
 --- a/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py
 +++ b/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py
 @@ -17,8 +17,9 @@
@@ -114,7 +113,7 @@ index 8270de3..9982098 100644
 -import sys
 -sys.path.append('../')
 +import sys, os
-+HERE = os.path.dirname(__file__)
++HERE = os.path.normpath(os.path.dirname(__file__))
 +sys.path.append(os.path.dirname(HERE))
  import gi
  import configparser
@@ -147,7 +146,7 @@ index 8270de3..9982098 100644
  
      for key in config['tracker']:
 diff --git a/apps/deepstream-opticalflow/deepstream-opticalflow.py b/apps/deepstream-opticalflow/deepstream-opticalflow.py
-index be7233f..3bacf9b 100644
+index be7233f..5b8dee5 100755
 --- a/apps/deepstream-opticalflow/deepstream-opticalflow.py
 +++ b/apps/deepstream-opticalflow/deepstream-opticalflow.py
 @@ -22,7 +22,8 @@ import os
@@ -155,13 +154,13 @@ index be7233f..3bacf9b 100644
  import sys
  
 -sys.path.append('../')
-+HERE = os.path.dirname(__file__)
++HERE = os.path.normpath(os.path.dirname(__file__))
 +sys.path.append(os.path.dirname(HERE))
  import cv2
  import numpy as np
  
 diff --git a/apps/deepstream-rtsp-in-rtsp-out/deepstream_test1_rtsp_in_rtsp_out.py b/apps/deepstream-rtsp-in-rtsp-out/deepstream_test1_rtsp_in_rtsp_out.py
-index a7de46d..88b3edc 100644
+index a7de46d..d1b684b 100755
 --- a/apps/deepstream-rtsp-in-rtsp-out/deepstream_test1_rtsp_in_rtsp_out.py
 +++ b/apps/deepstream-rtsp-in-rtsp-out/deepstream_test1_rtsp_in_rtsp_out.py
 @@ -16,8 +16,9 @@
@@ -171,7 +170,7 @@ index a7de46d..88b3edc 100644
 -import sys
 -sys.path.append("../")
 +import sys, os
-+HERE = os.path.dirname(__file__)
++HERE = os.path.normpath(os.path.dirname(__file__))
 +sys.path.append(os.path.dirname(HERE))
  import pyds
  from common.bus_call import bus_call
@@ -189,7 +188,7 @@ index a7de46d..88b3edc 100644
  
      pgie_batch_size = pgie.get_property("batch-size")
 diff --git a/apps/deepstream-segmentation/deepstream_segmentation.py b/apps/deepstream-segmentation/deepstream_segmentation.py
-index 27f1ea5..8440e5b 100644
+index 27f1ea5..8c1aff7 100755
 --- a/apps/deepstream-segmentation/deepstream_segmentation.py
 +++ b/apps/deepstream-segmentation/deepstream_segmentation.py
 @@ -17,9 +17,9 @@
@@ -200,13 +199,13 @@ index 27f1ea5..8440e5b 100644
 -
 -sys.path.append('../')
 +import sys, os
-+HERE = os.path.dirname(__file__)
++HERE = os.path.normpath(os.path.dirname(__file__))
 +sys.path.append(os.path.dirname(HERE))
  import gi
  import math
  
 diff --git a/apps/deepstream-ssd-parser/deepstream_ssd_parser.py b/apps/deepstream-ssd-parser/deepstream_ssd_parser.py
-index f231d30..1ef2ea2 100644
+index f231d30..976840f 100755
 --- a/apps/deepstream-ssd-parser/deepstream_ssd_parser.py
 +++ b/apps/deepstream-ssd-parser/deepstream_ssd_parser.py
 @@ -19,9 +19,10 @@
@@ -215,7 +214,7 @@ index f231d30..1ef2ea2 100644
  
 -import sys
 +import sys, os
-+HERE = os.path.dirname(__file__)
++HERE = os.path.normpath(os.path.dirname(__file__))
 +sys.path.append(os.path.dirname(HERE))
  import io
 -sys.path.append("../")
@@ -250,7 +249,7 @@ index f231d30..1ef2ea2 100644
      print("Adding elements to Pipeline \n")
      pipeline.add(source)
 diff --git a/apps/deepstream-test1-rtsp-out/deepstream_test1_rtsp_out.py b/apps/deepstream-test1-rtsp-out/deepstream_test1_rtsp_out.py
-index ccd5b25..5d2657a 100644
+index ccd5b25..4f7c86f 100755
 --- a/apps/deepstream-test1-rtsp-out/deepstream_test1_rtsp_out.py
 +++ b/apps/deepstream-test1-rtsp-out/deepstream_test1_rtsp_out.py
 @@ -18,8 +18,8 @@
@@ -259,7 +258,7 @@ index ccd5b25..5d2657a 100644
  import argparse
 -import sys
 -sys.path.append('../')
-+HERE = os.path.dirname(__file__)
++HERE = os.path.normpath(os.path.dirname(__file__))
 +sys.path.append(os.path.dirname(HERE))
  
  import gi
@@ -274,7 +273,7 @@ index ccd5b25..5d2657a 100644
      print("Adding elements to Pipeline \n")
      pipeline.add(source)
 diff --git a/apps/deepstream-test1-usbcam/deepstream_test_1_usb.py b/apps/deepstream-test1-usbcam/deepstream_test_1_usb.py
-index 39cf842..188dbd4 100644
+index 39cf842..57bad10 100755
 --- a/apps/deepstream-test1-usbcam/deepstream_test_1_usb.py
 +++ b/apps/deepstream-test1-usbcam/deepstream_test_1_usb.py
 @@ -17,8 +17,9 @@
@@ -284,7 +283,7 @@ index 39cf842..188dbd4 100644
 -import sys
 -sys.path.append('../')
 +import sys, os
-+HERE = os.path.dirname(__file__)
++HERE = os.path.normpath(os.path.dirname(__file__))
 +sys.path.append(os.path.dirname(HERE))
  import gi
  gi.require_version('Gst', '1.0')
@@ -299,7 +298,7 @@ index 39cf842..188dbd4 100644
      sink.set_property('sync', False)
  
 diff --git a/apps/deepstream-test1/deepstream_test_1.py b/apps/deepstream-test1/deepstream_test_1.py
-index 67be84b..e0d28e6 100644
+index 67be84b..19d3453 100755
 --- a/apps/deepstream-test1/deepstream_test_1.py
 +++ b/apps/deepstream-test1/deepstream_test_1.py
 @@ -17,8 +17,9 @@
@@ -309,7 +308,7 @@ index 67be84b..e0d28e6 100644
 -import sys
 -sys.path.append('../')
 +import sys, os
-+HERE = os.path.dirname(__file__)
++HERE = os.path.normpath(os.path.dirname(__file__))
 +sys.path.append(os.path.dirname(HERE))
  import gi
  gi.require_version('Gst', '1.0')
@@ -324,7 +323,7 @@ index 67be84b..e0d28e6 100644
      print("Adding elements to Pipeline \n")
      pipeline.add(source)
 diff --git a/apps/deepstream-test2/deepstream_test_2.py b/apps/deepstream-test2/deepstream_test_2.py
-index 91970fa..131155b 100644
+index 91970fa..a1b6408 100755
 --- a/apps/deepstream-test2/deepstream_test_2.py
 +++ b/apps/deepstream-test2/deepstream_test_2.py
 @@ -17,8 +17,9 @@
@@ -334,7 +333,7 @@ index 91970fa..131155b 100644
 -import sys
 -sys.path.append('../')
 +import sys, os
-+HERE = os.path.dirname(__file__)
++HERE = os.path.normpath(os.path.dirname(__file__))
 +sys.path.append(os.path.dirname(HERE))
  import platform
  import configparser
@@ -360,7 +359,7 @@ index 91970fa..131155b 100644
  
      for key in config['tracker']:
 diff --git a/apps/deepstream-test3/deepstream_test_3.py b/apps/deepstream-test3/deepstream_test_3.py
-index e5dd35d..c368ee2 100644
+index 3e4b298..0b10455 100755
 --- a/apps/deepstream-test3/deepstream_test_3.py
 +++ b/apps/deepstream-test3/deepstream_test_3.py
 @@ -17,8 +17,9 @@
@@ -370,12 +369,12 @@ index e5dd35d..c368ee2 100644
 -import sys
 -sys.path.append('../')
 +import sys, os
-+HERE = os.path.dirname(__file__)
++HERE = os.path.normpath(os.path.dirname(__file__))
 +sys.path.append(os.path.dirname(HERE))
  import gi
  import configparser
  gi.require_version('Gst', '1.0')
-@@ -270,7 +271,7 @@ def main(args):
+@@ -274,7 +275,7 @@ def main(args):
      streammux.set_property('height', 1080)
      streammux.set_property('batch-size', number_sources)
      streammux.set_property('batched-push-timeout', 4000000)
@@ -385,7 +384,7 @@ index e5dd35d..c368ee2 100644
      if(pgie_batch_size != number_sources):
          print("WARNING: Overriding infer-config batch-size",pgie_batch_size," with number of sources ", number_sources," \n")
 diff --git a/apps/deepstream-test4/deepstream_test_4.py b/apps/deepstream-test4/deepstream_test_4.py
-index aa0b5a6..7f08b20 100644
+index aa0b5a6..fbad829 100755
 --- a/apps/deepstream-test4/deepstream_test_4.py
 +++ b/apps/deepstream-test4/deepstream_test_4.py
 @@ -17,9 +17,9 @@
@@ -396,7 +395,7 @@ index aa0b5a6..7f08b20 100644
 -
 -sys.path.append('../')
 +import sys, os
-+HERE = os.path.dirname(__file__)
++HERE = os.path.normpath(os.path.dirname(__file__))
 +sys.path.append(os.path.dirname(HERE))
  import gi
  
@@ -413,7 +412,7 @@ index aa0b5a6..7f08b20 100644
  pgie_classes_str = ["Vehicle", "TwoWheeler", "Person", "Roadsign"]
  
 diff --git a/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py b/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py
-index fbee687..faa5b0f 100644
+index fbee687..4664c88 100644
 --- a/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py
 +++ b/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py
 @@ -17,8 +17,9 @@
@@ -423,7 +422,7 @@ index fbee687..faa5b0f 100644
 -import sys
 -sys.path.append('../')
 +import sys, os
-+HERE = os.path.dirname(__file__)
++HERE = os.path.normpath(os.path.dirname(__file__))
 +sys.path.append(os.path.dirname(HERE))
  import gi
  import configparser
@@ -446,3 +445,6 @@ index fbee687..faa5b0f 100644
  
  CONFIG_GPU_ID = "gpu-id"
  CONFIG_GROUP_TRACKER = "tracker"
+-- 
+2.32.0
+
