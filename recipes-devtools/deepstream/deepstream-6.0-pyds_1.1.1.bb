@@ -9,10 +9,10 @@ SRC_URI = "git://${SRC_REPO};branch=${SRCBRANCH} \
            file://0001-Fixes-for-cross-building.patch \
            file://0002-Allow-apps-to-be-run-from-other-working-directories.patch \
            "
-# Two commits after the v1.1.0 tag
-SRCREV = "20c6b13671e81cf73ca98fa795f84cab7dd6fc67"
+# v1.1.1 tag
+SRCREV = "9bffad1aea802f6be4419712c0a50f05d6a2d490"
 
-PV .= "+git${SRCPV}"
+#PV .= "+git${SRCPV}"
 
 COMPATIBLE_MACHINE = "(tegra)"
 
