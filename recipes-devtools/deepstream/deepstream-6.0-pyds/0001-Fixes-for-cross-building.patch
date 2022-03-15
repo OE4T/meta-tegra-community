@@ -1,17 +1,17 @@
-From d41999a9463a57f9ac48e182fe323e255c3d3f6d Mon Sep 17 00:00:00 2001
+From f81eb26e2d7e8f9da4da30fc5b8f3cb4cf634826 Mon Sep 17 00:00:00 2001
 From: Matt Madison <matt@madison.systems>
-Date: Thu, 17 Feb 2022 08:06:47 -0800
-Subject: [PATCH] Fixes for cross building
+Date: Tue, 15 Mar 2022 04:49:23 -0700
+Subject: [PATCH 1/2] Fixes for cross-building
 
-Signed-off-by: Matt Madison <matt@madison.systems>
 ---
  bindings/CMakeLists.txt | 64 +++++++++++++----------------------------
  1 file changed, 20 insertions(+), 44 deletions(-)
 
-Index: git/bindings/CMakeLists.txt
-===================================================================
---- git.orig/bindings/CMakeLists.txt
-+++ git/bindings/CMakeLists.txt
+diff --git a/bindings/CMakeLists.txt b/bindings/CMakeLists.txt
+index 58c3865..7008bf0 100644
+--- a/bindings/CMakeLists.txt
++++ b/bindings/CMakeLists.txt
+>>>>>>> 682a857 (deepstream-6.0-pyds: update to 1.1.1)
 @@ -13,7 +13,8 @@
  # See the License for the specific language governing permissions and
  # limitations under the License.
@@ -50,7 +50,7 @@ Index: git/bindings/CMakeLists.txt
  
  # Setting python build versions
 -set(PYTHON_VERSION ${PYTHON_MAJOR_VERSION}.${PYTHON_MINOR_VERSION})
--set(PIP_WHEEL pyds-1.1.0-py3-none-${PIP_PLATFORM}.whl)
+-set(PIP_WHEEL pyds-1.1.1-py3-none-${PIP_PLATFORM}.whl)
 +set(PYTHON_VERSION ${Python_VERSION})
 +
 +find_package(PkgConfig REQUIRED)
@@ -127,3 +127,41 @@ Index: git/bindings/CMakeLists.txt
 -
 -add_custom_target(pip_wheel ALL DEPENDS ${PIP_WHEEL})
 +target_link_libraries(pyds nvbufsurface nvbufsurftransform)
+<<<<<<< HEAD
+=======
+diff --git a/bindings/include/pyds.hpp b/bindings/include/pyds.hpp
+index 45b1052..c605a50 100644
+--- a/bindings/include/pyds.hpp
++++ b/bindings/include/pyds.hpp
+@@ -19,7 +19,7 @@
+ 
+ #include <memory>
+ #include <optional>
+-#include <pybind11.h>
++#include <pybind11/pybind11.h>
+ #include "pybind11/pybind11.h"
+ #include "pybind11/cast.h"
+ #include "pybind11/pytypes.h"
+@@ -52,4 +52,4 @@ namespace pydeepstream {
+     // rewritting ""_a operator from pybind11 namespace and putting it into
+     // pydeepstream namespace
+     py::arg operator ""_a(const char *str, size_t len);
+-}
+\ No newline at end of file
++}
+diff --git a/bindings/include/utils.hpp b/bindings/include/utils.hpp
+index d98b5c9..5cbe367 100644
+--- a/bindings/include/utils.hpp
++++ b/bindings/include/utils.hpp
+@@ -32,7 +32,7 @@
+ #include <memory>
+ #include <optional>
+ #include <pybind11/cast.h>
+-#include <pybind11.h>
++#include <pybind11/pybind11.h>
+ #include "../docstrings/pydocumentation.h"
+ 
+ namespace py = pybind11;
+-- 
+2.32.0
+
