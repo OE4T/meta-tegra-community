@@ -16,4 +16,4 @@ do_install() {
 }
 
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"
-RDEPENDS:${PN} = "tensorrt-samples tensorrt-samples-trtexec tegra-tools-jetson-clocks wget bash"
+RDEPENDS:${PN} = "tensorrt-samples tensorrt-trtexec tegra-tools-jetson-clocks wget bash"
