@@ -10,7 +10,7 @@
 # speed things up.
 
 TEGRACHIPID="$(printf "0x%02x" $(cat /sys/module/tegra_fuse/parameters/tegra_chip_id))"
-SAMPLEROOT="/opt/nvidia/vpi1"
+SAMPLEROOT="/opt/nvidia/vpi2"
 PATH="$SAMPLEROOT/bin:$PATH"
 SAMPLEASSETS="$SAMPLEROOT/assets"
 SKIPCODE=97
@@ -30,7 +30,7 @@ run_stereo_disparity() {
         return $SKIPCODE
     fi
     echo "Running 02_stereo_disparity - Backend is $1"
-    vpi_sample_02_stereo_disparity "$1" "$SAMPLEASSETS/chair_stereo_left.png" "$SAMPLEASSETS/chair_stereo_right.png"  
+    vpi_sample_02_stereo_disparity "$1" "$SAMPLEASSETS/chair_stereo_left.png" "$SAMPLEASSETS/chair_stereo_right.png"
 }
 
 run_harris_corners() {
@@ -76,7 +76,7 @@ run_klt_tracker() {
 run_fft() {
     echo "Running 07_fft - Backend is $1"
     vpi_sample_07_fft "$1" "$SAMPLEASSETS/kodim08.png"
- 
+
 }
 
 run_tnr() {
