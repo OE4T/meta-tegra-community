@@ -147,6 +147,9 @@ do_install () {
 	    ln -s ../lib$libname.so.1.1 ${D}${libdir}/openssl-1.1/lib$libname.so
 	    mv ${D}${libdir}/lib$libname.a ${D}${libdir}/openssl-1.1/
 	done
+	for binname in openssl c_rehash; do
+	    mv ${D}${bindir}/$binname ${D}${bindir}/$binname-1.1
+	done
 }
 
 do_install:append:class-native () {
