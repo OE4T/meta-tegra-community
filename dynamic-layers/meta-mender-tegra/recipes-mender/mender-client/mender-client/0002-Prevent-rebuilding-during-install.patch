@@ -1,0 +1,18 @@
+Index: git/src/github.com/mendersoftware/mender/Makefile
+===================================================================
+--- git.orig/src/github.com/mendersoftware/mender/Makefile
++++ git/src/github.com/mendersoftware/mender/Makefile
+@@ -74,10 +74,10 @@ MODULES_ARTIFACT_GENERATORS = \
+ 	support/modules-artifact-gen/directory-artifact-gen \
+ 	support/modules-artifact-gen/single-file-artifact-gen
+ 
+-build:
+-	$(GO) build $(GO_LDFLAGS) $(BUILDV) $(BUILDTAGS)
++build: mender
+ 
+-mender: build
++mender:
++	$(GO) build $(GO_LDFLAGS) $(BUILDV) $(BUILDTAGS)
+ 
+ install: install-bin \
+ 	install-conf \
