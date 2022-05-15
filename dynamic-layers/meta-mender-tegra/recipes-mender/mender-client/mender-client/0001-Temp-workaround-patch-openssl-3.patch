@@ -5,7 +5,6 @@ Subject: [PATCH] Fix char types
 
 ---
  .../github.com/mendersoftware/openssl/fips.go | 39 -------------------
- .../mendersoftware/openssl/hostname.go        |  4 +-
  2 files changed, 2 insertions(+), 41 deletions(-)
  delete mode 100644 vendor/github.com/mendersoftware/openssl/fips.go
 
@@ -54,28 +53,6 @@ index f65e14d..0000000
 -	}
 -	return nil
 -}
-diff --git a/src/github.com/mendersoftware/mender/vendor/github.com/mendersoftware/openssl/hostname.go b/src/github.com/mendersoftware/mender/vendor/github.com/mendersoftware/openssl/hostname.go
-index 2263875..e72a63b 100644
---- a/src/github.com/mendersoftware/mender/vendor/github.com/mendersoftware/openssl/hostname.go
-+++ b/src/github.com/mendersoftware/mender/vendor/github.com/mendersoftware/openssl/hostname.go
-@@ -60,7 +60,7 @@ func (c *Certificate) CheckHost(host string, flags CheckFlags) error {
- 	chost := unsafe.Pointer(C.CString(host))
- 	defer C.free(chost)
- 
--	rv := C.X509_check_host(c.x, (*C.uchar)(chost), C.size_t(len(host)),
-+	rv := C.X509_check_host(c.x, (*C.char)(chost), C.size_t(len(host)),
- 		C.uint(flags), nil)
- 	runtime.KeepAlive(c)
- 	if rv > 0 {
-@@ -80,7 +80,7 @@ func (c *Certificate) CheckHost(host string, flags CheckFlags) error {
- func (c *Certificate) CheckEmail(email string, flags CheckFlags) error {
- 	cemail := unsafe.Pointer(C.CString(email))
- 	defer C.free(cemail)
--	rv := C.X509_check_email(c.x, (*C.uchar)(cemail), C.size_t(len(email)),
-+	rv := C.X509_check_email(c.x, (*C.char)(cemail), C.size_t(len(email)),
- 		C.uint(flags))
- 	runtime.KeepAlive(c)
- 	if rv > 0 {
 -- 
 2.32.0
 
