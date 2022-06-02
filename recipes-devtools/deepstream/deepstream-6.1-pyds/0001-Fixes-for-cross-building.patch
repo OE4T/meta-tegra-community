@@ -1,16 +1,18 @@
-From f81eb26e2d7e8f9da4da30fc5b8f3cb4cf634826 Mon Sep 17 00:00:00 2001
-From: Matt Madison <matt@madison.systems>
-Date: Tue, 15 Mar 2022 04:49:23 -0700
+From f37fdaf0b8b8a0b404ec0af379fee87eeb874392 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ilies.chergui@gmail.com>
+Date: Fri, 3 Jun 2022 00:01:57 +0100
 Subject: [PATCH 1/2] Fixes for cross-building
 
+Signed-off-by: Matt Madison <matt@madison.systems>
+Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 ---
- bindings/CMakeLists.txt    | 68 +++++++++++---------------------------
+ bindings/CMakeLists.txt    | 67 ++++++++++++--------------------------
  bindings/include/pyds.hpp  |  4 +--
  bindings/include/utils.hpp |  2 +-
- 3 files changed, 23 insertions(+), 51 deletions(-)
+ 3 files changed, 23 insertions(+), 50 deletions(-)
 
 diff --git a/bindings/CMakeLists.txt b/bindings/CMakeLists.txt
-index 58c3865..7008bf0 100644
+index 089cc22..f49e51a 100644
 --- a/bindings/CMakeLists.txt
 +++ b/bindings/CMakeLists.txt
 @@ -13,7 +13,8 @@
@@ -26,9 +28,9 @@ index 58c3865..7008bf0 100644
 @@ -23,9 +24,9 @@ function(check_variable_set variable_name default_value)
  endfunction()
  
- check_variable_set(DS_VERSION 6.0)
+ check_variable_set(DS_VERSION 6.1)
 -check_variable_set(PYTHON_MAJOR_VERSION 3)
--check_variable_set(PYTHON_MINOR_VERSION 6)
+-check_variable_set(PYTHON_MINOR_VERSION 8)
 -check_variable_set(PIP_PLATFORM linux_x86_64)
 +find_package(Python MODULE REQUIRED COMPONENTS Development)
 +check_variable_set(PYTHON_MAJOR_VERSION ${Python_VERSION_MAJOR})
@@ -53,7 +55,7 @@ index 58c3865..7008bf0 100644
  
  # Setting python build versions
 -set(PYTHON_VERSION ${PYTHON_MAJOR_VERSION}.${PYTHON_MINOR_VERSION})
--set(PIP_WHEEL pyds-1.1.1-py3-none-${PIP_PLATFORM}.whl)
+-set(PIP_WHEEL pyds-1.1.2-py3-none-${PIP_PLATFORM}.whl)
 +set(PYTHON_VERSION ${Python_VERSION})
 +
 +find_package(PkgConfig REQUIRED)
@@ -77,11 +79,11 @@ index 58c3865..7008bf0 100644
 -        /usr/include/glib-2.0
 -        /usr/lib/aarch64-linux-gnu/glib-2.0/include/
 -        /usr/lib/x86_64-linux-gnu/glib-2.0/include
-+	${pybind11_INCLUDE_DIRS}
++        ${pybind11_INCLUDE_DIRS}
          )
  
  add_library(pyds SHARED src/pyds.cpp src/utils.cpp src/bindanalyticsmeta.cpp
-@@ -78,38 +70,18 @@ add_library(pyds SHARED src/pyds.cpp src/utils.cpp src/bindanalyticsmeta.cpp
+@@ -78,38 +70,19 @@ add_library(pyds SHARED src/pyds.cpp src/utils.cpp src/bindanalyticsmeta.cpp
  
  set_target_properties(pyds PROPERTIES PREFIX "")
  set_target_properties(pyds PROPERTIES OUTPUT_NAME "pyds")
@@ -116,7 +118,7 @@ index 58c3865..7008bf0 100644
 +foreach(nvds_lib nvds_osd nvds_meta nvds_infer nvdsgst_meta)
          add_ds_lib(${nvds_lib})
  endforeach()
--
+ 
 -# Pip wheel build
 -add_custom_command(
 -        OUTPUT ${PIP_WHEEL}
@@ -149,12 +151,12 @@ index 45b1052..c605a50 100644
 \ No newline at end of file
 +}
 diff --git a/bindings/include/utils.hpp b/bindings/include/utils.hpp
-index d98b5c9..5cbe367 100644
+index ad6d308..c613f80 100644
 --- a/bindings/include/utils.hpp
 +++ b/bindings/include/utils.hpp
-@@ -32,7 +32,7 @@
- #include <memory>
+@@ -33,7 +33,7 @@
  #include <optional>
+ #include <mutex>
  #include <pybind11/cast.h>
 -#include <pybind11.h>
 +#include <pybind11/pybind11.h>

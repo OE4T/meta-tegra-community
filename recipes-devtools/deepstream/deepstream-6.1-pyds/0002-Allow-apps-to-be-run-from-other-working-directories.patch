@@ -1,8 +1,10 @@
-From 13e8b521c506587fb8fb6f4317107c3fc47049f7 Mon Sep 17 00:00:00 2001
-From: Matt Madison <matt@madison.systems>
-Date: Tue, 15 Mar 2022 04:50:42 -0700
+From cd19e251679a8453228fc5c8fd1bd47cff431873 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ilies.chergui@gmail.com>
+Date: Fri, 3 Jun 2022 00:29:53 +0100
 Subject: [PATCH 2/2] Allow apps to be run from other working directories
 
+Signed-off-by: Matt Madison <matt@madison.systems>
+Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 ---
  apps/common/is_aarch_64.py                        |  4 ----
  apps/common/utils.py                              |  2 --
@@ -51,7 +53,7 @@ index f0e9e17..de91166 100644
  def long_to_uint64(l):
      value = ctypes.c_uint64(l & 0xffffffffffffffff).value
 diff --git a/apps/deepstream-imagedata-multistream-redaction/deepstream_imagedata-multistream_redaction.py b/apps/deepstream-imagedata-multistream-redaction/deepstream_imagedata-multistream_redaction.py
-index e6f52bd..ceda023 100644
+index 1814f25..ab7cfaf 100644
 --- a/apps/deepstream-imagedata-multistream-redaction/deepstream_imagedata-multistream_redaction.py
 +++ b/apps/deepstream-imagedata-multistream-redaction/deepstream_imagedata-multistream_redaction.py
 @@ -18,9 +18,9 @@
@@ -67,7 +69,7 @@ index e6f52bd..ceda023 100644
  import gi
  import configparser
  
-@@ -381,7 +381,7 @@ def main(uri_inputs,codec,bitrate ):
+@@ -380,7 +380,7 @@ def main(uri_inputs,codec,bitrate ):
      streammux.set_property('height', 1080)
      streammux.set_property('batch-size', number_sources)
      streammux.set_property('batched-push-timeout', 4000000)
@@ -77,7 +79,7 @@ index e6f52bd..ceda023 100644
      if (pgie_batch_size != number_sources):
          print("WARNING: Overriding infer-config batch-size", pgie_batch_size, " with number of sources ",
 diff --git a/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py b/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py
-index 24f90f5..22391a3 100755
+index b8ef50d..800e152 100755
 --- a/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py
 +++ b/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py
 @@ -17,9 +17,9 @@
@@ -93,7 +95,7 @@ index 24f90f5..22391a3 100755
  import gi
  import configparser
  
-@@ -354,7 +354,7 @@ def main(args):
+@@ -355,7 +355,7 @@ def main(args):
      streammux.set_property('height', 1080)
      streammux.set_property('batch-size', number_sources)
      streammux.set_property('batched-push-timeout', 4000000)
@@ -103,7 +105,7 @@ index 24f90f5..22391a3 100755
      if (pgie_batch_size != number_sources):
          print("WARNING: Overriding infer-config batch-size", pgie_batch_size, " with number of sources ",
 diff --git a/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py b/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py
-index 8270de3..0d4eea2 100755
+index 8dc7bb5..0310bcf 100755
 --- a/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py
 +++ b/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py
 @@ -17,8 +17,9 @@
@@ -146,7 +148,7 @@ index 8270de3..0d4eea2 100755
  
      for key in config['tracker']:
 diff --git a/apps/deepstream-opticalflow/deepstream-opticalflow.py b/apps/deepstream-opticalflow/deepstream-opticalflow.py
-index be7233f..5b8dee5 100755
+index 750a592..1f4fa63 100755
 --- a/apps/deepstream-opticalflow/deepstream-opticalflow.py
 +++ b/apps/deepstream-opticalflow/deepstream-opticalflow.py
 @@ -22,7 +22,8 @@ import os
@@ -160,7 +162,7 @@ index be7233f..5b8dee5 100755
  import numpy as np
  
 diff --git a/apps/deepstream-rtsp-in-rtsp-out/deepstream_test1_rtsp_in_rtsp_out.py b/apps/deepstream-rtsp-in-rtsp-out/deepstream_test1_rtsp_in_rtsp_out.py
-index a7de46d..d1b684b 100755
+index 88fd89b..645cfff 100755
 --- a/apps/deepstream-rtsp-in-rtsp-out/deepstream_test1_rtsp_in_rtsp_out.py
 +++ b/apps/deepstream-rtsp-in-rtsp-out/deepstream_test1_rtsp_in_rtsp_out.py
 @@ -16,8 +16,9 @@
@@ -172,10 +174,10 @@ index a7de46d..d1b684b 100755
 +import sys, os
 +HERE = os.path.normpath(os.path.dirname(__file__))
 +sys.path.append(os.path.dirname(HERE))
- import pyds
  from common.bus_call import bus_call
  from common.is_aarch_64 import is_aarch64
-@@ -311,9 +312,9 @@ def main(args):
+ import pyds
+@@ -302,9 +303,9 @@ def main(args):
      streammux.set_property("batched-push-timeout", 4000000)
  
      if gie=="nvinfer":
@@ -188,7 +190,7 @@ index a7de46d..d1b684b 100755
  
      pgie_batch_size = pgie.get_property("batch-size")
 diff --git a/apps/deepstream-segmentation/deepstream_segmentation.py b/apps/deepstream-segmentation/deepstream_segmentation.py
-index 27f1ea5..8c1aff7 100755
+index cc0b92d..85be8ec 100755
 --- a/apps/deepstream-segmentation/deepstream_segmentation.py
 +++ b/apps/deepstream-segmentation/deepstream_segmentation.py
 @@ -17,9 +17,9 @@
@@ -205,7 +207,7 @@ index 27f1ea5..8c1aff7 100755
  import math
  
 diff --git a/apps/deepstream-ssd-parser/deepstream_ssd_parser.py b/apps/deepstream-ssd-parser/deepstream_ssd_parser.py
-index f231d30..976840f 100755
+index 8f1db26..97d1239 100755
 --- a/apps/deepstream-ssd-parser/deepstream_ssd_parser.py
 +++ b/apps/deepstream-ssd-parser/deepstream_ssd_parser.py
 @@ -19,9 +19,10 @@
@@ -220,7 +222,7 @@ index f231d30..976840f 100755
 -sys.path.append("../")
  import gi
  gi.require_version("Gst", "1.0")
- from gi.repository import GObject, Gst
+ from gi.repository import GLib, Gst
 @@ -122,7 +123,7 @@ def osd_sink_pad_buffer_probe(pad, info, u_data):
          # allocated string. Use pyds.get_string() to get the string content.
          id_dict = {
@@ -239,7 +241,7 @@ index f231d30..976840f 100755
  
      while l_frame is not None:
          try:
-@@ -373,7 +374,7 @@ def main(args):
+@@ -374,7 +375,7 @@ def main(args):
      streammux.set_property("height", IMAGE_HEIGHT)
      streammux.set_property("batch-size", 1)
      streammux.set_property("batched-push-timeout", 4000000)
@@ -249,7 +251,7 @@ index f231d30..976840f 100755
      print("Adding elements to Pipeline \n")
      pipeline.add(source)
 diff --git a/apps/deepstream-test1-rtsp-out/deepstream_test1_rtsp_out.py b/apps/deepstream-test1-rtsp-out/deepstream_test1_rtsp_out.py
-index ccd5b25..4f7c86f 100755
+index 462c4f1..9925c41 100755
 --- a/apps/deepstream-test1-rtsp-out/deepstream_test1_rtsp_out.py
 +++ b/apps/deepstream-test1-rtsp-out/deepstream_test1_rtsp_out.py
 @@ -18,8 +18,8 @@
@@ -263,7 +265,7 @@ index ccd5b25..4f7c86f 100755
  
  import gi
  gi.require_version('Gst', '1.0')
-@@ -222,7 +222,7 @@ def main(args):
+@@ -221,7 +221,7 @@ def main(args):
      streammux.set_property('batch-size', 1)
      streammux.set_property('batched-push-timeout', 4000000)
      
@@ -273,7 +275,7 @@ index ccd5b25..4f7c86f 100755
      print("Adding elements to Pipeline \n")
      pipeline.add(source)
 diff --git a/apps/deepstream-test1-usbcam/deepstream_test_1_usb.py b/apps/deepstream-test1-usbcam/deepstream_test_1_usb.py
-index 39cf842..57bad10 100755
+index 83fcda8..3a166c6 100755
 --- a/apps/deepstream-test1-usbcam/deepstream_test_1_usb.py
 +++ b/apps/deepstream-test1-usbcam/deepstream_test_1_usb.py
 @@ -17,8 +17,9 @@
@@ -287,8 +289,8 @@ index 39cf842..57bad10 100755
 +sys.path.append(os.path.dirname(HERE))
  import gi
  gi.require_version('Gst', '1.0')
- from gi.repository import GObject, Gst
-@@ -212,7 +213,7 @@ def main(args):
+ from gi.repository import GLib, Gst
+@@ -211,7 +212,7 @@ def main(args):
      streammux.set_property('height', 1080)
      streammux.set_property('batch-size', 1)
      streammux.set_property('batched-push-timeout', 4000000)
@@ -298,7 +300,7 @@ index 39cf842..57bad10 100755
      sink.set_property('sync', False)
  
 diff --git a/apps/deepstream-test1/deepstream_test_1.py b/apps/deepstream-test1/deepstream_test_1.py
-index 67be84b..19d3453 100755
+index 8d0e9e4..a4ea28a 100755
 --- a/apps/deepstream-test1/deepstream_test_1.py
 +++ b/apps/deepstream-test1/deepstream_test_1.py
 @@ -17,8 +17,9 @@
@@ -312,8 +314,8 @@ index 67be84b..19d3453 100755
 +sys.path.append(os.path.dirname(HERE))
  import gi
  gi.require_version('Gst', '1.0')
- from gi.repository import GObject, Gst
-@@ -195,7 +196,7 @@ def main(args):
+ from gi.repository import GLib, Gst
+@@ -194,7 +195,7 @@ def main(args):
      streammux.set_property('height', 1080)
      streammux.set_property('batch-size', 1)
      streammux.set_property('batched-push-timeout', 4000000)
@@ -323,7 +325,7 @@ index 67be84b..19d3453 100755
      print("Adding elements to Pipeline \n")
      pipeline.add(source)
 diff --git a/apps/deepstream-test2/deepstream_test_2.py b/apps/deepstream-test2/deepstream_test_2.py
-index 91970fa..a1b6408 100755
+index 8c686ea..8ab8644 100755
 --- a/apps/deepstream-test2/deepstream_test_2.py
 +++ b/apps/deepstream-test2/deepstream_test_2.py
 @@ -17,8 +17,9 @@
@@ -338,7 +340,7 @@ index 91970fa..a1b6408 100755
  import platform
  import configparser
  
-@@ -255,14 +256,14 @@ def main(args):
+@@ -254,14 +255,14 @@ def main(args):
      streammux.set_property('batched-push-timeout', 4000000)
  
      #Set properties of pgie and sgie
@@ -359,7 +361,7 @@ index 91970fa..a1b6408 100755
  
      for key in config['tracker']:
 diff --git a/apps/deepstream-test3/deepstream_test_3.py b/apps/deepstream-test3/deepstream_test_3.py
-index 3e4b298..0b10455 100755
+index edce707..e7c601c 100755
 --- a/apps/deepstream-test3/deepstream_test_3.py
 +++ b/apps/deepstream-test3/deepstream_test_3.py
 @@ -17,8 +17,9 @@
@@ -371,20 +373,20 @@ index 3e4b298..0b10455 100755
 +import sys, os
 +HERE = os.path.normpath(os.path.dirname(__file__))
 +sys.path.append(os.path.dirname(HERE))
+ from pathlib import Path
  import gi
  import configparser
- gi.require_version('Gst', '1.0')
-@@ -274,7 +275,7 @@ def main(args):
-     streammux.set_property('height', 1080)
-     streammux.set_property('batch-size', number_sources)
-     streammux.set_property('batched-push-timeout', 4000000)
--    pgie.set_property('config-file-path', "dstest3_pgie_config.txt")
-+    pgie.set_property('config-file-path', os.path.join(HERE, "dstest3_pgie_config.txt"))
+@@ -318,7 +319,7 @@ def main(args, requested_pgie=None, config=None, disable_probe=False):
+     elif requested_pgie == "nvinfer" and config != None:
+         pgie.set_property('config-file-path', config)
+     else:
+-        pgie.set_property('config-file-path', "dstest3_pgie_config.txt")
++        pgie.set_property('config-file-path', os.path.join(HERE, "dstest3_pgie_config.txt"))
      pgie_batch_size=pgie.get_property("batch-size")
      if(pgie_batch_size != number_sources):
          print("WARNING: Overriding infer-config batch-size",pgie_batch_size," with number of sources ", number_sources," \n")
 diff --git a/apps/deepstream-test4/deepstream_test_4.py b/apps/deepstream-test4/deepstream_test_4.py
-index aa0b5a6..fbad829 100755
+index d50450a..7342af1 100755
 --- a/apps/deepstream-test4/deepstream_test_4.py
 +++ b/apps/deepstream-test4/deepstream_test_4.py
 @@ -17,9 +17,9 @@
@@ -412,7 +414,7 @@ index aa0b5a6..fbad829 100755
  pgie_classes_str = ["Vehicle", "TwoWheeler", "Person", "Roadsign"]
  
 diff --git a/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py b/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py
-index fbee687..4664c88 100644
+index 62cb715..5f59e66 100644
 --- a/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py
 +++ b/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py
 @@ -17,8 +17,9 @@
