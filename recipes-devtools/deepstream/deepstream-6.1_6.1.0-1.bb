@@ -2,16 +2,16 @@ DESCRIPTION = "NVIDIA Deepstream SDK"
 HOMEPAGE = "https://developer.nvidia.com/deepstream-sdk"
 LICENSE = "Proprietary"
 LIC_FILES_CHKSUM = " \
-    file://usr/share/doc/deepstream-6.0/copyright;md5=7a5ffdb833cdefe5ac34aaa81de173a3 \
-    file://opt/nvidia/deepstream/deepstream-6.0/LICENSE.txt;md5=5dcf86799aa20202668e226e93f9cfd9 \
-    file://opt/nvidia/deepstream/deepstream-6.0/doc/nvidia-tegra/LICENSE.iothub_client;md5=4f8c6347a759d246b5f96281726b8611 \
-    file://opt/nvidia/deepstream/deepstream-6.0/doc/nvidia-tegra/LICENSE.nvds_amqp_protocol_adaptor;md5=8b4b651fa4090272b2e08e208140a658 \
+    file://usr/share/doc/deepstream-6.1/copyright;md5=32b2256361779ec59211b3a698f24ce2 \
+    file://opt/nvidia/deepstream/deepstream-6.1/LICENSE.txt;md5=2312d311b4dfaf054d6604065f8038ec \
+    file://opt/nvidia/deepstream/deepstream-6.1/doc/nvidia-tegra/LICENSE.iothub_client;md5=4f8c6347a759d246b5f96281726b8611 \
+    file://opt/nvidia/deepstream/deepstream-6.1/doc/nvidia-tegra/LICENSE.nvds_amqp_protocol_adaptor;md5=8b4b651fa4090272b2e08e208140a658 \
 "
 
 inherit l4t_deb_pkgfeed
 
 SRC_COMMON_DEBS = "${BPN}_${PV}_arm64.deb;subdir=${BPN}"
-SRC_URI[sha256sum] = "5520f52b30f02e4e6535d11229b758a9c46fb6004528ea9eda0952b9bbf2d5f5"
+SRC_URI[sha256sum] = "3982595611cb1c4d94b3a530feb9061ccf502fa4954faa5250ca9848789633f4"
 
 COMPATIBLE_MACHINE = "(tegra)"
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"
@@ -25,20 +25,25 @@ PACKAGECONFIG[redis] = ",,hiredis"
 PACKAGECONFIG[azure] = ""
 PACKAGECONFIG[triton] = ""
 PACKAGECONFIG[rivermax] = ""
+PACKAGECONFIG[realsense] = ""
 
 DEPENDS = "glib-2.0 gstreamer1.0 gstreamer1.0-plugins-base gstreamer1.0-rtsp-server \
-    tensorrt-core tensorrt-plugins libnvvpi1 libvisionworks libnpp json-glib \
-    openssl111 tegra-libraries-multimedia \
+    tensorrt-core tensorrt-plugins libnvvpi2 libcufft libcublas libnpp json-glib \
+    openssl111 tegra-libraries-multimedia yaml-cpp-060 mdns \
 "
+# XXX--- see hack in do_install
+DEPENDS += "patchelf-native"
+# ---XXX
 
 S = "${WORKDIR}/${BPN}"
 B = "${WORKDIR}/build"
 
-DEEPSTREAM_PATH = "/opt/nvidia/deepstream/deepstream-6.0"
+DEEPSTREAM_BASEDIR = "/opt/nvidia/deepstream"
+DEEPSTREAM_PATH = "${DEEPSTREAM_BASEDIR}/deepstream-6.1"
 SYSROOT_DIRS += "${DEEPSTREAM_PATH}/lib/"
 
 do_configure() {
-    for feature in azure amqp kafka redis triton rivermax; do
+    for feature in azure amqp kafka redis triton rivermax realsense; do
         if ! echo "${PACKAGECONFIG}" | grep -q "$feature"; then
             rm -f ${S}${DEEPSTREAM_PATH}/lib/libnvds_${feature}*
             if [ "$feature" = "azure" ]; then
@@ -50,6 +55,9 @@ do_configure() {
             fi
             if [ "$feature" = "rivermax" ]; then
                 rm -f ${S}${DEEPSTREAM_PATH}/lib/gst-plugins/libnvdsgst_udp.so
+            fi
+            if [ "$feature" = "realsense" ]; then
+                rm -f ${S}${DEEPSTREAM_PATH}/lib/libnvds_3d_dataloader_realsense.so
             fi
         fi
     done
@@ -82,6 +90,20 @@ do_install() {
     cp -R --preserve=mode,timestamps ${S}${DEEPSTREAM_PATH}/sources/includes/* ${D}${includedir}/
 
     cp -R --preserve=mode,timestamps ${S}${DEEPSTREAM_PATH}/sources/ ${D}${DEEPSTREAM_PATH}/
+
+    # XXX---
+    # Some of the libraries are not using the right SONAME
+    # in its DT_NEEDED ELF header, so we have to rewrite it to prevent
+    # a broken runtime dependency.
+    patchelf --replace-needed libdns_sd.so.1.0.0 libdns_sd.so.1 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
+    patchelf --replace-needed libdns_sd.so.1.0.0 libdns_sd.so.1 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nmos.so
+    patchelf --replace-needed libcufft.so libcufft.so.10 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
+    patchelf --replace-needed libcublas.so libcublas.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
+    patchelf --replace-needed libcufft.so libcufft.so.10 ${D}${DEEPSTREAM_PATH}/lib/libnvds_audiotransform.so
+    # ---XXX
+    cd ${D}${DEEPSTREAM_BASEDIR}
+    ln -s deepstream-6.1 deepstream
+    cd -
 }
 
 INHIBIT_PACKAGE_STRIP = "1"
@@ -90,7 +112,7 @@ INHIBIT_SYSROOT_STRIP = "1"
 INSANE_SKIP = "dev-so ldflags"
 
 def pkgconf_packages(d):
-    pkgconf = bb.utils.filter('PACKAGECONFIG', 'azure amqp kafka redis triton rivermax', d).split()
+    pkgconf = bb.utils.filter('PACKAGECONFIG', 'azure amqp kafka redis triton rivermax realsense', d).split()
     pn = d.getVar('PN')
     return ' '.join(['{}-{}'.format(pn, p) for p in pkgconf])
 
@@ -102,6 +124,7 @@ FILES:${PN} = "\
     ${sysconfdir}/ld.so.conf.d/  \
     ${libdir}/gstreamer-1.0/deepstream \
     ${DEEPSTREAM_PATH}/lib \
+    ${DEEPSTREAM_BASEDIR} \
 "
 
 FILES:${PN}-dev = "${includedir}"
@@ -127,8 +150,8 @@ FILES:${PN}-amqp = "${DEEPSTREAM_PATH}/lib/libnvds_amqp*"
 FILES:${PN}-kafka = "${DEEPSTREAM_PATH}/lib/libnvds_kafka*"
 FILES:${PN}-redis = "${DEEPSTREAM_PATH}/lib/libnvds_redis*"
 FILES:${PN}-rivermax = "${libdir}/gstreamer-1.0/deepstream/libnvdsgst_udp.so"
+FILES:${PN}-realsense = "${DEEPSTREAM_PATH}/lib/libnvds_3d_dataloader_realsense.so"
 
-RDEPENDS:${PN} = "libvisionworks-devso-symlink"
 RDEPENDS:${PN}-samples = "${PN}-samples-data"
 RDEPENDS:${PN}-samples-data = "bash"
 RDEPENDS:${PN}-sources = "bash ${PN}-samples-data ${PN}"
