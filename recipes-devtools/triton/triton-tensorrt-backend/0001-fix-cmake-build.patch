@@ -1,0 +1,94 @@
+From 77bd0e5f98fd00de8c0ee8ab63ba40cd9a940725 Mon Sep 17 00:00:00 2001
+From: Roger Knecht <roger@norberthealth.com>
+Date: Wed, 29 Jun 2022 16:49:41 +0200
+Subject: [PATCH] fix cmake build
+
+---
+ CMakeLists.txt | 37 +++++++++++++------------------------
+ 1 file changed, 13 insertions(+), 24 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 5da6ecd..df0e55f 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required(VERSION 3.17)
++cmake_minimum_required(VERSION 3.16)
+ 
+ project(tritontensorrtbackend LANGUAGES C CXX)
+ 
+@@ -46,7 +46,7 @@ if(NOT CMAKE_BUILD_TYPE)
+ endif()
+ 
+ set(TRITON_TENSORRT_BACKEND_LIBNAME triton_tensorrt)
+-set(TRITON_TENSORRT_BACKEND_INSTALLDIR ${CMAKE_INSTALL_PREFIX}/backends/tensorrt)
++set(TRITON_TENSORRT_BACKEND_INSTALLDIR ${CMAKE_INSTALL_LIBDIR}/tensorrt)
+ 
+ #
+ # Dependencies
+@@ -54,30 +54,14 @@ set(TRITON_TENSORRT_BACKEND_INSTALLDIR ${CMAKE_INSTALL_PREFIX}/backends/tensorrt
+ # FetchContent's composibility isn't very good. We must include the
+ # transitive closure of all repos so that we can override the tag.
+ #
+-include(FetchContent)
+-
+-FetchContent_Declare(
+-  repo-common
+-  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
+-  GIT_TAG ${TRITON_COMMON_REPO_TAG}
+-)
+-FetchContent_Declare(
+-  repo-core
+-  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
+-  GIT_TAG ${TRITON_CORE_REPO_TAG}
+-)
+-FetchContent_Declare(
+-  repo-backend
+-  GIT_REPOSITORY https://github.com/triton-inference-server/backend.git
+-  GIT_TAG ${TRITON_BACKEND_REPO_TAG}
+-)
+-FetchContent_MakeAvailable(repo-common repo-core repo-backend)
+ 
+ #
+ # CUDA
+ #
+ if(${TRITON_ENABLE_GPU})
+-  find_package(CUDAToolkit REQUIRED)
++  enable_language(CUDA)
++  find_package(CUDA REQUIRED)
++  include_directories(${CUDA_INCLUDE_DIRS})
+   message(STATUS "Using CUDA ${CUDA_VERSION}")
+   set(CUDA_NVCC_FLAGS -std=c++11)
+ 
+@@ -178,9 +162,14 @@ find_library(NVINFER_PLUGIN_LIBRARY NAMES nvinfer_plugin)
+ target_link_libraries(
+   triton-tensorrt-backend
+   PRIVATE
+-    triton-core-serverapi   # from repo-core
+-    triton-core-serverstub  # from repo-core
++    triton-common-async-work-queue
++    triton-common-error
++    triton-common-logging
++    triton-common-model-config
++    triton-common-table-printer
+     triton-backend-utils    # from repo-backend
++    kernel-library-new
++    triton-core             # from repo-core
+     -lpthread
+     ${NVINFER_LIBRARY}
+     ${NVINFER_PLUGIN_LIBRARY}
+@@ -194,7 +183,7 @@ target_link_libraries(
+ target_link_libraries(
+     triton-tensorrt-backend
+     PRIVATE
+-      CUDA::cudart
++      cudart
+ )
+ 
+ 
+-- 
+2.17.1
+
