@@ -1,0 +1,215 @@
+From a7eb2512575b93634a979e289534d9771ad6fc9d Mon Sep 17 00:00:00 2001
+From: Roger Knecht <roger@norberthealth.com>
+Date: Fri, 1 Jul 2022 13:04:43 +0200
+Subject: [PATCH] fix cmake build
+
+---
+ CMakeLists.txt     | 35 ++++++-----------------------------
+ src/CMakeLists.txt | 32 +++++++++-----------------------
+ src/filesystem.cc  |  2 +-
+ 3 files changed, 16 insertions(+), 53 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d1d6f4a..42e043a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required(VERSION 3.18)
++cmake_minimum_required(VERSION 3.16)
+ 
+ project(tritoncore LANGUAGES C CXX)
+ 
+@@ -96,6 +96,7 @@ add_library(
+   triton-core-serverstub SHARED
+   ${CMAKE_CURRENT_SOURCE_DIR}/src/tritonserver_stub.cc
+ )
++set_target_properties(triton-core-serverstub PROPERTIES LIBRARY_OUTPUT_NAME triton-core-serverstub)
+ 
+ add_library(
+   TritonCore::triton-core-serverstub ALIAS triton-core-serverstub
+@@ -115,7 +116,7 @@ else()
+   target_compile_options(
+     triton-core-serverstub
+     PRIVATE
+-      -Wall -Wextra -Wno-unused-parameter -Werror
++      -Wall -Wextra -Wno-unused-parameter
+   )
+ endif()
+ 
+@@ -180,14 +181,6 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
+     message(FATAL_ERROR "TRITON_ENABLE_METRICS_GPU=ON requires TRITON_ENABLE_GPU=ON")
+   endif()
+ 
+-  include(FetchContent)
+-  FetchContent_Declare(
+-    repo-third-party
+-    GIT_REPOSITORY https://github.com/triton-inference-server/third_party.git
+-    GIT_TAG ${TRITON_THIRD_PARTY_REPO_TAG}
+-  )
+-  FetchContent_MakeAvailable(repo-third-party)
+-
+   # Need to use ExternalProject for our builds so that we can get the
+   # correct dependencies between Triton shared library components and
+   # the ExternalProject dependencies (found in the third_party repo)
+@@ -250,27 +243,10 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
+     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src"
+     BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/triton-core"
+     CMAKE_CACHE_ARGS
+-      -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
+       ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
+       ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
+       ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
+-      -DGTEST_ROOT:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/googletest
+-      -DgRPC_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/grpc/lib/cmake/grpc
+-      -Dc-ares_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/c-ares/lib/cmake/c-ares
+-      -Dabsl_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/absl/lib/cmake/absl
+-      -Dnlohmann_json_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/nlohmann_json/lib/cmake/nlohmann_json
+-      -Dprometheus-cpp_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/prometheus-cpp/lib/cmake/prometheus-cpp
+-      -Dstorage_client_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/lib/cmake/storage_client
+-      -Dazure-storage-cpplite_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/azure-storage-cpplite
+-      -Dgoogle_cloud_cpp_common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/lib/cmake/google_cloud_cpp_common
+-      -DCrc32c_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/crc32c/lib/cmake/Crc32c
+-      -DAWSSDK_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/cmake/AWSSDK
+-      -Daws-cpp-sdk-core_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/cmake/aws-cpp-sdk-core
+-      -Daws-cpp-sdk-s3_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/cmake/aws-cpp-sdk-s3
+-      -Daws-c-event-stream_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-c-event-stream/cmake
+-      -Daws-c-common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-c-common/cmake
+-      -Daws-checksums_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-checksums/cmake
+-      -DCNMEM_PATH:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/cnmem
++      -DCUDA_TOOLKIT_ROOT_DIR:PATH=${CUDA_TOOLKIT_ROOT_DIR}
+       -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
+       -DTRITON_EXTRA_LIB_PATHS:PATH=${TRITON_EXTRA_LIB_PATHS}
+       -DTRITON_ENABLE_NVTX:BOOL=${TRITON_ENABLE_NVTX}
+@@ -289,7 +265,8 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
+       -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+       -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}
+       -DTRITON_VERSION:STRING=${TRITON_VERSION}
+-    DEPENDS ${TRITON_DEPENDS}
++      -DCUDA_TOOLKIT_ROOT_DIR:PATH=${CUDA_TOOLKIT_ROOT_DIR}
++    INSTALL_COMMAND ""
+   )
+ endif() # NOT TRITON_CORE_HEADERS_ONLY
+ 
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 87ebcf8..52ad185 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required(VERSION 3.18)
++cmake_minimum_required(VERSION 3.16)
+ 
+ project(libtritonserver LANGUAGES C CXX)
+ 
+@@ -38,24 +38,16 @@ endif()
+ # We must include the transitive closure of all repos so that we can
+ # override the tag.
+ #
+-include(FetchContent)
+-
+-FetchContent_Declare(
+-  repo-common
+-  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
+-  GIT_TAG ${TRITON_COMMON_REPO_TAG}
+-)
+-
+ set(TRITON_COMMON_ENABLE_PROTOBUF ON)
+ 
+-FetchContent_MakeAvailable(repo-common)
+-
+ #
+ # CUDA
+ #
+ if(${TRITON_ENABLE_GPU})
+-  find_package(CUDAToolkit REQUIRED)
++  enable_language(CUDA)
+   find_package(CUDA REQUIRED)
++  include_directories(${CUDA_INCLUDE_DIRS})
++  link_directories(${CUDA_LIBRARIES})
+   message(STATUS "Using CUDA ${CUDA_VERSION}")
+ endif() # TRITON_ENABLE_GPU
+ 
+@@ -69,7 +61,7 @@ message(STATUS "Using Boost ${Boost_VERSION}")
+ # Protobuf
+ #
+ set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
+-find_package(Protobuf CONFIG REQUIRED)
++find_package(Protobuf REQUIRED)
+ message(STATUS "Using protobuf ${Protobuf_VERSION}")
+ 
+ #
+@@ -218,6 +210,7 @@ add_library(
+   triton-core SHARED
+   ${SERVER_SRCS} ${SERVER_HDRS}
+ )
++set_target_properties(triton-core PROPERTIES LIBRARY_OUTPUT_NAME triton-core)
+ 
+ add_library(
+   TritonCore::triton-core ALIAS triton-core
+@@ -237,7 +230,7 @@ else()
+   target_compile_options(
+     triton-core
+     PRIVATE
+-      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
++      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations
+   )
+   set_target_properties(
+     triton-core
+@@ -420,12 +413,10 @@ find_library(RE2_LIBRARY NAMES re2)
+ target_link_libraries(
+   triton-core
+   PRIVATE
+-    proto-library                    # from repo-common
+     triton-common-async-work-queue   # from repo-common
+     triton-common-error              # from repo-common
+     triton-common-model-config       # from repo-common
+     triton-common-logging            # from repo-common
+-    triton-common-json               # from repo-common
+     triton-common-table-printer      # from repo-common
+     protobuf::libprotobuf
+     ${RE2_LIBRARY}
+@@ -475,12 +466,12 @@ if(${TRITON_ENABLE_AZURE_STORAGE})
+ endif() # TRITON_ENABLE_AZURE_STORAGE
+ 
+ if(${TRITON_ENABLE_GPU})
+-  find_library(CNMEM_LIBRARY NAMES cnmem PATHS ${CNMEM_PATH}/lib)
++  find_library(CNMEM_LIBRARY NAMES cnmem)
+   target_link_libraries(
+     triton-core
+     PRIVATE
+       ${CNMEM_LIBRARY}
+-      CUDA::cudart
++      cudart
+   )
+ endif() # TRITON_ENABLE_GPU
+ 
+@@ -499,8 +490,3 @@ install(
+   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+ )
+-
+-# Currently unit tests do not build for windows...
+-if (NOT WIN32)
+-  add_subdirectory(test test)
+-endif() # NOT WIN32
+diff --git a/src/filesystem.cc b/src/filesystem.cc
+index 009a612..7a6f8e9 100644
+--- a/src/filesystem.cc
++++ b/src/filesystem.cc
+@@ -2183,7 +2183,7 @@ ReadBinaryProto(const std::string& path, google::protobuf::MessageLite* msg)
+ 
+   google::protobuf::io::CodedInputStream coded_stream(
+       reinterpret_cast<const uint8_t*>(msg_str.c_str()), msg_str.size());
+-  coded_stream.SetTotalBytesLimit(INT_MAX, INT_MAX);
++  //coded_stream.SetTotalBytesLimit(INT_MAX, INT_MAX);
+   if (!msg->ParseFromCodedStream(&coded_stream)) {
+     return Status(
+         Status::Code::INTERNAL, "Can't parse " + path + " as binary proto");
+-- 
+2.17.1
+
