@@ -1,0 +1,93 @@
+From 72179bb97c5757503282a96ac0b4cad60d16401b Mon Sep 17 00:00:00 2001
+From: Roger Knecht <roger@norberthealth.com>
+Date: Wed, 22 Jun 2022 13:57:50 +0200
+Subject: [PATCH] fix cmake build
+
+---
+ CMakeLists.txt          | 10 ++++++++--
+ protobuf/CMakeLists.txt |  4 ++--
+ 2 files changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d060a9c..a84f9e9 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required(VERSION 3.17)
++cmake_minimum_required(VERSION 3.16)
+ 
+ project(tritoncommon LANGUAGES C CXX)
+ 
+@@ -70,6 +70,7 @@ add_library(
+   triton-common-error
+   src/error.cc
+   )
++set_target_properties(triton-common-error PROPERTIES ARCHIVE_OUTPUT_NAME triton-common-error)
+ 
+ add_library(
+   TritonCommon::triton-common-error ALIAS triton-common-error
+@@ -93,6 +94,7 @@ add_library(
+   triton-common-logging
+   src/logging.cc
+ )
++set_target_properties(triton-common-logging PROPERTIES ARCHIVE_OUTPUT_NAME triton-common-logging)
+ 
+ add_library(
+   TritonCommon::triton-common-logging ALIAS triton-common-logging
+@@ -142,6 +144,7 @@ add_library(
+   src/async_work_queue.cc
+   src/error.cc
+ )
++set_target_properties(triton-common-async-work-queue PROPERTIES ARCHIVE_OUTPUT_NAME triton-common-async-work-queue)
+ 
+ add_library(
+   TritonCommon::triton-common-async-work-queue ALIAS  triton-common-async-work-queue
+@@ -196,6 +199,7 @@ add_library(
+ add_library(
+   TritonBackend::triton-common-table-printer ALIAS triton-common-table-printer
+ )
++set_target_properties(triton-common-table-printer PROPERTIES ARCHIVE_OUTPUT_NAME triton-common-table-printer)
+ 
+ target_include_directories(
+   triton-common-table-printer
+@@ -249,7 +253,7 @@ if(${TRITON_COMMON_ENABLE_PROTOBUF} OR ${TRITON_COMMON_ENABLE_GRPC})
+   add_subdirectory(protobuf)
+ 
+   set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
+-  find_package(Protobuf CONFIG REQUIRED)
++  find_package(Protobuf REQUIRED)
+   message(STATUS "Using protobuf ${Protobuf_VERSION}")
+ 
+   #
+@@ -260,6 +264,8 @@ if(${TRITON_COMMON_ENABLE_PROTOBUF} OR ${TRITON_COMMON_ENABLE_GRPC})
+     src/model_config.cc
+     )
+ 
++  set_target_properties(triton-common-model-config PROPERTIES ARCHIVE_OUTPUT_NAME triton-common-model-config)
++
+   add_library(
+     TritonCommon::triton-common-model-config ALIAS triton-common-model-config
+   )
+diff --git a/protobuf/CMakeLists.txt b/protobuf/CMakeLists.txt
+index 39fdabf..c5c541e 100644
+--- a/protobuf/CMakeLists.txt
++++ b/protobuf/CMakeLists.txt
+@@ -24,10 +24,10 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required (VERSION 3.18)
++cmake_minimum_required (VERSION 3.16)
+ 
+ set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
+-find_package(Protobuf CONFIG REQUIRED)
++find_package(Protobuf REQUIRED)
+ message(STATUS "Using protobuf ${Protobuf_VERSION}")
+ include_directories(${Protobuf_INCLUDE_DIRS})
+ 
+-- 
+2.17.1
+
