@@ -17,6 +17,8 @@ DEPENDS = " \
     triton-core \
 "
 
+COMPATIBLE_MACHINE = "(cuda)"
+
 inherit cmake cuda
 
 PACKAGECONFIG ??= "gpu"
