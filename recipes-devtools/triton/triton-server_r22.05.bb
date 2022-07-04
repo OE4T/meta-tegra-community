@@ -17,6 +17,8 @@ DEPENDS = "\
     triton-backend \
 "
 
+COMPATIBLE_MACHINE = "(cuda)"
+
 inherit pkgconfig cmake cuda
 
 EXTRA_OECMAKE = "\
