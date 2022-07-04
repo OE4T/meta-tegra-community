@@ -21,6 +21,8 @@ DEPENDS = "\
     triton-common \
 "
 
+COMPATIBLE_MACHINE = "(cuda)"
+
 inherit cmake cuda
 
 EXTRA_OECMAKE = "\

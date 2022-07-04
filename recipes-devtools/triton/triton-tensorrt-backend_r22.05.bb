@@ -20,6 +20,8 @@ DEPENDS = "\
     cuda-cudart \
 "
 
+COMPATIBLE_MACHINE = "(cuda)"
+
 inherit cuda cmake
 
 PACKAGECONFIG ??= "gpu"
