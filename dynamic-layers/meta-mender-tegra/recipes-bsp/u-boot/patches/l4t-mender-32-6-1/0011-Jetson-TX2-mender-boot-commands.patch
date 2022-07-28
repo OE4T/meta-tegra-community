@@ -15,7 +15,7 @@ Index: git/include/env_default.h
 ===================================================================
 --- git.orig/include/env_default.h
 +++ git/include/env_default.h
-@@ -37,8 +37,8 @@ const char default_environment[] = {
+@@ -41,8 +41,8 @@ const char default_environment[] = {
  #ifdef	CONFIG_USE_BOOTARGS
  	"bootargs="	CONFIG_BOOTARGS			"\0"
  #endif
@@ -24,8 +24,8 @@ Index: git/include/env_default.h
 +#ifdef	CONFIG_MENDER_BOOTCOMMAND
 +	"bootcmd="	CONFIG_MENDER_BOOTCOMMAND	"\0"
  #endif
- #ifdef	CONFIG_RAMBOOTCOMMAND
- 	"ramboot="	CONFIG_RAMBOOTCOMMAND		"\0"
+ #if defined(CONFIG_BOOTDELAY)
+ 	"bootdelay="	__stringify(CONFIG_BOOTDELAY)	"\0"
 Index: git/include/env_mender.h
 ===================================================================
 --- git.orig/include/env_mender.h

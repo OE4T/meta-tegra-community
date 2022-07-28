@@ -10,10 +10,10 @@ Signed-off-by: Matt Madison <matt@madison.systems>
  configs/p3541-0000_defconfig | 9 +++++++--
  1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/configs/p3541-0000_defconfig b/configs/p3541-0000_defconfig
-index 35dda4228b..fe3f00a30e 100644
---- a/configs/p3541-0000_defconfig
-+++ b/configs/p3541-0000_defconfig
+Index: git/configs/p3541-0000_defconfig
+===================================================================
+--- git.orig/configs/p3541-0000_defconfig
++++ git/configs/p3541-0000_defconfig
 @@ -3,8 +3,10 @@ CONFIG_ARCH_TEGRA=y
  CONFIG_SYS_TEXT_BASE=0x80080000
  CONFIG_SYS_MALLOC_LEN=0x2500000
@@ -34,6 +34,3 @@ index 35dda4228b..fe3f00a30e 100644
 +CONFIG_BOOTCOUNT_LIMIT=y
 +CONFIG_BOOTCOUNT_ENV=y
 +# CONFIG_BOOTCOMMAND is not set
--- 
-2.32.0
-

@@ -9,11 +9,11 @@ Signed-off-by: Matt Madison <matt@madison.systems>
  configs/p3450-0002_defconfig | 5 +++--
  2 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/configs/p2371-2180_defconfig b/configs/p2371-2180_defconfig
-index 329878dc90..f62228c805 100644
---- a/configs/p2371-2180_defconfig
-+++ b/configs/p2371-2180_defconfig
-@@ -61,8 +61,8 @@ CONFIG_DOS_PARTITION=y
+Index: git/configs/p2371-2180_defconfig
+===================================================================
+--- git.orig/configs/p2371-2180_defconfig
++++ git/configs/p2371-2180_defconfig
+@@ -63,8 +63,8 @@ CONFIG_DOS_PARTITION=y
  CONFIG_CMD_CACHE=y
  CONFIG_OF_LIBFDT_OVERLAY=y
  CONFIG_ENV_SIZE=0x20000
@@ -24,10 +24,10 @@ index 329878dc90..f62228c805 100644
  CONFIG_SYS_REDUNDAND_ENVIRONMENT=y
  # CONFIG_ENV_IS_NOWHERE is not set
  # CONFIG_ENV_IS_IN_EEPROM is not set
-diff --git a/configs/p3450-0002_defconfig b/configs/p3450-0002_defconfig
-index d617181548..81698df8b9 100644
---- a/configs/p3450-0002_defconfig
-+++ b/configs/p3450-0002_defconfig
+Index: git/configs/p3450-0002_defconfig
+===================================================================
+--- git.orig/configs/p3450-0002_defconfig
++++ git/configs/p3450-0002_defconfig
 @@ -64,9 +64,10 @@ CONFIG_DOS_PARTITION=y
  CONFIG_CMD_CACHE=y
  CONFIG_OF_LIBFDT_OVERLAY=y
@@ -41,6 +41,3 @@ index d617181548..81698df8b9 100644
  # CONFIG_ENV_IS_NOWHERE is not set
  # CONFIG_ENV_IS_IN_EEPROM is not set
  # CONFIG_ENV_IS_IN_FAT is not set
--- 
-2.32.0
-
