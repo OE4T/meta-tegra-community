@@ -14,7 +14,7 @@ Index: git/configs/p3541-0000_defconfig
 ===================================================================
 --- git.orig/configs/p3541-0000_defconfig
 +++ git/configs/p3541-0000_defconfig
-@@ -3,8 +3,10 @@ CONFIG_ARCH_TEGRA=y
+@@ -5,8 +5,10 @@ CONFIG_ARCH_TEGRA=y
  CONFIG_SYS_TEXT_BASE=0x80080000
  CONFIG_SYS_MALLOC_LEN=0x2500000
  CONFIG_NR_DRAM_BANKS=16
@@ -27,7 +27,7 @@ Index: git/configs/p3541-0000_defconfig
  CONFIG_ENV_SECT_SIZE=0x1000
  CONFIG_DEFAULT_DEVICE_TREE="tegra210-p3541-0000"
  CONFIG_TEGRA210=y
-@@ -64,3 +66,6 @@ CONFIG_USB_STORAGE=y
+@@ -66,3 +68,6 @@ CONFIG_USB_STORAGE=y
  CONFIG_DOS_PARTITION=y
  CONFIG_CMD_CACHE=y
  CONFIG_OF_LIBFDT_OVERLAY=y

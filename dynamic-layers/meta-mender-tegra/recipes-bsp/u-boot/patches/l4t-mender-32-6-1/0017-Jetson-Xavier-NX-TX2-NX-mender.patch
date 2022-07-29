@@ -8,12 +8,12 @@ Signed-off-by: Matt Madison <matt@madison.systems>
  configs/p3636-0001_defconfig | 33 +++++++++++++++++++++++++++++++--
  1 file changed, 31 insertions(+), 2 deletions(-)
 
-diff --git a/configs/p3636-0001_defconfig b/configs/p3636-0001_defconfig
-index 9e90f1ff8a..3da443ae8b 100644
---- a/configs/p3636-0001_defconfig
-+++ b/configs/p3636-0001_defconfig
-@@ -1,8 +1,6 @@
- CONFIG_ARM=y
+Index: git/configs/p3636-0001_defconfig
+===================================================================
+--- git.orig/configs/p3636-0001_defconfig
++++ git/configs/p3636-0001_defconfig
+@@ -3,8 +3,6 @@ CONFIG_COUNTER_FREQUENCY=19200000
+ CONFIG_SYS_L2CACHE_OFF=y
  CONFIG_ARCH_TEGRA=y
  CONFIG_SYS_TEXT_BASE=0x80080000
 -CONFIG_ENV_SIZE=0x8000
@@ -21,9 +21,9 @@ index 9e90f1ff8a..3da443ae8b 100644
  CONFIG_NR_DRAM_BANKS=1043
  CONFIG_DEFAULT_DEVICE_TREE="tegra186-p3636-0001"
  CONFIG_TEGRA186=y
-@@ -39,3 +37,34 @@ CONFIG_SYS_NS16550=y
+@@ -41,3 +39,34 @@ CONFIG_SYS_NS16550=y
  CONFIG_CMD_CACHE=y
- CONFIG_NVME=y
+ CONFIG_NVME_PCI=y
  CONFIG_OF_LIBFDT_OVERLAY=y
 +CONFIG_ENV_SIZE=0x20000
 +CONFIG_ENV_OFFSET=0x3bb000
@@ -56,6 +56,3 @@ index 9e90f1ff8a..3da443ae8b 100644
 +CONFIG_BOOTCOUNT_LIMIT=y
 +CONFIG_BOOTCOUNT_ENV=y
 +# CONFIG_BOOTCOMMAND is not set
--- 
-2.32.0
-
