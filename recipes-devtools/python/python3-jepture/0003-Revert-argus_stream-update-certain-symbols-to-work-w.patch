@@ -1,0 +1,36 @@
+From aac3537859395e41b00a0fc5612c5159918df533 Mon Sep 17 00:00:00 2001
+From: Bartosz Golaszewski <brgl@bgdev.pl>
+Date: Fri, 29 Jul 2022 14:57:42 +0200
+Subject: [PATCH] Revert "argus_stream: update certain symbols to work with
+ jetpack 5.0.1"
+
+This reverts commit b5776b5c8207341d3e9708b8a9dd6bd9f824f8b1.
+
+Upstream master works with jetpack 5.0.1 but we cannot just checkout the
+commit before this change as at the time the repo didn't have any
+license.
+
+Signed-off-by: Bartosz Golaszewski <brgl@bgdev.pl>
+---
+Upstream-Status: Inappropriate [yocto-specific]
+
+ src/argus_stream.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/argus_stream.cpp b/src/argus_stream.cpp
+index 6866afd..0c6bb6a 100644
+--- a/src/argus_stream.cpp
++++ b/src/argus_stream.cpp
+@@ -372,8 +372,8 @@ std::vector<ArgusStreamOutput> ArgusStream::next(bool skip){
+ 
+             if(!this->cameras[i]->dma_buffer){
+                 this->cameras[i]->dma_buffer = native_buffer->createNvBuffer(this->cameras[i]->i_stream->getResolution(),
+-                        NVBUF_COLOR_FORMAT_YUV420,
+-                        NVBUF_LAYOUT_BLOCK_LINEAR);
++                        NvBufferColorFormat_YUV420,
++                        NvBufferLayout_BlockLinear);
+                 if(!this->cameras[i]->dma_buffer){
+                     throw std::runtime_error("failed to create dma buffer");
+                 }
+-- 
+2.34.1
