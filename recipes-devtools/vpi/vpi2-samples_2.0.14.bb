@@ -1,7 +1,7 @@
 SUMMARY = "NVIDIA VPI command-line sample applications"
 HOMEPAGE = "https://developer.nvidia.com/embedded/vpi"
 LICENSE = "BSD-3-Clause & Proprietary"
-LIC_FILES_CHKSUM = "file://01-convolve_2d/main.cpp;beginline=4;endline=26;md5=0151558a559d381e69a909edafc3d247 \
+LIC_FILES_CHKSUM = "file://01-convolve_2d/main.cpp;endline=27;md5=ad6efe6d8b43b8bceef6d97c7b79193f \
                     file://assets/LICENSE;md5=6b5f633fc3acaabf21035790a05b1c71"
 
 COMPATIBLE_MACHINE = "(tegra)"
@@ -9,7 +9,7 @@ COMPATIBLE_MACHINE = "(tegra)"
 inherit l4t_deb_pkgfeed cuda cmake
 
 SRC_COMMON_DEBS = "vpi2-samples_${PV}_arm64.deb;subdir=vpi2-samples"
-SRC_URI[sha256sum] = "ca11a47e839578b16ca194a8ea56bf83ce28ac87f38f9df50f2207714c01116d"
+SRC_URI[sha256sum] = "27a21a7f9b29845dd563f2798ce4f9b24d12c56c27baea49899eb1cdb3a69f36"
 
 SRC_URI += "file://CMakeLists.txt;subdir=vpi2-samples/opt/nvidia/vpi2/samples"
 
@@ -22,5 +22,7 @@ PACKAGECONFIG[video] = "-DBUILD_VIDEO_SAMPLES=ON,-DBUILD_VIDEO_SAMPLES=OFF,"
 S = "${WORKDIR}/vpi2-samples/opt/nvidia/vpi2/samples"
 
 DEPENDS = "libnvvpi2 opencv"
+
+LDFLAGS += "-Wl,--allow-shlib-undefined"
 
 FILES:${PN} = "${VPI_PREFIX}"
