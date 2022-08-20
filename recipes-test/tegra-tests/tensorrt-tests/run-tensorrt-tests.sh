@@ -146,15 +146,8 @@ run_trtexec(){
 	trtexec --loadEngine=mnist16.trt --batch=16
 }
 
-CHIPID=$(cat /sys/module/tegra_fuse/parameters/tegra_chip_id)
-# Only run int8 tests on Xaviers (chip ID 0x19 == 25)
-if [ $CHIPID -eq 25 ]; then
-    INT8_TESTS="int8 int8_api"
-else
-    INT8_TESTS=
-fi
 TESTS="algorithm_selector char-rnn dynamic_reshape faster-rcnn googlenet"
-TESTS="$TESTS $INT8_TESTS mnist mnist_api onnx_mnist io_formats"
+TESTS="$TESTS int8 int8_api mnist mnist_api onnx_mnist io_formats"
 TESTS="$TESTS uff_mnist uff_plugin_v2_ext"
 TESTS="$TESTS trtexec"
 
