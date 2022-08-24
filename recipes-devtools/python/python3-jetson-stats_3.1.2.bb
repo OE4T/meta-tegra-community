@@ -9,7 +9,7 @@ SRC_URI += "file://0001-jtop-fix-no-attribute-issue.patch"
 
 COMPATIBLE_MACHINE = "(tegra)"
 
-inherit pypi setuptools3 systemd useradd
+inherit pypi setuptools3_legacy systemd useradd
 
 do_install:append() {
     # Need to move the systemd service into the right place manually and adjust
