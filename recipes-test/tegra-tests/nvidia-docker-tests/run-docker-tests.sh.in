@@ -1,0 +1,6 @@
+#! /bin/bash
+
+DOCKER_TESTS_DIR="/opt/nvidia-docker-tests"
+cd ${DOCKER_TESTS_DIR}
+
+./scripts/docker_test_ml.sh all nvcr.io/nvidia/
