@@ -1,0 +1,155 @@
+From 81f5b61deaf7c96b984dc1beb8991f73a148ebb4 Mon Sep 17 00:00:00 2001
+From: Atharva Nandanwar <anandanwar@sighthound.com>
+Date: Mon, 29 Aug 2022 10:55:36 -0600
+Subject: [PATCH] Distro agnostic support for Test ML script
+
+- replaced sudo with `which sudo`
+- unset the exit on error flag to support headless devices
+- removed few parameters from wget to support BusyBox wget from
+  non-ubuntu distributions
+- added DOCKER_REPO parameter for using upstream containers
+
+Signed-off-by: Atharva Nandanwar <anandanwar@sighthound.com>
+
+---
+ README.md                 |  7 +++++++
+ scripts/docker_run.sh     |  7 +++++--
+ scripts/docker_test_ml.sh | 15 ++++++++-------
+ scripts/l4t_version.sh    | 12 +++++++++---
+ 4 files changed, 29 insertions(+), 12 deletions(-)
+
+diff --git a/README.md b/README.md
+index a46b218..8910c6c 100644
+--- a/README.md
++++ b/README.md
+@@ -177,3 +177,10 @@ $ ./scripts/docker_test_ros.sh eloquent  # test if the build of 'ROS eloquent' w
+ $ ./scripts/docker_test_ros.sh foxy      # test if the build of 'ROS foxy' was successful
+ ```
+ 
++To run testing on upstream containers from NVIDIA container repository:
++
++``` bash
++$ ./scripts/docker_test_ml.sh all nvcr.io/nvidia/    # url with trailing slash is required
++```
++
++This can be useful to test your custom distribution.
+diff --git a/scripts/docker_run.sh b/scripts/docker_run.sh
+index 74f62cd..4219b8a 100755
+--- a/scripts/docker_run.sh
++++ b/scripts/docker_run.sh
+@@ -100,17 +100,20 @@ done
+ #echo "USER_VOLUME:     $USER_VOLUME"
+ #echo "USER_COMMAND:    '$USER_COMMAND'"
+ 
++set +e
+ 
+ # give docker root user X11 permissions
+-sudo xhost +si:localuser:root
++${SUDO} xhost +si:localuser:root
+ 
+ # enable SSH X11 forwarding inside container (https://stackoverflow.com/q/48235040)
+ XAUTH=/tmp/.docker.xauth
+ xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f $XAUTH nmerge -
+ chmod 777 $XAUTH
+ 
++set -e
++
+ # run the container
+-sudo docker run --runtime nvidia -it --rm --network host -e DISPLAY=$DISPLAY \
++${SUDO} docker run --runtime nvidia -it --rm --network host -e DISPLAY=$DISPLAY \
+     -v /tmp/.X11-unix/:/tmp/.X11-unix \
+     -v $XAUTH:$XAUTH -e XAUTHORITY=$XAUTH \
+     $USER_VOLUME $CONTAINER_IMAGE $USER_COMMAND
+diff --git a/scripts/docker_test_ml.sh b/scripts/docker_test_ml.sh
+index d40fc95..3c7513e 100755
+--- a/scripts/docker_test_ml.sh
++++ b/scripts/docker_test_ml.sh
+@@ -6,6 +6,7 @@ source scripts/l4t_version.sh
+ ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+ TEST_MOUNT="$ROOT/../test:/test"
+ CONTAINERS=${1:-"all"}
++DOCKER_REPO=$2
+ 
+ # cuda tests
+ test_cuda()
+@@ -80,7 +81,7 @@ test_pytorch()
+ 		if [ ! -d "test/data" ]; then
+ 			mkdir test/data
+ 		fi
+-		wget --quiet --show-progress --progress=bar:force:noscroll --no-check-certificate $DATA_URL -O test/data/$DATA_NAME.tar.gz
++		wget --quiet --no-check-certificate $WGET_ADDITIONAL_PARAMS $DATA_URL -O test/data/$DATA_NAME.tar.gz
+ 		tar -xzf test/data/$DATA_NAME.tar.gz -C test/data/
+ 	fi
+ 
+@@ -205,24 +206,24 @@ if [[ "$CONTAINERS" == "pytorch" || "$CONTAINERS" == "all" ]]; then
+ 	#test_pytorch_all "l4t-pytorch:r$L4T_VERSION-pth1.9-py3"
+ 	#test_pytorch_all "l4t-pytorch:r$L4T_VERSION-pth1.10-py3"
+ 	#test_pytorch_all "l4t-pytorch:r$L4T_VERSION-pth1.11-py3"
+-	test_pytorch_all "l4t-pytorch:r$L4T_VERSION-pth1.11-py3"
+-	test_pytorch_all "l4t-pytorch:r$L4T_VERSION-pth1.12-py3"
+-	test_pytorch_all "l4t-pytorch:r$L4T_VERSION-pth1.13-py3"
++	test_pytorch_all "${DOCKER_REPO}l4t-pytorch:r$L4T_VERSION-pth1.11-py3"
++	test_pytorch_all "${DOCKER_REPO}l4t-pytorch:r$L4T_VERSION-pth1.12-py3"
++	test_pytorch_all "${DOCKER_REPO}l4t-pytorch:r$L4T_VERSION-pth1.13-py3"
+ fi
+ 
+ #
+ # TensorFlow container
+ #
+ if [[ "$CONTAINERS" == "tensorflow" || "$CONTAINERS" == "all" ]]; then
+-	test_tensorflow_all "l4t-tensorflow:r$L4T_VERSION-tf1.15-py3"
+-	test_tensorflow_all "l4t-tensorflow:r$L4T_VERSION-tf2.9-py3"
++	test_tensorflow_all "${DOCKER_REPO}l4t-tensorflow:r$L4T_VERSION-tf1.15-py3"
++	test_tensorflow_all "${DOCKER_REPO}l4t-tensorflow:r$L4T_VERSION-tf2.9-py3"
+ fi
+ 
+ #
+ # ML container
+ #
+ if [[ "$CONTAINERS" == "ml" || "$CONTAINERS" == "all" ]]; then
+-	test_all "l4t-ml:r$L4T_VERSION-py3"
++	test_all "${DOCKER_REPO}l4t-ml:r$L4T_VERSION-py3"
+ fi
+ 
+ 
+diff --git a/scripts/l4t_version.sh b/scripts/l4t_version.sh
+index 421861d..c1b413c 100755
+--- a/scripts/l4t_version.sh
++++ b/scripts/l4t_version.sh
+@@ -21,8 +21,9 @@
+ # DEALINGS IN THE SOFTWARE.
+ #
+ 
+-ARCH=$(uname -i)
++ARCH=$(uname -m)
+ echo "ARCH:  $ARCH"
++WGET_ADDITIONAL_PARAMS="--show-progress --progress=bar:force:noscroll"
+ 
+ if [ $ARCH = "aarch64" ]; then
+ 	L4T_VERSION_STRING=$(head -n 1 /etc/nv_tegra_release)
+@@ -41,8 +42,8 @@ if [ $ARCH = "aarch64" ]; then
+ 	else
+ 		echo "reading L4T version from /etc/nv_tegra_release"
+ 
+-		L4T_RELEASE=$(echo $L4T_VERSION_STRING | cut -f 2 -d ' ' | grep -Po '(?<=R)[^;]+')
+-		L4T_REVISION=$(echo $L4T_VERSION_STRING | cut -f 2 -d ',' | grep -Po '(?<=REVISION: )[^;]+')
++		L4T_RELEASE=$(echo $L4T_VERSION_STRING | sed 's/# R\([0-9]*\).*/\1/')
++		L4T_REVISION=$(echo $L4T_VERSION_STRING | sed 's/# R35 (release), REVISION: \([0-9]*.[0-9]*\).*/\1/')
+ 	fi
+ 
+ 	L4T_REVISION_MAJOR=${L4T_REVISION:0:1}
+@@ -51,6 +52,11 @@ if [ $ARCH = "aarch64" ]; then
+ 	L4T_VERSION="$L4T_RELEASE.$L4T_REVISION"
+ 
+ 	echo "L4T BSP Version:  L4T R$L4T_VERSION"
++
++	L4T_DISTRO="$(cat /etc/os-release | grep -w ID | sed 's/ID=\([a-z]*\).*/\1/')"
++	if [ $L4T_DISTRO != "ubuntu" ]; then
++	    WGET_ADDITIONAL_PARAMS=""
++	fi
+ 	
+ elif [ $ARCH != "x86_64" ]; then
+ 	echo "unsupported architecture:  $ARCH"
+-- 
+2.34.1
+
