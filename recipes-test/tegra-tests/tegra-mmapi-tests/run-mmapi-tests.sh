@@ -166,7 +166,7 @@ find_usb_camera() {
 find_argus_camera() {
     for d in /dev/video*; do
 	[ -c "$d" ] || continue
-	if readlink -f /sys/class/video4linux/$(basename $d) | grep -q host1x; then
+	if readlink -f /sys/class/video4linux/$(basename $d) | grep -q tegra-capture-vi; then
 	    echo "$d"
 	    return
 	fi
