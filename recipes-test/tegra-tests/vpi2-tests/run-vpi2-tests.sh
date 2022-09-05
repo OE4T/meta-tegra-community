@@ -9,7 +9,19 @@
 # Some of these tests work better if you use jetson_clocks to
 # speed things up.
 
-TEGRACHIPID="$(printf "0x%02x" $(cat /sys/module/tegra_fuse/parameters/tegra_chip_id))"
+chipid_from_compatible() {
+    local compatible=$(tr '\0' ':' < /sys/firmware/devicetree/base/compatible)
+    if echo "$compatible" | grep -q "nvidia,tegra194"; then
+	echo "0x19"
+    elif echo "$compatible" | grep -q "nvidia,tegra234"; then
+	echo "0x23"
+    else
+	echo "UNKNOWN"
+    fi
+    return 0
+}
+
+TEGRACHIPID="$(chipid_from_compatible)"
 SAMPLEROOT="/opt/nvidia/vpi2"
 PATH="$SAMPLEROOT/bin:$PATH"
 SAMPLEASSETS="$SAMPLEROOT/assets"
