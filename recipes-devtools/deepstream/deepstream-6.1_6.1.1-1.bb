@@ -3,7 +3,7 @@ HOMEPAGE = "https://developer.nvidia.com/deepstream-sdk"
 LICENSE = "Proprietary"
 LIC_FILES_CHKSUM = " \
     file://usr/share/doc/deepstream-6.1/copyright;md5=32b2256361779ec59211b3a698f24ce2 \
-    file://opt/nvidia/deepstream/deepstream-6.1/LICENSE.txt;md5=2312d311b4dfaf054d6604065f8038ec \
+    file://opt/nvidia/deepstream/deepstream-6.1/LICENSE.txt;md5=430d70b62dcd279de697edf2d7a8661e \
     file://opt/nvidia/deepstream/deepstream-6.1/doc/nvidia-tegra/LICENSE.iothub_client;md5=4f8c6347a759d246b5f96281726b8611 \
     file://opt/nvidia/deepstream/deepstream-6.1/doc/nvidia-tegra/LICENSE.nvds_amqp_protocol_adaptor;md5=8b4b651fa4090272b2e08e208140a658 \
 "
@@ -11,7 +11,7 @@ LIC_FILES_CHKSUM = " \
 inherit l4t_deb_pkgfeed
 
 SRC_COMMON_DEBS = "${BPN}_${PV}_arm64.deb;subdir=${BPN}"
-SRC_URI[sha256sum] = "3982595611cb1c4d94b3a530feb9061ccf502fa4954faa5250ca9848789633f4"
+SRC_URI[sha256sum] = "5d901325c9ddd8e8e90ce70bce1fb94fa1b6a4749e6d2f26b4f78e235c9658de"
 
 COMPATIBLE_MACHINE = "(tegra)"
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"
