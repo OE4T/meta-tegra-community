@@ -7,10 +7,9 @@ LIC_FILES_CHKSUM = " \
 
 COMPATIBLE_MACHINE = "(tegra)"
 
-L4T_DEB_SOCNAME = "t186"
-L4T_BSP_DEB_VERSION = "${L4T_BSP_DEB_DEFAULT_VERSION_T186}"
-PKG_VER = "${L4T_VERSION}${@l4t_bsp_debian_version_suffix(d)}"
-SRC_SOC_DEBS = "nvidia-l4t-jetson-multimedia-api_${PKG_VER}_arm64.deb;subdir=git/jetson_multimedia_api"
+L4T_DEB_SOCNAME = "t194"
+PKG_VER = "${L4T_VERSION}${@l4t_bsp_debian_version_suffix(d, pkgname='nvidia-l4t-jetson-multimedia-api')}"
+SRC_COMMON_DEBS = "nvidia-l4t-jetson-multimedia-api_${PKG_VER}_arm64.deb;subdir=git/jetson_multimedia_api"
 
 inherit setuptools3 l4t_deb_pkgfeed
 
@@ -21,7 +20,7 @@ SRC_URI =+ " \
     file://0003-Revert-argus_stream-update-certain-symbols-to-work-w.patch \
 "
 
-SRC_URI[sha256sum] = "40225cf5279fc8ded8a29966e7923d1bdf5a7eb9ff5bee2c016fec2db40a786a"
+SRC_URI[sha256sum] = "7cf134ea26da03c12421ff91c2f9a0051d655704bfbb6917ff1d5ed678bd6600"
 SRCREV = "be40d9219e0f2eb69141f632181ae8c0ba969413"
 PV = "git${SRCPV}"
 
