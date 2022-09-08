@@ -9,8 +9,8 @@ SRC_URI = "git://${SRC_REPO};branch=${SRCBRANCH} \
            file://0001-Fixes-for-cross-building.patch \
            file://0002-Allow-apps-to-be-run-from-other-working-directories.patch \
            "
-# v1.1.2 tag
-SRCREV = "e4da85d06d9c03af7b594d50ac2a6a9daf51ede2"
+# v1.1.4 tag
+SRCREV = "f70dcc966d3a7db5389425d725f056a9a3899b84"
 
 #PV .= "+git${SRCPV}"
 
