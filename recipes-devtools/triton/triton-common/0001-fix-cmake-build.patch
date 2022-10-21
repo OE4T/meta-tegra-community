@@ -1,12 +1,13 @@
-From 72179bb97c5757503282a96ac0b4cad60d16401b Mon Sep 17 00:00:00 2001
+From 11ce1cbd530d0335e985cf0e5134e390b53722c0 Mon Sep 17 00:00:00 2001
 From: Roger Knecht <roger@norberthealth.com>
 Date: Wed, 22 Jun 2022 13:57:50 +0200
 Subject: [PATCH] fix cmake build
 
 ---
- CMakeLists.txt          | 10 ++++++++--
- protobuf/CMakeLists.txt |  4 ++--
- 2 files changed, 10 insertions(+), 4 deletions(-)
+ CMakeLists.txt                       | 10 ++++++++--
+ include/triton/common/model_config.h |  2 +-
+ protobuf/CMakeLists.txt              |  4 ++--
+ 3 files changed, 11 insertions(+), 5 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
 index d060a9c..a84f9e9 100644
@@ -71,6 +72,19 @@ index d060a9c..a84f9e9 100644
    add_library(
      TritonCommon::triton-common-model-config ALIAS triton-common-model-config
    )
+diff --git a/include/triton/common/model_config.h b/include/triton/common/model_config.h
+index d4b20c3..41156c1 100644
+--- a/include/triton/common/model_config.h
++++ b/include/triton/common/model_config.h
+@@ -36,7 +36,7 @@ using DimsList = ::google::protobuf::RepeatedField<::google::protobuf::int64>;
+ 
+ /// The type for the metric_tags map.
+ using MetricTagsMap = ::google::protobuf::Map<
+-    ::google::protobuf::string, ::google::protobuf::string>;
++    std::string, std::string>;
+ 
+ // Map from a host policy name to <setting, value> map of cmdline
+ // settings for the host policy.
 diff --git a/protobuf/CMakeLists.txt b/protobuf/CMakeLists.txt
 index 39fdabf..c5c541e 100644
 --- a/protobuf/CMakeLists.txt
@@ -88,6 +102,3 @@ index 39fdabf..c5c541e 100644
  message(STATUS "Using protobuf ${Protobuf_VERSION}")
  include_directories(${Protobuf_INCLUDE_DIRS})
  
--- 
-2.17.1
-
