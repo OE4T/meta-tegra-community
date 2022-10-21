@@ -19,30 +19,44 @@ DEPENDS = "\
 
 COMPATIBLE_MACHINE = "(cuda)"
 
-inherit cmake cuda
+inherit pkgconfig cmake python3-dir cuda
 
-EXTRA_OECMAKE = "\
-    -DTRITON_ENABLE_TESTS=OFF \
-    -DTRITON_ENABLE_GPU=OFF \
+EXTRA_OECMAKE += "\
     -DCMAKE_INSTALL_PREFIX=${D}/usr \
 "
 
-PACKAGECONFIG ??= "cc_http gpu"
+PACKAGECONFIG ??= "cc_http gpu python_http"
 PACKAGECONFIG[cc_http] = "-DTRITON_ENABLE_CC_HTTP=ON,-DTRITON_ENABLE_CC_HTTP=OFF,curl"
 PACKAGECONFIG[cc_grpc] = "-DTRITON_ENABLE_CC_GRPC=ON,-DTRITON_ENABLE_CC_GRPC=OFF,grpc protobuf protobuf-native"
-PACKAGECONFIG[python_http] = "-DTRITON_ENABLE_PYTHON_HTTP=ON,-DTRITON_ENABLE_PYTHON_HTTP=OFF"
-PACKAGECONFIG[python_grpc] = "-DTRITON_ENABLE_PYTHON_GRPC=ON,-DTRITON_ENABLE_PYTHON_GRPC=OFF"
+PACKAGECONFIG[python_http] = "-DTRITON_ENABLE_PYTHON_HTTP=ON,-DTRITON_ENABLE_PYTHON_HTTP=OFF,,triton-python-backend"
+PACKAGECONFIG[python_grpc] = "-DTRITON_ENABLE_PYTHON_GRPC=ON,-DTRITON_ENABLE_PYTHON_GRPC=OFF,,triton-python-backend"
 PACKAGECONFIG[java] = "-DTRITON_ENABLE_JAVA_HTTP=ON,-DTRITON_ENABLE_JAVA_HTTP=OFF"
 PACKAGECONFIG[perf] = "-DTRITON_ENABLE_PERF_ANALYZER=ON,-DTRITON_ENABLE_PERF_ANALYZER=OFF"
 PACKAGECONFIG[perf_c] = "-DTRITON_ENABLE_PERF_ANALYZER_C_API=ON,-DTRITON_ENABLE_PERF_ANALYZER_C_API=OFF"
 PACKAGECONFIG[perf_tfs] = "-DTRITON_ENABLE_PERF_ANALYZER_TFS=ON,-DTRITON_ENABLE_PERF_ANALYZER_TFS=OFF"
 PACKAGECONFIG[perf_ts] = "-DTRITON_ENABLE_PERF_ANALYZER_TS=ON,-DTRITON_ENABLE_PERF_ANALYZER_TS=OFF"
 PACKAGECONFIG[gpu] = "-DTRITON_ENABLE_GPU=ON,-DTRITON_ENABLE_GPU=OFF,cuda-cudart"
+PACKAGECONFIG[tests] = "-DTRITON_ENABLE_TESTS=ON,-DTRITON_ENABLE_TESTS=OFF"
+PACKAGECONFIG[examples] = "-DTRITON_ENABLE_EXAMPLES=ON,-DTRITON_ENABLE_EXAMPLES=OFF"
+
+python set_epoch() {
+    # workaround: Set epoch to 1980/1/1 to fix build error "ZIP does not support timestamps before 1980"
+    d.setVar('SOURCE_DATE_EPOCH', '315532800')
+}
+
+do_compile[prefuncs] += " set_epoch"
 
 do_install() {
     DESTDIR='${D}' eval ${DESTDIR:+DESTDIR=${DESTDIR} }${CMAKE_VERBOSE} cmake --build '${B}/cc-clients' "$@"  --target ${OECMAKE_TARGET_INSTALL} -- ${EXTRA_OECMAKE_BUILD}
-    install -d ${D}/${includedir}/triton
-    mv ${D}${includedir}/*.h ${D}/${includedir}/triton
+    install -d ${D}${includedir}/triton
+    mv ${D}${includedir}/*.h ${D}${includedir}/triton
     mv ${D}${libdir}/libhttpclient.so ${D}${libdir}/libhttpclient.so.${PV}
     ln -sr ${D}${libdir}/libhttpclient.so.${PV} ${D}${libdir}/libhttpclient.so
+
+    install -d ${D}${PYTHON_SITEPACKAGES_DIR}
+    cp --preserve=mode,timestamps --recursive ${B}/python-clients/library/linux/wheel/build/lib/* ${D}${PYTHON_SITEPACKAGES_DIR}
 }
+
+FILES_${PN} += " \
+    ${PYTHON_SITEPACKAGES_DIR} \
+"

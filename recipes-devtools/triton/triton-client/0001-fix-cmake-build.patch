@@ -1,16 +1,31 @@
-From d0368d2f5ddcaba6eabd4729236ed2743a161ea6 Mon Sep 17 00:00:00 2001
+From 9686622398e6321283d813375f3101c78601f660 Mon Sep 17 00:00:00 2001
 From: Roger Knecht <roger@norberthealth.com>
 Date: Thu, 23 Jun 2022 17:09:28 +0200
 Subject: [PATCH] fix cmake build
 
 ---
- CMakeLists.txt                 | 14 +++-----------
- src/c++/CMakeLists.txt         | 24 +++++-------------------
- src/c++/library/CMakeLists.txt | 16 ++++------------
- 3 files changed, 12 insertions(+), 42 deletions(-)
+ CMakeLists.txt                                | 16 ++++---------
+ src/c++/CMakeLists.txt                        | 24 ++++---------------
+ src/c++/examples/CMakeLists.txt               |  2 +-
+ src/c++/library/CMakeLists.txt                | 16 ++++---------
+ src/c++/perf_analyzer/CMakeLists.txt          |  4 ++--
+ .../client_backend/CMakeLists.txt             |  2 +-
+ .../tensorflow_serving/CMakeLists.txt         |  2 +-
+ .../client_backend/torchserve/CMakeLists.txt  |  2 +-
+ .../client_backend/triton/CMakeLists.txt      |  4 ++--
+ .../triton_c_api/CMakeLists.txt               |  2 +-
+ src/c++/tests/CMakeLists.txt                  |  2 +-
+ src/java/CMakeLists.txt                       |  2 +-
+ src/python/CMakeLists.txt                     | 22 ++++-------------
+ src/python/examples/CMakeLists.txt            |  2 +-
+ src/python/library/CMakeLists.txt             |  2 +-
+ src/python/library/build_wheel.py             |  1 +
+ .../library/tritonclient/CMakeLists.txt       |  2 +-
+ .../library/tritonclient/utils/CMakeLists.txt |  6 ++---
+ 18 files changed, 37 insertions(+), 76 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d25043c..20c10df 100644
+index d25043c..f41cd36 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -24,7 +24,7 @@
@@ -49,8 +64,18 @@ index d25043c..20c10df 100644
    )
  endif() # TRITON_ENABLE_CC_HTTP OR TRITON_ENABLE_CC_GRPC OR TRITON_ENABLE_PERF_ANALYZER
  
+@@ -204,7 +196,9 @@ if(TRITON_ENABLE_PYTHON_HTTP OR TRITON_ENABLE_PYTHON_GRPC)
+       -DTRITON_ENABLE_GPU:BOOL=${TRITON_ENABLE_GPU}
+       -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+       -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}
++      -DCUDA_TOOLKIT_ROOT_DIR:PATH=${CUDA_TOOLKIT_ROOT_DIR}
+     DEPENDS ${_py_client_depends}
++    INSTALL_COMMAND ""
+   )
+ endif() # TRITON_ENABLE_PYTHON_HTTP OR TRITON_ENABLE_PYTHON_GRPC
+ 
 diff --git a/src/c++/CMakeLists.txt b/src/c++/CMakeLists.txt
-index a641fcb..dc13fa3 100644
+index a641fcb..9e3c6eb 100644
 --- a/src/c++/CMakeLists.txt
 +++ b/src/c++/CMakeLists.txt
 @@ -24,7 +24,7 @@
@@ -108,6 +133,19 @@ index a641fcb..dc13fa3 100644
  endif() # TRITON_ENABLE_GPU
  
  #
+diff --git a/src/c++/examples/CMakeLists.txt b/src/c++/examples/CMakeLists.txt
+index c1fe4f9..bc0feb8 100644
+--- a/src/c++/examples/CMakeLists.txt
++++ b/src/c++/examples/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required (VERSION 3.18)
++cmake_minimum_required (VERSION 3.16)
+ 
+ if(WIN32)
+   message("C++ examples are not currently supported on Windows because "
 diff --git a/src/c++/library/CMakeLists.txt b/src/c++/library/CMakeLists.txt
 index e0eed14..ad47a7b 100644
 --- a/src/c++/library/CMakeLists.txt
@@ -175,6 +213,245 @@ index e0eed14..ad47a7b 100644
        )
      endif() # TRITON_ENABLE_GPU
    endforeach()
--- 
-2.17.1
-
+diff --git a/src/c++/perf_analyzer/CMakeLists.txt b/src/c++/perf_analyzer/CMakeLists.txt
+index 3682d32..65c30f8 100644
+--- a/src/c++/perf_analyzer/CMakeLists.txt
++++ b/src/c++/perf_analyzer/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required (VERSION 3.18)
++cmake_minimum_required (VERSION 3.16)
+ 
+ if(WIN32)
+   message("perf_analyzer is not currently supported on Windows because "
+@@ -88,7 +88,7 @@ if(TRITON_ENABLE_GPU)
+ 
+   target_link_libraries(
+     perf_analyzer
+-    PRIVATE CUDA::cudart
++    PRIVATE cudart
+   )
+ endif()
+ 
+diff --git a/src/c++/perf_analyzer/client_backend/CMakeLists.txt b/src/c++/perf_analyzer/client_backend/CMakeLists.txt
+index 23da6f3..d4d78ce 100644
+--- a/src/c++/perf_analyzer/client_backend/CMakeLists.txt
++++ b/src/c++/perf_analyzer/client_backend/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required (VERSION 3.18)
++cmake_minimum_required (VERSION 3.16)
+ 
+ # fixme
+ add_definitions(-DCURL_STATICLIB)
+diff --git a/src/c++/perf_analyzer/client_backend/tensorflow_serving/CMakeLists.txt b/src/c++/perf_analyzer/client_backend/tensorflow_serving/CMakeLists.txt
+index 7a1ad6e..8ced72c 100644
+--- a/src/c++/perf_analyzer/client_backend/tensorflow_serving/CMakeLists.txt
++++ b/src/c++/perf_analyzer/client_backend/tensorflow_serving/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required (VERSION 3.18)
++cmake_minimum_required (VERSION 3.16)
+ 
+ FetchContent_Declare(tensorflow-serving-repo
+   PREFIX tensorflow-serving-rep
+diff --git a/src/c++/perf_analyzer/client_backend/torchserve/CMakeLists.txt b/src/c++/perf_analyzer/client_backend/torchserve/CMakeLists.txt
+index 19e4c62..d3e37bb 100644
+--- a/src/c++/perf_analyzer/client_backend/torchserve/CMakeLists.txt
++++ b/src/c++/perf_analyzer/client_backend/torchserve/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required (VERSION 3.18)
++cmake_minimum_required (VERSION 3.16)
+ 
+ set(
+     TS_CLIENT_BACKEND_SRCS
+diff --git a/src/c++/perf_analyzer/client_backend/triton/CMakeLists.txt b/src/c++/perf_analyzer/client_backend/triton/CMakeLists.txt
+index cdb7410..c4373d5 100644
+--- a/src/c++/perf_analyzer/client_backend/triton/CMakeLists.txt
++++ b/src/c++/perf_analyzer/client_backend/triton/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required (VERSION 3.18)
++cmake_minimum_required (VERSION 3.16)
+ 
+ set(
+     TRITON_CLIENT_BACKEND_SRCS
+@@ -51,6 +51,6 @@ target_link_libraries(
+ if(${TRITON_ENABLE_GPU})
+   target_link_libraries(
+     triton-client-backend-library
+-    PRIVATE CUDA::cudart
++    PRIVATE cudart
+   )
+ endif() # TRITON_ENABLE_GPU
+diff --git a/src/c++/perf_analyzer/client_backend/triton_c_api/CMakeLists.txt b/src/c++/perf_analyzer/client_backend/triton_c_api/CMakeLists.txt
+index 705d25b..392cb73 100644
+--- a/src/c++/perf_analyzer/client_backend/triton_c_api/CMakeLists.txt
++++ b/src/c++/perf_analyzer/client_backend/triton_c_api/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required (VERSION 3.18)
++cmake_minimum_required (VERSION 3.16)
+ 
+ set(
+     TRITON_C_API_CLIENT_BACKEND_SRCS
+diff --git a/src/c++/tests/CMakeLists.txt b/src/c++/tests/CMakeLists.txt
+index 5d9a0fb..7092a5e 100644
+--- a/src/c++/tests/CMakeLists.txt
++++ b/src/c++/tests/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required (VERSION 3.18)
++cmake_minimum_required (VERSION 3.16)
+ 
+ if(WIN32)
+   message("C++ tests are not currently supported on Windows because "
+diff --git a/src/java/CMakeLists.txt b/src/java/CMakeLists.txt
+index 0beeb42..65b1c2d 100644
+--- a/src/java/CMakeLists.txt
++++ b/src/java/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required(VERSION 3.17)
++cmake_minimum_required(VERSION 3.16)
+ 
+ project(java-clients LANGUAGES C CXX)
+ 
+diff --git a/src/python/CMakeLists.txt b/src/python/CMakeLists.txt
+index 444df2c..acaf2af 100644
+--- a/src/python/CMakeLists.txt
++++ b/src/python/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required(VERSION 3.17)
++cmake_minimum_required(VERSION 3.16)
+ 
+ project(python-clients LANGUAGES C CXX)
+ 
+@@ -48,27 +48,15 @@ endif()
+ #
+ # Dependencies
+ #
+-include(FetchContent)
+-
+-FetchContent_Declare(
+-  repo-common
+-  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
+-  GIT_TAG ${TRITON_COMMON_REPO_TAG}
+-  GIT_SHALLOW ON
+-)
+-
+-if(TRITON_ENABLE_PYTHON_GRPC)
+-  set(TRITON_COMMON_ENABLE_PROTOBUF ON)
+-  set(TRITON_COMMON_ENABLE_GRPC ON)
+-endif() # TRITON_ENABLE_PYTHON_GRPC
+-
+-FetchContent_MakeAvailable(repo-common)
+ 
+ #
+ # CUDA
+ #
+ if(${TRITON_ENABLE_GPU})
+-  find_package(CUDAToolkit REQUIRED)
++  enable_language(CUDA)
++  find_package(CUDA REQUIRED)
++  include_directories(${CUDA_INCLUDE_DIRS})
++  link_directories(${CUDA_LIBRARIES})
+ endif() # TRITON_ENABLE_GPU
+ 
+ #
+diff --git a/src/python/examples/CMakeLists.txt b/src/python/examples/CMakeLists.txt
+index 411cc59..38a6d6c 100644
+--- a/src/python/examples/CMakeLists.txt
++++ b/src/python/examples/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required (VERSION 3.18)
++cmake_minimum_required (VERSION 3.16)
+ 
+ if(${TRITON_ENABLE_PYTHON_HTTP})
+   install(
+diff --git a/src/python/library/CMakeLists.txt b/src/python/library/CMakeLists.txt
+index 0124865..e66d527 100644
+--- a/src/python/library/CMakeLists.txt
++++ b/src/python/library/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required (VERSION 3.18)
++cmake_minimum_required (VERSION 3.16)
+ 
+ add_subdirectory(tritonclient)
+ 
+diff --git a/src/python/library/build_wheel.py b/src/python/library/build_wheel.py
+index 442d6fe..3b975e8 100644
+--- a/src/python/library/build_wheel.py
++++ b/src/python/library/build_wheel.py
+@@ -31,6 +31,7 @@ import pathlib
+ import re
+ import shutil
+ import subprocess
++import sys
+ from distutils.dir_util import copy_tree
+ from tempfile import mkstemp
+ 
+diff --git a/src/python/library/tritonclient/CMakeLists.txt b/src/python/library/tritonclient/CMakeLists.txt
+index ee95fd7..89d36a2 100644
+--- a/src/python/library/tritonclient/CMakeLists.txt
++++ b/src/python/library/tritonclient/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required (VERSION 3.18)
++cmake_minimum_required (VERSION 3.16)
+ 
+ if(${TRITON_ENABLE_PYTHON_HTTP})
+   file(COPY http DESTINATION .)
+diff --git a/src/python/library/tritonclient/utils/CMakeLists.txt b/src/python/library/tritonclient/utils/CMakeLists.txt
+index 98e9d19..7b74672 100644
+--- a/src/python/library/tritonclient/utils/CMakeLists.txt
++++ b/src/python/library/tritonclient/utils/CMakeLists.txt
+@@ -35,9 +35,9 @@ if(NOT WIN32)
+   add_library(cshm SHARED shared_memory/shared_memory.cc)
+   if(${TRITON_ENABLE_GPU})
+     target_compile_definitions(cshm PUBLIC TRITON_ENABLE_GPU=1)
+-    target_link_libraries(cshm PUBLIC CUDA::cudart)
++    target_link_libraries(cshm INTERFACE cudart)
+   endif() # TRITON_ENABLE_GPU
+-  target_link_libraries(cshm PRIVATE rt)
++  target_link_libraries(cshm INTERFACE rt)
+ 
+   #
+   # libccudashm.so
+@@ -52,7 +52,7 @@ if(NOT WIN32)
+     )
+     target_include_directories(ccudashm PUBLIC ${CUDA_INCLUDE_DIRS})
+     target_compile_definitions(ccudashm PUBLIC TRITON_ENABLE_GPU=1)
+-    target_link_libraries(ccudashm PUBLIC CUDA::cudart)
++    target_link_libraries(ccudashm PUBLIC cudart)
+   endif() # TRITON_ENABLE_GPU
+ endif() # WIN32
+ 
