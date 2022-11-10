@@ -1,27 +1,20 @@
-From 11ce1cbd530d0335e985cf0e5134e390b53722c0 Mon Sep 17 00:00:00 2001
-From: Roger Knecht <roger@norberthealth.com>
-Date: Wed, 22 Jun 2022 13:57:50 +0200
-Subject: [PATCH] fix cmake build
+From fcfe293be6220321365b226c84342655a5fe0e8e Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ilies.chergui@gmail.com>
+Date: Thu, 10 Nov 2022 19:23:23 +0000
+Subject: [PATCH] Build fixups
 
+Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
+Signed-off-by: Roger Knecht <roger@norberthealth.com>
 ---
- CMakeLists.txt                       | 10 ++++++++--
- include/triton/common/model_config.h |  2 +-
- protobuf/CMakeLists.txt              |  4 ++--
- 3 files changed, 11 insertions(+), 5 deletions(-)
+ CMakeLists.txt                       | 8 +++++++-
+ include/triton/common/model_config.h | 2 +-
+ protobuf/CMakeLists.txt              | 2 +-
+ 3 files changed, 9 insertions(+), 3 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d060a9c..a84f9e9 100644
+index d060a9c..9e070c1 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -24,7 +24,7 @@
- # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- 
--cmake_minimum_required(VERSION 3.17)
-+cmake_minimum_required(VERSION 3.16)
- 
- project(tritoncommon LANGUAGES C CXX)
- 
 @@ -70,6 +70,7 @@ add_library(
    triton-common-error
    src/error.cc
@@ -86,15 +79,11 @@ index d4b20c3..41156c1 100644
  // Map from a host policy name to <setting, value> map of cmdline
  // settings for the host policy.
 diff --git a/protobuf/CMakeLists.txt b/protobuf/CMakeLists.txt
-index 39fdabf..c5c541e 100644
+index 39fdabf..15065c6 100644
 --- a/protobuf/CMakeLists.txt
 +++ b/protobuf/CMakeLists.txt
-@@ -24,10 +24,10 @@
- # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- 
--cmake_minimum_required (VERSION 3.18)
-+cmake_minimum_required (VERSION 3.16)
+@@ -27,7 +27,7 @@
+ cmake_minimum_required (VERSION 3.18)
  
  set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
 -find_package(Protobuf CONFIG REQUIRED)
@@ -102,3 +91,6 @@ index 39fdabf..c5c541e 100644
  message(STATUS "Using protobuf ${Protobuf_VERSION}")
  include_directories(${Protobuf_INCLUDE_DIRS})
  
+-- 
+2.25.1
+

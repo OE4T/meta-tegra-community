@@ -1,27 +1,20 @@
-From a7eb2512575b93634a979e289534d9771ad6fc9d Mon Sep 17 00:00:00 2001
-From: Roger Knecht <roger@norberthealth.com>
-Date: Fri, 1 Jul 2022 13:04:43 +0200
-Subject: [PATCH] fix cmake build
+From 6fff9f2288bac40b998159b6461a4a6a3316e96b Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ilies.chergui@gmail.com>
+Date: Thu, 10 Nov 2022 14:22:38 +0000
+Subject: [PATCH] Build fixups
 
+Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
+Signed-off-by: Roger Knecht <roger@norberthealth.com>
 ---
- CMakeLists.txt     | 35 ++++++-----------------------------
- src/CMakeLists.txt | 32 +++++++++-----------------------
+ CMakeLists.txt     | 33 +++++----------------------------
+ src/CMakeLists.txt | 30 ++++++++----------------------
  src/filesystem.cc  |  2 +-
- 3 files changed, 16 insertions(+), 53 deletions(-)
+ 3 files changed, 14 insertions(+), 51 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d1d6f4a..42e043a 100644
+index d1d6f4a..41a2c08 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -24,7 +24,7 @@
- # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- 
--cmake_minimum_required(VERSION 3.18)
-+cmake_minimum_required(VERSION 3.16)
- 
- project(tritoncore LANGUAGES C CXX)
- 
 @@ -96,6 +96,7 @@ add_library(
    triton-core-serverstub SHARED
    ${CMAKE_CURRENT_SOURCE_DIR}/src/tritonserver_stub.cc
@@ -94,18 +87,9 @@ index d1d6f4a..42e043a 100644
  endif() # NOT TRITON_CORE_HEADERS_ONLY
  
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 87ebcf8..52ad185 100644
+index 87ebcf8..ae23b59 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -24,7 +24,7 @@
- # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- 
--cmake_minimum_required(VERSION 3.18)
-+cmake_minimum_required(VERSION 3.16)
- 
- project(libtritonserver LANGUAGES C CXX)
- 
 @@ -38,24 +38,16 @@ endif()
  # We must include the transitive closure of all repos so that we can
  # override the tag.
@@ -211,5 +195,5 @@ index 009a612..7a6f8e9 100644
      return Status(
          Status::Code::INTERNAL, "Can't parse " + path + " as binary proto");
 -- 
-2.17.1
+2.25.1
 

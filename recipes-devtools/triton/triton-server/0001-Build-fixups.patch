@@ -1,26 +1,19 @@
-From 93ae515e6c87f23fa3473f43110f1e2c189e9f30 Mon Sep 17 00:00:00 2001
-From: Roger Knecht <roger@norberthealth.com>
-Date: Fri, 1 Jul 2022 14:57:31 +0200
-Subject: [PATCH] fix cmake build
+From bb1349c681814f2d624106ec2f0f0f2060830acc Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ilies.chergui@gmail.com>
+Date: Thu, 10 Nov 2022 16:17:11 +0000
+Subject: [PATCH] Build fixups
 
+Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
+Signed-off-by: Roger Knecht <roger@norberthealth.com>
 ---
- CMakeLists.txt     | 46 ++---------------------
- src/CMakeLists.txt | 94 +++++++++++++++++-----------------------------
- 2 files changed, 38 insertions(+), 102 deletions(-)
+ CMakeLists.txt     |  42 +------------------
+ src/CMakeLists.txt | 100 +++++++++++++++++----------------------------
+ 2 files changed, 39 insertions(+), 103 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 6d4ec543d..440fe5cd1 100644
+index 6d4ec543..cb1b1b66 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -24,7 +24,7 @@
- # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- 
--cmake_minimum_required(VERSION 3.18)
-+cmake_minimum_required(VERSION 3.16)
- 
- project(tritonserver LANGUAGES C CXX)
- 
 @@ -100,23 +100,8 @@ endif()
  #
  # Dependencies
@@ -77,29 +70,17 @@ index 6d4ec543d..440fe5cd1 100644
      -DTRITON_EXTRA_LIB_PATHS:PATH=${TRITON_EXTRA_LIB_PATHS}
      -DTRITON_ENABLE_ASAN:BOOL=${TRITON_ENABLE_ASAN}
      -DTRITON_ENABLE_NVTX:BOOL=${TRITON_ENABLE_NVTX}
-@@ -229,7 +189,7 @@ ExternalProject_Add(triton-server
-     -DTRITON_ENABLE_TENSORRT:BOOL=${TRITON_ENABLE_TENSORRT}
-     -DTRITON_ENABLE_ENSEMBLE:BOOL=${TRITON_ENABLE_ENSEMBLE}
+@@ -231,5 +191,5 @@ ExternalProject_Add(triton-server
      -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
--    -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}
-+    -DCMAKE_INSTALL_PREFIX:PATH=${DESTDIR}${CMAKE_INSTALL_PREFIX}
+     -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}
      -DTRITON_VERSION:STRING=${TRITON_VERSION}
 -  DEPENDS ${TRITON_DEPENDS}
 +    -DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH}
  )
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index d17392b86..36c2bd286 100644
+index d17392b8..c9982d5b 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -24,7 +24,7 @@
- # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- 
--cmake_minimum_required (VERSION 3.18)
-+cmake_minimum_required (VERSION 3.16)
- 
- project(tritonserverexe LANGUAGES C CXX)
- 
 @@ -36,35 +36,18 @@ include(GNUInstallDirs)
  # We must include the transitive closure of all repos so that we can
  # override the tag. The backend repo is needed for the tests.
@@ -188,6 +169,15 @@ index d17392b86..36c2bd286 100644
    )
  endif() # TRITON_ENABLE_GPU
  
+@@ -266,7 +252,7 @@ endif() # NOT WIN32
+ if (NOT WIN32)
+   install(
+     TARGETS main
+-    RUNTIME DESTINATION bin
++    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+   )
+ else()
+   # See explanation above as to why we need to rename main.exe to
 @@ -298,7 +284,7 @@ if(${TRITON_ENABLE_GRPC})
      target_compile_options(
        grpc-endpoint-library
@@ -292,7 +282,7 @@ index d17392b86..36c2bd286 100644
      )
  
    if(${TRITON_ENABLE_GPU})
-@@ -697,7 +679,7 @@ if (NOT WIN32)
+@@ -697,13 +679,13 @@ if (NOT WIN32)
      target_link_libraries(
        simple
        PRIVATE
@@ -301,6 +291,13 @@ index d17392b86..36c2bd286 100644
      )
    endif() # TRITON_ENABLE_GPU
  
+   install(
+     TARGETS simple
+-    RUNTIME DESTINATION bin
++    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+   )
+ 
+   #
 @@ -728,7 +710,7 @@ if (NOT WIN32)
      target_compile_options(
        multi_server
@@ -321,7 +318,7 @@ index d17392b86..36c2bd286 100644
      )
  
    if(${TRITON_ENABLE_GPU})
-@@ -761,7 +743,7 @@ if (NOT WIN32)
+@@ -761,13 +743,13 @@ if (NOT WIN32)
      target_link_libraries(
        multi_server
        PRIVATE
@@ -330,6 +327,13 @@ index d17392b86..36c2bd286 100644
      )
    endif() # TRITON_ENABLE_GPU
  
+   install(
+     TARGETS multi_server
+-    RUNTIME DESTINATION bin
++    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+   )
+ 
+   if(${TRITON_ENABLE_GPU})
 @@ -793,7 +775,7 @@ if (NOT WIN32)
        target_compile_options(
          memory_alloc
@@ -339,7 +343,7 @@ index d17392b86..36c2bd286 100644
        )
      endif()
  
-@@ -818,9 +800,8 @@ if (NOT WIN32)
+@@ -818,19 +800,13 @@ if (NOT WIN32)
        PRIVATE
          triton-common-async-work-queue  # from repo-common
          triton-common-error             # from repo-common
@@ -351,7 +355,9 @@ index d17392b86..36c2bd286 100644
        )
  
      install(
-@@ -829,8 +810,3 @@ if (NOT WIN32)
+       TARGETS memory_alloc
+-      RUNTIME DESTINATION bin
++      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
      )
    endif() # TRITON_ENABLE_GPU
  endif() # NOT WIN32
@@ -361,5 +367,5 @@ index d17392b86..36c2bd286 100644
 -  add_subdirectory(test test)
 -endif() # NOT WIN32
 -- 
-2.17.1
+2.25.1
 
