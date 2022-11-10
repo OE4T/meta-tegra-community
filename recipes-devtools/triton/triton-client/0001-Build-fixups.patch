@@ -1,18 +1,20 @@
-From 815e22afcdf70ab6756f4e47f4b4a74d9d566d44 Mon Sep 17 00:00:00 2001
-From: Roger Knecht <roger@norberthealth.com>
-Date: Thu, 23 Jun 2022 17:09:28 +0200
-Subject: [PATCH] fix cmake build
+From 93143b18f84da42c04c644f8a3b0140131025962 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ilies.chergui@gmail.com>
+Date: Thu, 10 Nov 2022 20:38:37 +0000
+Subject: [PATCH] Build fixups
 
+Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
+Signed-off-by: Roger Knecht <roger@norberthealth.com>
 ---
  CMakeLists.txt                                | 14 ++++--------
  src/c++/CMakeLists.txt                        | 22 ++++---------------
- src/c++/library/CMakeLists.txt                | 14 +++---------
+ src/c++/library/CMakeLists.txt                | 18 +++++----------
  src/c++/perf_analyzer/CMakeLists.txt          |  2 +-
  .../client_backend/triton/CMakeLists.txt      |  2 +-
  src/python/CMakeLists.txt                     | 20 ++++-------------
  src/python/library/build_wheel.py             |  1 +
  .../library/tritonclient/utils/CMakeLists.txt |  6 ++---
- 8 files changed, 21 insertions(+), 60 deletions(-)
+ 8 files changed, 23 insertions(+), 62 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
 index d25043c..3e272a0 100644
@@ -106,7 +108,7 @@ index a641fcb..6c2d7ec 100644
  
  #
 diff --git a/src/c++/library/CMakeLists.txt b/src/c++/library/CMakeLists.txt
-index e0eed14..2cf0371 100644
+index e0eed14..2fc78ed 100644
 --- a/src/c++/library/CMakeLists.txt
 +++ b/src/c++/library/CMakeLists.txt
 @@ -190,7 +190,7 @@ if(TRITON_ENABLE_CC_GRPC OR TRITON_ENABLE_PERF_ANALYZER)
@@ -163,6 +165,24 @@ index e0eed14..2cf0371 100644
        )
      endif() # TRITON_ENABLE_GPU
    endforeach()
+@@ -368,7 +360,7 @@ if(TRITON_ENABLE_CC_HTTP OR TRITON_ENABLE_PERF_ANALYZER)
+   install(
+       FILES
+       ${CMAKE_CURRENT_SOURCE_DIR}/http_client.h
+-      DESTINATION include
++      DESTINATION include/triton
+   )
+ endif() # TRITON_ENABLE_CC_HTTP OR TRITON_ENABLE_PERF_ANALYZER
+ 
+@@ -377,7 +369,7 @@ if(TRITON_ENABLE_CC_HTTP OR TRITON_ENABLE_CC_GRPC OR TRITON_ENABLE_PERF_ANALYZER
+       FILES
+       ${CMAKE_CURRENT_SOURCE_DIR}/common.h
+       ${CMAKE_CURRENT_SOURCE_DIR}/ipc.h
+-      DESTINATION include
++      DESTINATION include/triton
+   )
+ 
+   include(GNUInstallDirs)
 diff --git a/src/c++/perf_analyzer/CMakeLists.txt b/src/c++/perf_analyzer/CMakeLists.txt
 index 3682d32..b446dd8 100644
 --- a/src/c++/perf_analyzer/CMakeLists.txt
@@ -261,3 +281,6 @@ index 98e9d19..7b74672 100644
    endif() # TRITON_ENABLE_GPU
  endif() # WIN32
  
+-- 
+2.25.1
+
