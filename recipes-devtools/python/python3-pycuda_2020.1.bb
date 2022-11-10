@@ -36,5 +36,4 @@ do_configure() {
     ${PYTHON_PN} -u ${S}/configure.py
     # disable CURAND otherwise cannot compile
     sed -i 's?CUDA_ENABLE_CURAND = True?CUDA_ENABLE_CURAND = False?g' ${B}/siteconf.py
-    cp ${B}/siteconf.py ${S}
 }
