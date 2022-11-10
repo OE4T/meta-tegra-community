@@ -1,25 +1,18 @@
-From 7a9143270124321baa5d3579d5996e2b3789bed9 Mon Sep 17 00:00:00 2001
-From: Roger Knecht <roger@norberthealth.com>
-Date: Fri, 24 Jun 2022 19:13:11 +0200
-Subject: [PATCH] fix cmake build
+From 7abd2221ed42d34a814d2afa86777347b20cdb7d Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ilies.chergui@gmail.com>
+Date: Thu, 10 Nov 2022 19:33:38 +0000
+Subject: [PATCH] Build fixups
 
+Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
+Signed-off-by: Roger Knecht <roger@norberthealth.com>
 ---
- CMakeLists.txt | 25 ++++++-------------------
- 1 file changed, 6 insertions(+), 19 deletions(-)
+ CMakeLists.txt | 23 +++++------------------
+ 1 file changed, 5 insertions(+), 18 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 622f69a..1fa4c8f 100644
+index 622f69a..68e8f6c 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -24,7 +24,7 @@
- # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- 
--cmake_minimum_required(VERSION 3.17)
-+cmake_minimum_required(VERSION 3.16)
- 
- project(tritonbackend LANGUAGES C CXX)
- 
 @@ -45,28 +45,15 @@ endif()
  #
  # Dependencies
@@ -71,5 +64,5 @@ index 622f69a..1fa4c8f 100644
      kernel-library-new
    )
 -- 
-2.17.1
+2.25.1
 
