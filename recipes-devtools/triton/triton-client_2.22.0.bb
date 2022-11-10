@@ -4,8 +4,8 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=1c4cd58940438cc34ebeb4fec0a79ec8"
 SECTION = "libs"
 
 SRC_URI = "\
-    git://github.com/triton-inference-server/client.git;protocol=https;branch=${PV} \
-    file://0001-fix-cmake-build.patch \
+    git://github.com/triton-inference-server/client.git;protocol=https;branch=r22.05 \
+    file://0001-Build-fixups.patch \
 "
 
 SRCREV = "1a167ab9eb1c6ffc23d12c04bc9ffbd3dede0856"
@@ -21,9 +21,9 @@ COMPATIBLE_MACHINE = "(cuda)"
 
 inherit pkgconfig cmake python3-dir cuda
 
-EXTRA_OECMAKE += "\
-    -DCMAKE_INSTALL_PREFIX=${D}/usr \
-"
+EXTRA_OECMAKE += '\
+    -DCMAKE_INSTALL_PREFIX="${D}${prefix}" \
+'
 
 PACKAGECONFIG ??= "cc_http gpu python_http"
 PACKAGECONFIG[cc_http] = "-DTRITON_ENABLE_CC_HTTP=ON,-DTRITON_ENABLE_CC_HTTP=OFF,curl"
@@ -39,24 +39,27 @@ PACKAGECONFIG[gpu] = "-DTRITON_ENABLE_GPU=ON,-DTRITON_ENABLE_GPU=OFF,cuda-cudart
 PACKAGECONFIG[tests] = "-DTRITON_ENABLE_TESTS=ON,-DTRITON_ENABLE_TESTS=OFF"
 PACKAGECONFIG[examples] = "-DTRITON_ENABLE_EXAMPLES=ON,-DTRITON_ENABLE_EXAMPLES=OFF"
 
-python set_epoch() {
-    # workaround: Set epoch to 1980/1/1 to fix build error "ZIP does not support timestamps before 1980"
-    d.setVar('SOURCE_DATE_EPOCH', '315532800')
+def get_epoch_time(d):
+    import time
+    return int(time.time())
+
+SOURCE_DATE_EPOCH = "${@get_epoch_time(d)}"
+
+cmake_runcmake_install() {
+	bbnote ${DESTDIR:+DESTDIR=${DESTDIR} }${CMAKE_VERBOSE} cmake --build '${B}/cc-clients' "$@" -- ${EXTRA_OECMAKE_BUILD}
+	eval ${DESTDIR:+DESTDIR=${DESTDIR} }${CMAKE_VERBOSE} cmake --build '${B}/cc-clients' "$@" -- ${EXTRA_OECMAKE_BUILD}
 }
 
-do_compile[prefuncs] += " set_epoch"
-
 do_install() {
-    DESTDIR='${D}' eval ${DESTDIR:+DESTDIR=${DESTDIR} }${CMAKE_VERBOSE} cmake --build '${B}/cc-clients' "$@"  --target ${OECMAKE_TARGET_INSTALL} -- ${EXTRA_OECMAKE_BUILD}
-    install -d ${D}${includedir}/triton
-    mv ${D}${includedir}/*.h ${D}${includedir}/triton
-    mv ${D}${libdir}/libhttpclient.so ${D}${libdir}/libhttpclient.so.${PV}
-    ln -sr ${D}${libdir}/libhttpclient.so.${PV} ${D}${libdir}/libhttpclient.so
-
+    cmake_runcmake_install --target ${OECMAKE_TARGET_INSTALL}
     install -d ${D}${PYTHON_SITEPACKAGES_DIR}
-    cp --preserve=mode,timestamps --recursive ${B}/python-clients/library/linux/wheel/build/lib/* ${D}${PYTHON_SITEPACKAGES_DIR}
+    cp --preserve=mode,timestamps -R ${B}/python-clients/library/linux/wheel/build/lib/* ${D}${PYTHON_SITEPACKAGES_DIR}
 }
 
 FILES:${PN} += " \
+    ${includedir}/triton \
     ${PYTHON_SITEPACKAGES_DIR} \
 "
+
+SOLIBS = ".so"
+FILES_SOLIBSDEV = ""
