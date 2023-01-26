@@ -11,7 +11,6 @@
 SAMPLEROOT="/usr/src/tensorrt"
 PATH="$SAMPLEROOT/bin:$PATH"
 SAMPLEDATA="$PWD/tensorrt-tests"
-FASTER_RCNN_MODELS="faster_rcnn_models.tgz"
 RESNET50_MODELS="resnet50.tar.gz"
 SKIPCODE=97
 HAVE_MNIST_PGMS=no
@@ -51,46 +50,6 @@ run_dynamic_reshape() {
     sample_dynamic_reshape  --datadir=${SAMPLEDATA}/mnist/
 }
 
-run_faster-rcnn() {
-    local FASTER_RCNN_MODELS_URL="https://dl.dropboxusercontent.com/s/o6ii098bu51d139/${FASTER_RCNN_MODELS}"
-    if ! wget --no-check-certificate -q ${FASTER_RCNN_MODELS_URL} -O ${SAMPLEDATA}/faster-rcnn/${FASTER_RCNN_MODELS}; then
-        echo "Skipping Faster RCNN - Could not download ${FASTER_RCNN_MODELS}"
-        return $SKIPCODE
-    fi
-
-    if [ -f "${SAMPLEDATA}/faster-rcnn/${FASTER_RCNN_MODELS}" ]; then
-        tar zxf ${SAMPLEDATA}/faster-rcnn/${FASTER_RCNN_MODELS} -C ${SAMPLEDATA}/faster-rcnn --strip-components=1 --exclude=ZF_*
-    fi
-
-    echo "Running faster-rcnn"
-    sample_fasterRCNN --datadir=${SAMPLEDATA}/faster-rcnn/
-}
-
-run_googlenet() {
-    echo "Running googlenet"
-    sample_googlenet --datadir=${SAMPLEDATA}/googlenet/
-}
-
-run_int8() {
-    copy_mnist_data
-    local TRAIN_IMAGES="train-images-idx3-ubyte"
-    local TRAIN_LABELS="train-labels-idx1-ubyte"
-    local TRAIN_IMAGES_URL="http://yann.lecun.com/exdb/mnist/${TRAIN_IMAGES}.gz"
-    local TRAIN_LABELS_URL="http://yann.lecun.com/exdb/mnist/${TRAIN_LABELS}.gz"
-    if ! wget --no-check-certificate -q ${TRAIN_IMAGES_URL} -O - | zcat > ${SAMPLEDATA}/mnist/${TRAIN_IMAGES}; then
-        echo "Skipping INT8 - Could not download ${TRAIN_IMAGES}"
-        return $SKIPCODE
-    fi
-
-    if ! wget --no-check-certificate -q ${TRAIN_LABELS_URL} -O - | zcat > ${SAMPLEDATA}/mnist/${TRAIN_LABELS}; then
-        echo "Skipping INT8 - Could not download ${TRAIN_LABELS}"
-        return $SKIPCODE
-    fi
-
-    echo "Running int8"
-    sample_int8 --datadir=${SAMPLEDATA}/mnist/
-}
-
 run_int8_api() {
     copy_resnet50_data
     echo "Running int8-api"
@@ -98,16 +57,6 @@ run_int8_api() {
       --image=${SAMPLEDATA}/resnet50/airliner.ppm \
       --reference=${SAMPLEDATA}/int8_api/reference_labels.txt \
       --ranges=${SAMPLEDATA}/int8_api/resnet50_per_tensor_dynamic_range.txt
-}
-
-run_mnist() {
-    echo "Running mnist"
-    sample_mnist --datadir=${SAMPLEDATA}/mnist/
-}
-
-run_mnist_api() {
-    copy_mnist_data
-    sample_mnist_api --datadir=${SAMPLEDATA}/mnist/
 }
 
 run_onnx_mnist() {
@@ -119,18 +68,6 @@ run_io_formats() {
     copy_mnist_data
     echo "Running io-formats"
     sample_io_formats --datadir=${SAMPLEDATA}/mnist/
-}
-
-run_uff_mnist() {
-    copy_mnist_data
-    echo "Running uff-mnist"
-    sample_uff_mnist --datadir=${SAMPLEDATA}/mnist/
-}
-
-run_uff_plugin_v2_ext() {
-    copy_mnist_data
-    echo "Running uff-plugin-v2-ext"
-    sample_uff_plugin_v2_ext --datadir=${SAMPLEDATA}/mnist/
 }
 
 run_trtexec(){
@@ -146,9 +83,8 @@ run_trtexec(){
 	trtexec --loadEngine=mnist16.trt --batch=16
 }
 
-TESTS="algorithm_selector char-rnn dynamic_reshape faster-rcnn googlenet"
-TESTS="$TESTS int8 int8_api mnist mnist_api onnx_mnist io_formats"
-TESTS="$TESTS uff_mnist uff_plugin_v2_ext"
+TESTS="algorithm_selector char-rnn dynamic_reshape"
+TESTS="$TESTS int8_api onnx_mnist io_formats"
 TESTS="$TESTS trtexec"
 
 find_test() {
