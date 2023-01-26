@@ -50,7 +50,7 @@ run_video_dec_cuda() {
     fi
 }
 
-run_video_enc_cuda() {
+run_video_cuda_enc() {
     local rc=0
     [ -e "$SAMPLEYUV" ] || generate_yuv_sample_vid
     echo "Running 03_video_cuda_enc"
@@ -125,28 +125,28 @@ run_video_dec_drm() {
     return $rc
 }
 
-run_camera_jpeg_capture() {
+run_argus_camera_jpeg() {
     local mipicam=$(find_argus_camera)
     if [ -z "$mipicam" ]; then
-	echo "Skipping 09_camera_jpeg_capture - no MIPI camera"
+	echo "Skipping 09_argus_camera_jpeg - no MIPI camera"
 	return $SKIPCODE
     fi
     local rc=0
-    echo "Running 09_camera_jpeg_capture"
-    camera_jpeg_capture || rc=1
+    echo "Running 09_argus_camera_jpeg"
+    argus_camera_jpeg || rc=1
     rm -f output*.jpg
     return $rc
 }
 
-run_camera_recording() {
+run_argus_camera_recording() {
     local mipicam=$(find_argus_camera)
     if [ -z "$mipicam" ]; then
-	echo "Skipping 10_camera_recording - no MIPI camera"
+	echo "Skipping 10_argus_camera_recording - no MIPI camera"
 	return $SKIPCODE
     fi
     local rc=0
-    echo "Running 10_camera_recording"
-    camera_recording || rc=1
+    echo "Running 10_argus_camera_recording"
+    argus_camera_recording || rc=1
     [ $rc -ne 0 ] || run_video_decode output.h264 || rc=1
     rm -f output.h264
     return $rc
@@ -174,14 +174,14 @@ find_argus_camera() {
     echo ""
 }
 
-run_camera_v4l2_cuda() {
+run_v4l2_camera_cuda() {
     local usbcam=$(find_usb_camera)
     if [ -z "$usbcam" ]; then
-	echo "Skipping 12_camera_v4l2_cuda - no USB camera"
+	echo "Skipping 12_v4l2_camera_cuda - no USB camera"
 	return $SKIPCODE
     fi
-    echo "Running 12_camera_v4l2_cuda -d $usbcam"
-    camera_v4l2_cuda -d $usbcam -s 1280x720 -f YUYV -c -N 120
+    echo "Running 12_v4l2_camera_cuda -d $usbcam"
+    v4l2_camera_cuda -d $usbcam -s 1280x720 -f YUYV -c -N 120
 }
 
 run_camera_sample() {
@@ -249,21 +249,21 @@ run_frontend() {
     rm -f output*.h265 trt.h264 trtModel.cache
 }
 
-run_v4l2cuda() {
+run_v4l2_camera_cuda_rgb() {
     local usbcam=$(find_usb_camera)
     if [ -z "$usbcam" ]; then
-	echo "Skipping run_v4l2cuda - no USB camera"
+	echo "Skipping 18_v4l2_camera_cuda_rgb - no USB camera"
 	return $SKIPCODE
     fi
-    echo "Running capture-cuda -d $usbcam"
-    capture-cuda -d $usbcam
+    echo "Running 18_v4l2_camera_cuda_rgb -d $usbcam"
+    v4l2_camera_cuda_rgb -d $usbcam
     rm -f out.ppm
 }
 
-TESTS="video_decode video_encode video_dec_cuda video_enc_cuda video_dec_trt jpeg_encode"
-TESTS="$TESTS jpeg_decode video_convert video_dec_drm camera_jpeg_capture camera_recording"
-TESTS="$TESTS camera_v4l2_cuda camera_sample decode_sample encode_sample transform_sample"
-TESTS="$TESTS backend frontend v4l2cuda"
+TESTS="video_decode video_encode video_dec_cuda video_cuda_enc video_dec_trt jpeg_encode"
+TESTS="$TESTS jpeg_decode video_convert video_dec_drm argus_camera_jpeg argus_camera_recording"
+TESTS="$TESTS v4l2_camera_cuda camera_sample decode_sample encode_sample transform_sample"
+TESTS="$TESTS backend frontend v4l2_camera_cuda_rgb"
 
 find_test() {
     for t in $TESTS; do
