@@ -1,0 +1,35 @@
+#!/bin/bash
+# Historically NVIDIA does not re-tag containers in NVIDIA NGC to match latest versions of L4T.
+# This means matching the version of L4T running on the device is not sufficient to find the matching
+# containers on NVIDIA NGC.
+# This script remaps the L4T_VERSION value to match the availability of containers on nvidia ngc
+# as understood at build time and prints a message when the L4T_VERSION is overridden.
+# It should be called after L4T_VERSION is defined in an environment variable through l4t_version.sh
+# or similar mechanism
+
+if [ -z "${L4T_VERSION}" ]; then
+    echo "Please use l4t_version.sh to define an L4T version before sourcing this script"
+    exit 1
+fi
+
+check_remap() {
+    declare -A l4t_version_remap
+
+    # Build this array based on available tags in
+    #       https://catalog.ngc.nvidia.com/orgs/nvidia/containers/l4t-ml
+    #       https://catalog.ngc.nvidia.com/orgs/nvidia/containers/l4t-tensorflow
+    #       https://catalog.ngc.nvidia.com/orgs/nvidia/containers/l4t-pytorch
+    l4t_version_remap["35.2.1"]="35.1.0"
+    l4t_version_remap["32.7.2"]="32.7.1"
+    l4t_version_remap["32.7.3"]="32.7.1"
+
+    if [ "${l4t_version_remap[${L4T_VERSION}]+test}" ]; then
+            L4T_VERSION_ACTUAL=${L4T_VERSION}
+            L4T_VERSION=${l4t_version_remap[${L4T_VERSION}]}
+            echo "Overriding L4T_VERSION ${L4T_VERSION_ACTUAL} with version ${L4T_VERSION} to match container availability on NGC"
+    else
+            echo "No remap necessary for l4t version ${L4T_VERSION}"
+    fi
+}
+
+check_remap
