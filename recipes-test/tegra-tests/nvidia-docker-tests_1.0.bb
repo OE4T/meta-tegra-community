@@ -5,12 +5,14 @@ LIC_FILES_CHKSUM = "file://LICENSE.md;md5=da33f1c12f6d31e71cd114d0c336d4be"
 SRC_REPO ?= "github.com/dusty-nv/jetson-containers"
 SRCBRANCH ?= "master"
 SRC_URI = "git://${SRC_REPO};branch=${SRCBRANCH};protocol=https"
-SRCREV = "39496f8eba51ababb0cfb625fc70410163e4fe43"
+SRCREV = "bb17dc7db1ce46bb29e79ef0ac4e13aa934adf31"
 PV = "1.0+git${SRCPV}"
 
 SRC_URI += "\
-        file://0001-Distro-agnostic-support-for-Test-ML-script.patch \
-	file://run-docker-tests.sh.in \
+    file://0001-Distro-agnostic-support-for-Test-ML-script.patch \
+    file://0002-Add-version-remap-script-support.patch \
+    file://l4t_version_remap.sh.in \
+    file://run-docker-tests.sh.in \
 "
 
 COMPATIBLE_MACHINE = "(tegra)"
@@ -32,14 +34,15 @@ do_install() {
 
     install -d ${D}${bindir}
     install -m 0755 ${WORKDIR}/run-docker-tests.sh.in ${D}${bindir}/run-docker-tests
+    install -m 0755 ${WORKDIR}/l4t_version_remap.sh.in ${D}/opt/nvidia-docker-tests/scripts/l4t_version_remap.sh
 }
 
 FILES:${PN} = " \
-                /opt/nvidia-docker-tests \
-		${bindir}/run-docker-tests \
-	      "
+    /opt/nvidia-docker-tests \
+    ${bindir}/run-docker-tests \
+"
 RDEPENDS:${PN} = " \
-                   bash \
-                   nvidia-docker \
-		   nv-tegra-release \
-		   "
+    bash \
+    nvidia-docker \
+    nv-tegra-release \
+"
