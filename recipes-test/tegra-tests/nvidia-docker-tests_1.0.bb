@@ -29,6 +29,9 @@ do_install() {
     for i in $(ls ${S}/test/*.py); do
         install ${i} ${D}/opt/nvidia-docker-tests/test
     done
+    for i in $(ls ${S}/test/*.sh); do
+        install -m 0755 ${i} ${D}/opt/nvidia-docker-tests/test
+    done
     install -d ${D}/opt/nvidia-docker-tests/test/data
     install -m 0644 ${S}/test/data/test_0.jpg ${D}/opt/nvidia-docker-tests/test/data
 
