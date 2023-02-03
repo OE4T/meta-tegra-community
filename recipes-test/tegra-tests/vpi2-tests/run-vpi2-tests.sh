@@ -28,46 +28,26 @@ SAMPLEASSETS="$SAMPLEROOT/assets"
 SKIPCODE=97
 
 run_convolve_2d() {
-    if [ "$TEGRACHIPID" != "0x19" ] && [ "$1" = "pva" ]; then
-        echo "Skipping 01_convolve_2d - pva backend is not supported"
-        return $SKIPCODE
-    fi
     echo "Running 01_convolve_2d - Backend is $1"
     vpi_sample_01_convolve_2d "$1" "$SAMPLEASSETS/kodim08.png"
 }
 
 run_stereo_disparity() {
-    if [ "$TEGRACHIPID" != "0x19" ] && [ "$1" = "pva" ]; then
-        echo "Skipping 02_stereo_disparity - pva backend is not supported"
-        return $SKIPCODE
-    fi
     echo "Running 02_stereo_disparity - Backend is $1"
     vpi_sample_02_stereo_disparity "$1" "$SAMPLEASSETS/chair_stereo_left.png" "$SAMPLEASSETS/chair_stereo_right.png"
 }
 
 run_harris_corners() {
-    if [ "$TEGRACHIPID" != "0x19" ] && [ "$1" = "pva" ]; then
-        echo "Skipping 03_harris_corners - pva backend is not supported"
-        return $SKIPCODE
-    fi
     echo "Running 03_harris_corners - Backend is $1"
     vpi_sample_03_harris_corners "$1" "$SAMPLEASSETS/kodim08.png"
 }
 
 run_rescale() {
-    if [ "$TEGRACHIPID" != "0x19" ] && [ "$1" = "pva" ]; then
-        echo "Skipping 04_rescale - pva backend is not supported"
-        return $SKIPCODE
-    fi
     echo "Running 04_rescale - Backend is $1"
     vpi_sample_04_rescale "$1" "$SAMPLEASSETS/kodim08.png"
 }
 
 run_benchmark() {
-    if [ "$TEGRACHIPID" != "0x19" ] && [ "$1" = "pva" ]; then
-        echo "Skipping 05_benchmark - pva backend is not supported"
-        return $SKIPCODE
-    fi
     echo "Running 05_benchmark - Backend is $1"
     vpi_sample_05_benchmark "$1"
 }
@@ -75,10 +55,6 @@ run_benchmark() {
 run_klt_tracker() {
     if [ ! -x "$SAMPLEROOT/bin/vpi_sample_06_klt_tracker" ]; then
         echo "Skipping 06_klt_tracker"
-        return $SKIPCODE
-    fi
-    if [ "$TEGRACHIPID" != "0x19" ] && [ "$1" = "pva" ]; then
-        echo "Skipping 06_klt_tracker - pva backend is not supported"
         return $SKIPCODE
     fi
     echo "Running 06_klt_tracker - Backend is $1"
@@ -141,18 +117,23 @@ run_background_subtractor() {
     vpi_sample_14_background_subtractor "$1" "$SAMPLEASSETS/pedestrians.mp4"
 }
 
+run_image_view() {
+    echo "Running 15_image_view - Backend is $1"
+    vpi_sample_15_image_view "$SAMPLEASSETS/kodim08.png"
+}
+
 # VPI samples list
 TESTS="convolve_2d stereo_disparity harris_corners rescale benchmark"
 TESTS="$TESTS klt_tracker fft tnr perspwarp fisheye optflow_lk optflow_dense"
-TESTS="$TESTS background_subtractor"
+TESTS="$TESTS background_subtractor image_view"
 
 # List of VPI backend per sample app
 convolve_2d=("cpu" "cuda" "pva")
-stereo_disparity=("cpu" "cuda" "pva" "pva-nvenc-vic")
+stereo_disparity=("cpu" "cuda" "pva" "ofa" "ofa-pva-vic" "pva-nvenc-vic")
 harris_corners=("cpu" "cuda" "pva")
 rescale=("cpu" "cuda" "vic")
 benchmark=("cpu" "cuda" "pva")
-klt_tracker=("cpu" "cuda" "pva")
+klt_tracker=("cpu" "cuda")
 fft=("cpu" "cuda")
 tnr=("cuda" "vic")
 perspwarp=("cpu" "cuda" "vic")
@@ -160,6 +141,7 @@ fisheye=("cuda")
 optflow_lk=("cpu" "cuda")
 optflow_dense=("nvenc")
 background_subtractor=("cpu" "cuda")
+image_view=("cpu")
 
 find_test() {
     for t in $TESTS; do
