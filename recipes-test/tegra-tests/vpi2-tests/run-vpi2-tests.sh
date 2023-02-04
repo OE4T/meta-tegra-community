@@ -122,10 +122,20 @@ run_image_view() {
     vpi_sample_15_image_view "$SAMPLEASSETS/kodim08.png"
 }
 
+run_template_matching() {
+    echo "Running 17_template_matching - Backend is $1"
+    vpi_sample_17_template_matching "$1" "$SAMPLEASSETS/kodim08.png" "100,200,100,100"
+}
+
+run_orb_feature_detector() {
+    echo "Running 18_orb_feature_detector - Backend is $1"
+    vpi_sample_18_orb_feature_detector "$1" "$SAMPLEASSETS/kodim08.png"
+}
+
 # VPI samples list
 TESTS="convolve_2d stereo_disparity harris_corners rescale benchmark"
 TESTS="$TESTS klt_tracker fft tnr perspwarp fisheye optflow_lk optflow_dense"
-TESTS="$TESTS background_subtractor image_view"
+TESTS="$TESTS background_subtractor image_view template_matching orb_feature_detector"
 
 # List of VPI backend per sample app
 convolve_2d=("cpu" "cuda" "pva")
@@ -142,6 +152,8 @@ optflow_lk=("cpu" "cuda")
 optflow_dense=("nvenc")
 background_subtractor=("cpu" "cuda")
 image_view=("cpu")
+template_matching=("cpu" "cuda")
+orb_feature_detector=("cpu" "cuda")
 
 find_test() {
     for t in $TESTS; do
