@@ -1,5 +1,5 @@
 option(BUILD_VIDEO_SAMPLES "Build video samples requiring ffmpeg" OFF)
-set(SUBDIRS 01-convolve_2d 02-stereo_disparity 03-harris_corners 04-rescale 05-benchmark 07-fft 11-fisheye 15-image_view)
+set(SUBDIRS 01-convolve_2d 02-stereo_disparity 03-harris_corners 04-rescale 05-benchmark 07-fft 11-fisheye 15-image_view 17-template_matching 18-orb_feature_detector)
 if(BUILD_VIDEO_SAMPLES)
   list(APPEND SUBDIRS 06-klt_tracker 09-tnr 10-perspwarp 12-optflow_lk 13-optflow_dense 14-background_subtractor)
 endif()
