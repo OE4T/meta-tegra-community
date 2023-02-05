@@ -2,16 +2,16 @@ DESCRIPTION = "NVIDIA Deepstream SDK"
 HOMEPAGE = "https://developer.nvidia.com/deepstream-sdk"
 LICENSE = "Proprietary"
 LIC_FILES_CHKSUM = " \
-    file://usr/share/doc/deepstream-6.1/copyright;md5=32b2256361779ec59211b3a698f24ce2 \
-    file://opt/nvidia/deepstream/deepstream-6.1/LICENSE.txt;md5=430d70b62dcd279de697edf2d7a8661e \
-    file://opt/nvidia/deepstream/deepstream-6.1/doc/nvidia-tegra/LICENSE.iothub_client;md5=4f8c6347a759d246b5f96281726b8611 \
-    file://opt/nvidia/deepstream/deepstream-6.1/doc/nvidia-tegra/LICENSE.nvds_amqp_protocol_adaptor;md5=8b4b651fa4090272b2e08e208140a658 \
+    file://usr/share/doc/deepstream-6.2/copyright;md5=6d940d04ee16883d3cb354fcf72498b2 \
+    file://opt/nvidia/deepstream/deepstream-6.2/LICENSE.txt;md5=2c2c89b896d6ff98d77ceec8d1a56082 \
+    file://opt/nvidia/deepstream/deepstream-6.2/doc/nvidia-tegra/LICENSE.iothub_client;md5=4f8c6347a759d246b5f96281726b8611 \
+    file://opt/nvidia/deepstream/deepstream-6.2/doc/nvidia-tegra/LICENSE.nvds_amqp_protocol_adaptor;md5=8b4b651fa4090272b2e08e208140a658 \
 "
 
 inherit l4t_deb_pkgfeed
 
 SRC_COMMON_DEBS = "${BPN}_${PV}_arm64.deb;subdir=${BPN}"
-SRC_URI[sha256sum] = "5d901325c9ddd8e8e90ce70bce1fb94fa1b6a4749e6d2f26b4f78e235c9658de"
+SRC_URI[sha256sum] = "0029fb3b4cad214e24844d9532703ef7809c097df9d92b0567dd8963e3a9dbd2"
 
 COMPATIBLE_MACHINE = "(tegra)"
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"
@@ -29,7 +29,7 @@ PACKAGECONFIG[realsense] = ""
 
 DEPENDS = "glib-2.0 gstreamer1.0 gstreamer1.0-plugins-base gstreamer1.0-rtsp-server \
     tensorrt-core tensorrt-plugins libnvvpi2 libcufft libcublas libnpp json-glib \
-    openssl111 tegra-libraries-multimedia yaml-cpp-060 mdns \
+    openssl111 tegra-libraries-multimedia yaml-cpp-060 mdns grpc protobuf \
 "
 # XXX--- see hack in do_install
 DEPENDS += "patchelf-native"
@@ -39,7 +39,7 @@ S = "${WORKDIR}/${BPN}"
 B = "${WORKDIR}/build"
 
 DEEPSTREAM_BASEDIR = "/opt/nvidia/deepstream"
-DEEPSTREAM_PATH = "${DEEPSTREAM_BASEDIR}/deepstream-6.1"
+DEEPSTREAM_PATH = "${DEEPSTREAM_BASEDIR}/deepstream-6.2"
 SYSROOT_DIRS += "${DEEPSTREAM_PATH}/lib/"
 
 do_configure() {
@@ -100,9 +100,16 @@ do_install() {
     patchelf --replace-needed libcufft.so libcufft.so.10 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
     patchelf --replace-needed libcublas.so libcublas.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
     patchelf --replace-needed libcufft.so libcufft.so.10 ${D}${DEEPSTREAM_PATH}/lib/libnvds_audiotransform.so
+    patchelf --replace-needed libgrpc++.so.1.38 libgrpc++.so.1.50 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
+    patchelf --replace-needed libgrpc++.so.1.38 libgrpc++.so.1.50 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
+    patchelf --replace-needed libprotobuf.so.3.15.8.0 libprotobuf.so.32 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
+    patchelf --replace-needed libprotobuf.so.3.15.8.0 libprotobuf.so.32 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
+    patchelf --replace-needed libprotobuf.so.3.15.8.0 libprotobuf.so.32 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_audio_proto.so
+    patchelf --replace-needed libnppial.so libnppial.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
+    patchelf --replace-needed libnppist.so libnppist.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
     # ---XXX
     cd ${D}${DEEPSTREAM_BASEDIR}
-    ln -s deepstream-6.1 deepstream
+    ln -s deepstream-6.2 deepstream
     cd -
 }
 
