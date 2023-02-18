@@ -1,0 +1,148 @@
+From 7189e3ebbf8cde85627f9ad4c11c3621ee00532b Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ilies.chergui@gmail.com>
+Date: Mon, 20 Feb 2023 11:46:51 +0000
+Subject: [PATCH 2/2] fix oe paths and libraries version
+
+Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
+---
+ jtop/core/jetson_libraries.py | 70 ++++++++++++++++++-----------------
+ jtop/service.py               |  2 +-
+ 2 files changed, 37 insertions(+), 35 deletions(-)
+
+diff --git a/jtop/core/jetson_libraries.py b/jtop/core/jetson_libraries.py
+index a7bc8c3..55cae66 100644
+--- a/jtop/core/jetson_libraries.py
++++ b/jtop/core/jetson_libraries.py
+@@ -17,6 +17,7 @@
+ 
+ import os
+ import re
++from pathlib import Path
+ from .common import cat
+ from .command import Command
+ # Fix connection refused for python 2.7
+@@ -26,20 +27,19 @@ except NameError:
+     FileNotFoundError = IOError
+ 
+ 
+-MODULES = ['cuDNN', 'TensorRT', 'VPI']  # 'Visionworks'
+ CUDA_FILE_RE = re.compile(r'CUDA Version (.*)')
+ CUDA_NVCC_RE = re.compile(r'V([0-9]+.[0-9]+.[0-9]+)')
+ 
+ 
+ def get_cuda():
+     cuda_version = ''
+-    if os.path.isfile("/usr/local/cuda/version.txt"):
+-        version = cat("/usr/local/cuda/version.txt")
++    if os.path.isfile("/usr/local/cuda-11.4/version.txt"):
++        version = cat("/usr/local/cuda-11.4/version.txt")
+         match = re.search(CUDA_FILE_RE, version)
+         if match:
+             cuda_version = match.group(1)
+-    elif os.path.isfile("/usr/local/cuda/bin/nvcc"):
+-        cmd = Command(['/usr/local/cuda/bin/nvcc', '--version'])
++    elif os.path.isfile("/usr/local/cuda-11.4/bin/nvcc"):
++        cmd = Command(['/usr/local/cuda-11.4/bin/nvcc', '--version'])
+         try:
+             lines = cmd()
+             for line in lines:
+@@ -49,6 +49,17 @@ def get_cuda():
+                     break
+         except (OSError, Command.CommandException):
+             pass
++    elif os.path.isfile("/usr/bin/cuda-samples/deviceQuery"):
++        cmd = Command(['/usr/bin/cuda-samples/deviceQuery'])
++        try:
++            lines = cmd()
++            for line in lines:
++                if "CUDA Driver Version" in line:
++                    temp = line.split("/")
++                    cuda_version = temp[-1].strip()
++                    break
++        except (OSError, Command.CommandException):
++            pass
+     return cuda_version
+ 
+ 
+@@ -74,37 +85,28 @@ def get_opencv():
+         pass
+     return opencv_version, opencv_cuda
+ 
++def get_libraries():
++    os_variables = {}
+ 
+-def get_all_modules():
+-    modules = {}
+-    # Extract all modules in dpkg -l
+-    dpkg = Command(['dpkg', '-l'])
+-    try:
+-        lines = dpkg()
+-        for row in lines:
+-            row = re.sub(r'\n+ +', '\n', row)  # remove spaces at the start of lines and empty lines
+-            row = re.sub(r'\s +', '\t', row)  # replace two or more spaces with tab
+-            cells = row.split('\t')
+-            if len(cells) > 2:
+-                name = cells[1]
+-                version = cells[2]
+-                modules[name] = version
+-    except (OSError, Command.CommandException):
+-        pass
+-    return modules
++    # Get cuDNN, TensorRT and VPI
++    trt_match = re.search('libnvinfer.so.(\d+.\d+.\d+)', str(list(Path('/usr/lib/').glob("libnvinfer.so.*.*"))))
++    if trt_match is not None:
++        os_variables['TensorRT'] = trt_match.group(1)
++    else:
++        os_variables['TensorRT'] = 'not Installed!'
+ 
++    cudnn_match = re.search('libcudnn.so.(\d+.\d+.\d+)',str(list(Path('/usr/lib/').glob("libcudnn.so.*.*"))))
++    if cudnn_match is not None:
++        os_variables['cuDNN'] = cudnn_match.group(1)
++    else:
++        os_variables['cuDNN'] = 'not Installed!'
++
++    vpi_match = re.search('libnvvpi.so.(\d+.\d+.\d+)',str(list(Path('/opt/nvidia/vpi2/lib/aarch64-linux-gnu/').glob("libnvvpi.so.*.*"))))
++    if vpi_match is not None:
++        os_variables['VPI'] = vpi_match.group(1)
++    else:
++        os_variables['VPI'] = 'not Installed!'
+ 
+-def get_libraries():
+-    os_variables = {}
+-    # Find all modules
+-    modules = get_all_modules()
+-    for name in MODULES:
+-        os_variables[name] = ''
+-        # Find version if installed
+-        for module, version in modules.items():
+-            if name.lower() in module:
+-                os_variables[name] = version.split('-')[0]
+-                break
+     # Get Vulkan output
+     cmd_vulkaninfo = Command(['which', 'vulkaninfo'])
+     try:
+@@ -134,7 +136,7 @@ if __name__ == "__main__":
+         opencv_cuda_string = "YES" if opencv_cuda else "NO"
+         print("OPENCV: {opencv_version} - with CUDA: {opencv_cuda}".format(opencv_version=opencv_version, opencv_cuda=opencv_cuda_string))
+     else:
+-        print("OPENCV not Installed!")
++        print("OPENCV: not Installed!")
+     # Get all libraries
+     os_variables = get_libraries()
+     for name, value in os_variables.items():
+diff --git a/jtop/service.py b/jtop/service.py
+index 2f7ed76..d3fdbeb 100644
+--- a/jtop/service.py
++++ b/jtop/service.py
+@@ -65,7 +65,7 @@ VERSION_RE = re.compile(r""".*__version__ = ["'](.*?)['"]""", re.S)
+ 
+ PATH_TEGRASTATS = ['/usr/bin/tegrastats', '/home/nvidia/tegrastats']
+ PATH_JETSON_CLOCKS = ['/usr/bin/jetson_clocks', '/home/nvidia/jetson_clocks.sh']
+-PATH_FAN_LEGACY = ['/sys/kernel/debug/tegra_fan', '/sys/devices/pwm-fan']
++PATH_FAN_LEGACY = ['/sys/kernel/debug/tegra_fan', '/sys/devices/pwm-fan', '/sys/devices/platform/pwm-fan']
+ PATH_FAN = ['/sys/devices/platform']
+ PATH_NVPMODEL = ['nvpmodel']
+ # Pipe configuration
+-- 
+2.25.1
+
