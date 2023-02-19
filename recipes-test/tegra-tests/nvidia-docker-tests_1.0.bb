@@ -5,7 +5,7 @@ LIC_FILES_CHKSUM = "file://LICENSE.md;md5=da33f1c12f6d31e71cd114d0c336d4be"
 SRC_REPO ?= "github.com/dusty-nv/jetson-containers"
 SRCBRANCH ?= "master"
 SRC_URI = "git://${SRC_REPO};branch=${SRCBRANCH};protocol=https"
-SRCREV = "bb17dc7db1ce46bb29e79ef0ac4e13aa934adf31"
+SRCREV = "4636fc6400607d8e60729d14055a0e26ab8d3ba6"
 PV = "1.0+git${SRCPV}"
 
 SRC_URI += "\
