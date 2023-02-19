@@ -1,9 +1,9 @@
-From b4773893af2e235b45462f3507d9fbc176cf6039 Mon Sep 17 00:00:00 2001
+From b111475f8c0ad8bb90fc49a6169d169148a13bea Mon Sep 17 00:00:00 2001
 From: Dan Walkes <danwalkes@trellis-logic.com>
-Date: Sun, 29 Jan 2023 12:57:05 -0700
+Date: Sun, 19 Feb 2023 01:05:54 -0700
 Subject: [PATCH] Add version remap script support
 
-Nice NGC doesn't include tags for every L4T revision,
+Since NGC doesn't include tags for every L4T revision,
 add support for a remap script which can remap L4T_VERSION
 to one which is supported by NGC.
 
@@ -13,12 +13,12 @@ Signed-off-by: Dan Walkes <danwalkes@trellis-logic.com>
  1 file changed, 4 insertions(+)
 
 diff --git a/scripts/docker_test_ml.sh b/scripts/docker_test_ml.sh
-index 3c7513e..83f3edf 100755
+index a71f279..73dee92 100755
 --- a/scripts/docker_test_ml.sh
 +++ b/scripts/docker_test_ml.sh
-@@ -3,6 +3,10 @@
- set -e
- source scripts/l4t_version.sh
+@@ -11,6 +11,10 @@ if [ -e scripts/l4t_version_remap.sh ]; then
+         source scripts/l4t_version_remap.sh
+ fi
  
 +if [ -e scripts/l4t_version_remap.sh ]; then
 +        source scripts/l4t_version_remap.sh
