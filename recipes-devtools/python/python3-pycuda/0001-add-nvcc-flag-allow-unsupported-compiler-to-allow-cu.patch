@@ -1,0 +1,64 @@
+From e027555027b80faceaabc8a6ad0a053f8e4db7da Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ilies.chergui@gmail.com>
+Date: Sun, 19 Feb 2023 15:51:52 +0000
+Subject: [PATCH] add nvcc flag "-allow-unsupported-compiler" to allow cuda
+ compilation and update nvcc binary path
+
+Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
+---
+ pycuda/compiler.py | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/pycuda/compiler.py b/pycuda/compiler.py
+index 96aa1b1..3828f45 100644
+--- a/pycuda/compiler.py
++++ b/pycuda/compiler.py
+@@ -301,6 +301,9 @@ def compile(
+     for i in include_dirs:
+         options.append("-I" + i)
+ 
++    if "-allow-unsupported-compiler" not in options:
++        options.append("-allow-unsupported-compiler")
++
+     return compile_plain(source, options, keep, nvcc, cache_dir, target)
+ 
+ 
+@@ -341,7 +344,7 @@ class SourceModule(CudaModule):
+     def __init__(
+         self,
+         source,
+-        nvcc="nvcc",
++        nvcc="/usr/local/cuda-11.4/bin/nvcc",
+         options=None,
+         keep=False,
+         no_extern_c=False,
+@@ -389,7 +392,7 @@ def _search_on_path(filenames):
+ 
+ @memoize
+ def _find_nvcc_on_path():
+-    return _search_on_path(["nvcc", "nvcc.exe"])
++    return _search_on_path(["/usr/local/cuda-11.4/bin/nvcc", "nvcc.exe"])
+ 
+ 
+ class DynamicModule(CudaModule):
+@@ -400,7 +403,7 @@ class DynamicModule(CudaModule):
+ 
+     def __init__(
+         self,
+-        nvcc="nvcc",
++        nvcc="/usr/local/cuda-11.4/bin/nvcc",
+         link_options=None,
+         keep=False,
+         no_extern_c=False,
+@@ -563,7 +566,7 @@ class DynamicSourceModule(DynamicModule):
+     def __init__(
+         self,
+         source,
+-        nvcc="nvcc",
++        nvcc="/usr/local/cuda-11.4/bin/nvcc",
+         options=None,
+         keep=False,
+         no_extern_c=False,
+-- 
+2.25.1
+
