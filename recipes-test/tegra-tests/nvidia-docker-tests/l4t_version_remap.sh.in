@@ -19,7 +19,6 @@ check_remap() {
     #       https://catalog.ngc.nvidia.com/orgs/nvidia/containers/l4t-ml
     #       https://catalog.ngc.nvidia.com/orgs/nvidia/containers/l4t-tensorflow
     #       https://catalog.ngc.nvidia.com/orgs/nvidia/containers/l4t-pytorch
-    l4t_version_remap["35.2.1"]="35.1.0"
     l4t_version_remap["32.7.2"]="32.7.1"
     l4t_version_remap["32.7.3"]="32.7.1"
 
