@@ -1,6 +1,6 @@
-From 81f5b61deaf7c96b984dc1beb8991f73a148ebb4 Mon Sep 17 00:00:00 2001
-From: Atharva Nandanwar <anandanwar@sighthound.com>
-Date: Mon, 29 Aug 2022 10:55:36 -0600
+From 21ddf5cbee4fbbe36e3773d44e76ae285454730b Mon Sep 17 00:00:00 2001
+From: Dan Walkes <danwalkes@trellis-logic.com>
+Date: Sun, 19 Feb 2023 00:55:25 -0700
 Subject: [PATCH] Distro agnostic support for Test ML script
 
 - replaced sudo with `which sudo`
@@ -8,21 +8,22 @@ Subject: [PATCH] Distro agnostic support for Test ML script
 - removed few parameters from wget to support BusyBox wget from
   non-ubuntu distributions
 - added DOCKER_REPO parameter for using upstream containers
+- Removed unsupported l4t-tensorflow 1.15 tag reference
 
 Signed-off-by: Atharva Nandanwar <anandanwar@sighthound.com>
-
+Signed-off-by: Dan Walkes <danwalkes@trellis-logic.com>
 ---
  README.md                 |  7 +++++++
  scripts/docker_run.sh     |  7 +++++--
- scripts/docker_test_ml.sh | 15 ++++++++-------
+ scripts/docker_test_ml.sh | 15 ++++++++++-----
  scripts/l4t_version.sh    | 12 +++++++++---
- 4 files changed, 29 insertions(+), 12 deletions(-)
+ 4 files changed, 31 insertions(+), 10 deletions(-)
 
 diff --git a/README.md b/README.md
-index a46b218..8910c6c 100644
+index 1a08625..5fc136c 100644
 --- a/README.md
 +++ b/README.md
-@@ -177,3 +177,10 @@ $ ./scripts/docker_test_ros.sh eloquent  # test if the build of 'ROS eloquent' w
+@@ -227,3 +227,10 @@ $ ./scripts/docker_test_ros.sh eloquent  # test if the build of 'ROS eloquent' w
  $ ./scripts/docker_test_ros.sh foxy      # test if the build of 'ROS foxy' was successful
  ```
  
@@ -61,10 +62,17 @@ index 74f62cd..4219b8a 100755
      -v $XAUTH:$XAUTH -e XAUTHORITY=$XAUTH \
      $USER_VOLUME $CONTAINER_IMAGE $USER_COMMAND
 diff --git a/scripts/docker_test_ml.sh b/scripts/docker_test_ml.sh
-index d40fc95..3c7513e 100755
+index fe08bb3..f9e9242 100755
 --- a/scripts/docker_test_ml.sh
 +++ b/scripts/docker_test_ml.sh
-@@ -6,6 +6,7 @@ source scripts/l4t_version.sh
+@@ -3,9 +3,14 @@
+ set -e
+ source scripts/l4t_version.sh
+ 
++if [ -e scripts/l4t_version_remap.sh ]; then
++        source scripts/l4t_version_remap.sh
++fi
++
  ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
  TEST_MOUNT="$ROOT/../test:/test"
  CONTAINERS=${1:-"all"}
@@ -72,7 +80,7 @@ index d40fc95..3c7513e 100755
  
  # cuda tests
  test_cuda()
-@@ -80,7 +81,7 @@ test_pytorch()
+@@ -80,7 +85,7 @@ test_pytorch()
  		if [ ! -d "test/data" ]; then
  			mkdir test/data
  		fi
@@ -81,16 +89,12 @@ index d40fc95..3c7513e 100755
  		tar -xzf test/data/$DATA_NAME.tar.gz -C test/data/
  	fi
  
-@@ -205,24 +206,24 @@ if [[ "$CONTAINERS" == "pytorch" || "$CONTAINERS" == "all" ]]; then
- 	#test_pytorch_all "l4t-pytorch:r$L4T_VERSION-pth1.9-py3"
- 	#test_pytorch_all "l4t-pytorch:r$L4T_VERSION-pth1.10-py3"
+@@ -199,22 +204,22 @@ if [[ "$CONTAINERS" == "pytorch" || "$CONTAINERS" == "all" ]]; then
  	#test_pytorch_all "l4t-pytorch:r$L4T_VERSION-pth1.11-py3"
--	test_pytorch_all "l4t-pytorch:r$L4T_VERSION-pth1.11-py3"
--	test_pytorch_all "l4t-pytorch:r$L4T_VERSION-pth1.12-py3"
--	test_pytorch_all "l4t-pytorch:r$L4T_VERSION-pth1.13-py3"
-+	test_pytorch_all "${DOCKER_REPO}l4t-pytorch:r$L4T_VERSION-pth1.11-py3"
-+	test_pytorch_all "${DOCKER_REPO}l4t-pytorch:r$L4T_VERSION-pth1.12-py3"
-+	test_pytorch_all "${DOCKER_REPO}l4t-pytorch:r$L4T_VERSION-pth1.13-py3"
+ 	#test_pytorch_all "l4t-pytorch:r$L4T_VERSION-pth1.12-py3"
+ 	#test_pytorch_all "l4t-pytorch:r$L4T_VERSION-pth1.13-py3"
+-	test_pytorch_all "l4t-pytorch:r$L4T_VERSION-pth2.0-py3"
++	test_pytorch_all "${DOCKER_REPO}l4t-pytorch:r$L4T_VERSION-pth2.0-py3"
  fi
  
  #
@@ -98,9 +102,9 @@ index d40fc95..3c7513e 100755
  #
  if [[ "$CONTAINERS" == "tensorflow" || "$CONTAINERS" == "all" ]]; then
 -	test_tensorflow_all "l4t-tensorflow:r$L4T_VERSION-tf1.15-py3"
--	test_tensorflow_all "l4t-tensorflow:r$L4T_VERSION-tf2.9-py3"
-+	test_tensorflow_all "${DOCKER_REPO}l4t-tensorflow:r$L4T_VERSION-tf1.15-py3"
-+	test_tensorflow_all "${DOCKER_REPO}l4t-tensorflow:r$L4T_VERSION-tf2.9-py3"
+-	test_tensorflow_all "l4t-tensorflow:r$L4T_VERSION-tf2.11-py3"
++	#test_tensorflow_all "l4t-tensorflow:r$L4T_VERSION-tf1.15-py3"
++	test_tensorflow_all "${DOCKER_REPO}l4t-tensorflow:r$L4T_VERSION-tf2.11-py3"
  fi
  
  #
