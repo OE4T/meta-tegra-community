@@ -1,0 +1,53 @@
+From a8600f5323074a6322ddf6dbda8e0bc212d53477 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ilies.chergui@gmail.com>
+Date: Sat, 18 Mar 2023 16:57:12 +0000
+Subject: [PATCH] update nvcc binary path
+
+Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
+---
+ pycuda/compiler.py | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/pycuda/compiler.py b/pycuda/compiler.py
+index 065a631..5c6f7f4 100644
+--- a/pycuda/compiler.py
++++ b/pycuda/compiler.py
+@@ -335,7 +335,7 @@ class SourceModule(CudaModule):
+     def __init__(
+         self,
+         source,
+-        nvcc="nvcc",
++        nvcc="/usr/local/cuda-10.2/bin/nvcc",
+         options=None,
+         keep=False,
+         no_extern_c=False,
+@@ -383,7 +383,7 @@ def _search_on_path(filenames):
+ 
+ @memoize
+ def _find_nvcc_on_path():
+-    return _search_on_path(["nvcc", "nvcc.exe"])
++    return _search_on_path(["/usr/local/cuda-10.2/bin/nvcc", "nvcc.exe"])
+ 
+ 
+ class DynamicModule(CudaModule):
+@@ -394,7 +394,7 @@ class DynamicModule(CudaModule):
+ 
+     def __init__(
+         self,
+-        nvcc="nvcc",
++        nvcc="/usr/local/cuda-10.2/bin/nvcc",
+         link_options=None,
+         keep=False,
+         no_extern_c=False,
+@@ -557,7 +557,7 @@ class DynamicSourceModule(DynamicModule):
+     def __init__(
+         self,
+         source,
+-        nvcc="nvcc",
++        nvcc="/usr/local/cuda-10.2/bin/nvcc",
+         options=None,
+         keep=False,
+         no_extern_c=False,
+-- 
+2.25.1
+
