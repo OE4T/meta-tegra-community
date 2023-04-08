@@ -21,6 +21,22 @@ chipid_from_compatible() {
     return 0
 }
 
+find_cuda_libdir() {
+    if [ -e /usr/local/cuda/lib ]; then
+	echo "/usr/local/cuda/lib"
+	return 0
+    fi
+    local culibdir
+    for culibdir in /usr/local/cuda-*/lib; do
+	if [ -d "$culibdir" ]; then
+	    echo "$culibdir"
+	    return 0
+	fi
+    done
+    echo ""
+    return 1
+}
+
 TEGRACHIPID="$(chipid_from_compatible)"
 SAMPLEROOT="/opt/nvidia/vpi2"
 PATH="$SAMPLEROOT/bin:$PATH"
@@ -132,6 +148,18 @@ run_orb_feature_detector() {
     vpi_sample_18_orb_feature_detector "$1" "$SAMPLEASSETS/kodim08.png"
 }
 
+if [ "$TEGRACHIPID" = "UNKNOWN" ]; then
+    echo "ERR: could not identify Tegra SoC" >&2
+    exit 1
+fi
+
+CUDALIBDIR=$(find_cuda_libdir)
+if [ -z "$CUDALIBDIR" ]; then
+    echo "ERR: cannot find CUDA libraries" >&2
+    exit 1
+fi
+export LD_LIBRARY_PATH="$CUDALIBDIR"
+
 # VPI samples list
 TESTS="convolve_2d stereo_disparity harris_corners rescale benchmark"
 TESTS="$TESTS klt_tracker fft tnr perspwarp fisheye optflow_lk optflow_dense"
@@ -139,7 +167,11 @@ TESTS="$TESTS background_subtractor image_view template_matching orb_feature_det
 
 # List of VPI backend per sample app
 convolve_2d=("cpu" "cuda" "pva")
-stereo_disparity=("cpu" "cuda" "pva" "ofa" "ofa-pva-vic" "pva-nvenc-vic")
+if [ "$TEGRACHIPID" = "0x19" ]; then
+    stereo_disparity=("cpu" "cuda" "pva" "pva-nvenc-vic")
+else
+    stereo_disparity=("cpu" "cuda" "pva" "ofa" "ofa-pva-vic")
+fi
 harris_corners=("cpu" "cuda" "pva")
 rescale=("cpu" "cuda" "vic")
 benchmark=("cpu" "cuda" "pva")
