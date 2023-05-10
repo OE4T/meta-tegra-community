@@ -1,0 +1,371 @@
+From bb1349c681814f2d624106ec2f0f0f2060830acc Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ilies.chergui@gmail.com>
+Date: Thu, 10 Nov 2022 16:17:11 +0000
+Subject: [PATCH] Build fixups
+
+Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
+Signed-off-by: Roger Knecht <roger@norberthealth.com>
+---
+ CMakeLists.txt     |  42 +------------------
+ src/CMakeLists.txt | 100 +++++++++++++++++----------------------------
+ 2 files changed, 39 insertions(+), 103 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6d4ec543..cb1b1b66 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -100,23 +100,8 @@ endif()
+ #
+ # Dependencies
+ #
+-include(FetchContent)
+-
+-FetchContent_Declare(
+-  repo-core
+-  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
+-  GIT_TAG ${TRITON_CORE_REPO_TAG}
+-)
+-FetchContent_Declare(
+-  repo-third-party
+-  GIT_REPOSITORY https://github.com/triton-inference-server/third_party.git
+-  GIT_TAG ${TRITON_THIRD_PARTY_REPO_TAG}
+-)
+-
+ set(TRITON_CORE_HEADERS_ONLY OFF)
+ 
+-FetchContent_MakeAvailable(repo-third-party repo-core)
+-
+ #
+ # Triton server executable and examples
+ #
+@@ -183,31 +168,6 @@ ExternalProject_Add(triton-server
+   SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src"
+   BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/triton-server"
+   CMAKE_CACHE_ARGS
+-    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
+-    ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
+-    ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
+-    ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
+-    -DGTEST_ROOT:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/googletest
+-    -DgRPC_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/grpc/lib/cmake/grpc
+-    -Dc-ares_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/c-ares/lib/cmake/c-ares
+-    -Dabsl_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/absl/lib/cmake/absl
+-    -Dnlohmann_json_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/nlohmann_json/lib/cmake/nlohmann_json
+-    -DLibevent_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevent/lib/cmake/libevent
+-    -Dlibevhtp_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevhtp/lib/cmake/libevhtp
+-    -Dstorage_client_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/lib/cmake/storage_client
+-    -Dazure-storage-cpplite_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/azure-storage-cpplite
+-    -Dgoogle_cloud_cpp_common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/lib/cmake/google_cloud_cpp_common
+-    -DCrc32c_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/crc32c/lib/cmake/Crc32c
+-    -DAWSSDK_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/cmake/AWSSDK
+-    -Daws-cpp-sdk-core_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/cmake/aws-cpp-sdk-core
+-    -Daws-cpp-sdk-s3_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/cmake/aws-cpp-sdk-s3
+-    -Daws-c-event-stream_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-c-event-stream/cmake
+-    -Daws-c-common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-c-common/cmake
+-    -Daws-checksums_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-checksums/cmake
+-    -DTRITON_THIRD_PARTY_REPO_TAG:STRING=${TRITON_THIRD_PARTY_REPO_TAG}
+-    -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
+-    -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
+-    -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG}
+     -DTRITON_EXTRA_LIB_PATHS:PATH=${TRITON_EXTRA_LIB_PATHS}
+     -DTRITON_ENABLE_ASAN:BOOL=${TRITON_ENABLE_ASAN}
+     -DTRITON_ENABLE_NVTX:BOOL=${TRITON_ENABLE_NVTX}
+@@ -231,5 +191,5 @@ ExternalProject_Add(triton-server
+     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+     -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}
+     -DTRITON_VERSION:STRING=${TRITON_VERSION}
+-  DEPENDS ${TRITON_DEPENDS}
++    -DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH}
+ )
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index d17392b8..c9982d5b 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -36,35 +36,18 @@ include(GNUInstallDirs)
+ # We must include the transitive closure of all repos so that we can
+ # override the tag. The backend repo is needed for the tests.
+ #
+-include(FetchContent)
+-
+-FetchContent_Declare(
+-  repo-common
+-  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
+-  GIT_TAG ${TRITON_COMMON_REPO_TAG}
+-)
+-FetchContent_Declare(
+-  repo-core
+-  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
+-  GIT_TAG ${TRITON_CORE_REPO_TAG}
+-)
+-FetchContent_Declare(
+-  repo-backend
+-  GIT_REPOSITORY https://github.com/triton-inference-server/backend.git
+-  GIT_TAG ${TRITON_BACKEND_REPO_TAG}
+-)
+-
+ if(TRITON_ENABLE_GRPC)
+   set(TRITON_COMMON_ENABLE_PROTOBUF ON)
+   set(TRITON_COMMON_ENABLE_GRPC ON)
+ endif() # TRITON_ENABLE_GRPC
+ 
+-FetchContent_MakeAvailable(repo-common repo-core repo-backend)
+-
+ # CUDA
+ #
+ if(${TRITON_ENABLE_GPU})
+-  find_package(CUDAToolkit REQUIRED)
++  enable_language(CUDA)
++  find_package(CUDA REQUIRED)
++  include_directories(${CUDA_INCLUDE_DIRS})
++  link_directories(${CUDA_LIBRARIES})
+   message(STATUS "Using CUDA ${CUDA_VERSION}")
+ endif() # TRITON_ENABLE_GPU
+ 
+@@ -79,13 +62,15 @@ endif()
+ #
+ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
+     ${TRITON_ENABLE_SAGEMAKER} OR ${TRITON_ENABLE_VERTEX_AI})
+-  find_package(Libevent CONFIG REQUIRED)
++  #find_package(Libevent REQUIRED)
++  find_package(PkgConfig REQUIRED)
++  pkg_check_modules(LIBEVENT REQUIRED libevent)
+   message(STATUS "Using libevent ${Libevent_VERSION}")
+ endif()
+ 
+ # re2
+ #
+-find_library(RE2_LIBRARY NAMES re2)
++find_package(re2 CONFIG REQUIRED)
+ 
+ #
+ # tritonserver executable
+@@ -127,7 +112,7 @@ else()
+   target_compile_options(
+     main
+     PRIVATE
+-      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
++      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations
+   )
+ endif()
+ 
+@@ -147,8 +132,9 @@ target_link_libraries(
+     triton-common-async-work-queue  # from repo-common
+     triton-common-error             # from repo-common
+     triton-common-logging           # from repo-common
+-    triton-core-serverapi           # from repo-core
+-    triton-core-serverstub          # from repo-core
++    #triton-core-serverapi           # from repo-core
++    triton-core                      # from repo-core
++    ${LIBEVENT_LIBRARIES}
+ )
+ 
+ if(${TRITON_ENABLE_ASAN})
+@@ -172,7 +158,7 @@ if(${TRITON_ENABLE_GPU})
+   target_link_libraries(
+     main
+     PRIVATE
+-      CUDA::cudart
++      cudart
+   )
+ endif() # TRITON_ENABLE_GPU
+ 
+@@ -266,7 +252,7 @@ endif() # NOT WIN32
+ if (NOT WIN32)
+   install(
+     TARGETS main
+-    RUNTIME DESTINATION bin
++    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+   )
+ else()
+   # See explanation above as to why we need to rename main.exe to
+@@ -298,7 +284,7 @@ if(${TRITON_ENABLE_GRPC})
+     target_compile_options(
+       grpc-endpoint-library
+       PRIVATE
+-        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
++        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations
+     )
+   endif()
+ 
+@@ -313,10 +299,10 @@ if(${TRITON_ENABLE_GRPC})
+     PUBLIC
+       proto-library           # from repo-common
+       triton-common-logging   # from repo-common
+-      triton-common-json      # from repo-common
++      #triton-common-json      # from repo-common
+       grpc-service-library    # from repo-common
+-      triton-core-serverapi   # from repo-core
+-      triton-core-serverstub  # from repo-core
++      #triton-core-serverapi   # from repo-core
++      triton-core             # from repo-core
+       gRPC::grpc++
+       gRPC::grpc
+       protobuf::libprotobuf
+@@ -343,7 +329,7 @@ if(${TRITON_ENABLE_GRPC})
+     target_link_libraries(
+       grpc-endpoint-library
+       PUBLIC
+-        CUDA::cudart
++        cudart
+     )
+   endif() # TRITON_ENABLE_GPU
+ 
+@@ -446,7 +432,7 @@ if(${TRITON_ENABLE_HTTP}
+     target_compile_options(
+       http-endpoint-library
+       PRIVATE
+-        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
++        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations
+     )
+   endif()
+ 
+@@ -459,13 +445,11 @@ if(${TRITON_ENABLE_HTTP}
+   target_link_libraries(
+     http-endpoint-library
+     PUBLIC
+-      triton-common-json      # from repo-common
+       triton-common-logging   # from repo-common
+-      triton-core-serverapi   # from repo-core
+-      triton-core-serverstub  # from repo-core
++      triton-core             # from repo-core
+       ${LIBEVENT_LIBRARIES}
+       libevhtp::evhtp
+-      ${RE2_LIBRARY}
++      re2
+   )
+ 
+   target_include_directories(
+@@ -483,7 +467,7 @@ if(${TRITON_ENABLE_HTTP}
+     target_link_libraries(
+       http-endpoint-library
+       PUBLIC
+-        CUDA::cudart
++        cudart
+     )
+   endif() # TRITON_ENABLE_GPU
+ 
+@@ -583,8 +567,7 @@ if(${TRITON_ENABLE_TRACING})
+     tracing-library
+     PUBLIC
+       triton-common-logging    # from repo-common
+-      triton-core-serverapi    # from repo-core
+-      triton-core-serverstub   # from repo-core
++      triton-core              # from repo-core
+   )
+ 
+   target_compile_definitions(
+@@ -602,7 +585,7 @@ if(${TRITON_ENABLE_TRACING})
+     target_link_libraries(
+       tracing-library
+       PUBLIC
+-        CUDA::cudart
++        cudart
+     )
+   endif() # TRITON_ENABLE_GPU
+ 
+@@ -664,7 +647,7 @@ if (NOT WIN32)
+     target_compile_options(
+       simple
+       PRIVATE
+-        -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations -Werror
++        -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations
+     )
+   endif()
+ 
+@@ -683,8 +666,7 @@ if (NOT WIN32)
+     PRIVATE
+       triton-common-async-work-queue  # from repo-common
+       triton-common-error             # from repo-common
+-      triton-core-serverapi           # from repo-core
+-      triton-core-serverstub          # from repo-core
++      triton-core                     # from repo-core
+     )
+ 
+   if(${TRITON_ENABLE_GPU})
+@@ -697,13 +679,13 @@ if (NOT WIN32)
+     target_link_libraries(
+       simple
+       PRIVATE
+-        CUDA::cudart
++        cudart
+     )
+   endif() # TRITON_ENABLE_GPU
+ 
+   install(
+     TARGETS simple
+-    RUNTIME DESTINATION bin
++    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+   )
+ 
+   #
+@@ -728,7 +710,7 @@ if (NOT WIN32)
+     target_compile_options(
+       multi_server
+       PRIVATE
+-        -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations -Werror
++        -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations
+     )
+   endif()
+ 
+@@ -747,8 +729,8 @@ if (NOT WIN32)
+     PRIVATE
+       triton-common-async-work-queue  # from repo-common
+       triton-common-error             # from repo-common
+-      triton-core-serverapi           # from repo-core
+-      triton-core-serverstub          # from repo-core
++      triton-core                     # from repo-core
++      pthread
+     )
+ 
+   if(${TRITON_ENABLE_GPU})
+@@ -761,13 +743,13 @@ if (NOT WIN32)
+     target_link_libraries(
+       multi_server
+       PRIVATE
+-        CUDA::cudart
++        cudart
+     )
+   endif() # TRITON_ENABLE_GPU
+ 
+   install(
+     TARGETS multi_server
+-    RUNTIME DESTINATION bin
++    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+   )
+ 
+   if(${TRITON_ENABLE_GPU})
+@@ -793,7 +775,7 @@ if (NOT WIN32)
+       target_compile_options(
+         memory_alloc
+         PRIVATE
+-          -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations -Werror
++          -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations
+       )
+     endif()
+ 
+@@ -818,19 +800,13 @@ if (NOT WIN32)
+       PRIVATE
+         triton-common-async-work-queue  # from repo-common
+         triton-common-error             # from repo-common
+-        triton-core-serverapi           # from repo-core
+-        triton-core-serverstub          # from repo-core
+-        CUDA::cudart
++        triton-core                     # from repo-core
++        cudart
+       )
+ 
+     install(
+       TARGETS memory_alloc
+-      RUNTIME DESTINATION bin
++      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+     )
+   endif() # TRITON_ENABLE_GPU
+ endif() # NOT WIN32
+-
+-# Currently unit tests do not build for windows...
+-if (NOT WIN32)
+-  add_subdirectory(test test)
+-endif() # NOT WIN32
+-- 
+2.25.1
+
