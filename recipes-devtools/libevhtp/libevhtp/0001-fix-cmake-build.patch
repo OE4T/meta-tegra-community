@@ -1,0 +1,43 @@
+From 491ecafe3b3b8651fa51a3234170cabb394e15d8 Mon Sep 17 00:00:00 2001
+From: Roger Knecht <roger@norberthealth.com>
+Date: Wed, 22 Jun 2022 11:17:05 +0200
+Subject: [PATCH] fix cmake build
+
+---
+ CMakeLists.txt        | 4 ++--
+ cmake/Config.cmake.in | 3 +++
+ 2 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 481ddd0..dcf5685 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -54,10 +54,10 @@ set(LIBEVHTP_SOURCE_FILES
+     parser.c
+     log.c)
+ 
+-find_package(LibEvent REQUIRED)
++find_package(PkgConfig REQUIRED)
++pkg_check_modules(LibEvent REQUIRED libevent)
+ list(APPEND LIBEVHTP_EXTERNAL_LIBS ${LIBEVENT_LIBRARIES})
+ list(APPEND LIBEVHTP_EXTERNAL_INCLUDES ${LIBEVENT_INCLUDE_DIRS})
+-list(APPEND package_deps LibEvent)
+ 
+ set(evhtp_dir_headers
+   "include/evhtp/evhtp.h"
+diff --git a/cmake/Config.cmake.in b/cmake/Config.cmake.in
+index b834857..20a2e07 100644
+--- a/cmake/Config.cmake.in
++++ b/cmake/Config.cmake.in
+@@ -1,5 +1,8 @@
+ @PACKAGE_INIT@
+ 
++find_package(PkgConfig REQUIRED)
++pkg_check_modules(LibEvent REQUIRED libevent)
++
+ set(package_deps @package_deps@)
+ foreach(dep IN LISTS package_deps)
+     find_package(${dep} REQUIRED)
+-- 
+2.17.1
+
