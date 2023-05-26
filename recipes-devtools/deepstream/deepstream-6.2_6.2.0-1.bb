@@ -100,11 +100,11 @@ do_install() {
     patchelf --replace-needed libcufft.so libcufft.so.10 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
     patchelf --replace-needed libcublas.so libcublas.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
     patchelf --replace-needed libcufft.so libcufft.so.10 ${D}${DEEPSTREAM_PATH}/lib/libnvds_audiotransform.so
-    patchelf --replace-needed libgrpc++.so.1.38 libgrpc++.so.1.50 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
-    patchelf --replace-needed libgrpc++.so.1.38 libgrpc++.so.1.50 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
-    patchelf --replace-needed libprotobuf.so.3.15.8.0 libprotobuf.so.32 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
-    patchelf --replace-needed libprotobuf.so.3.15.8.0 libprotobuf.so.32 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
-    patchelf --replace-needed libprotobuf.so.3.15.8.0 libprotobuf.so.32 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_audio_proto.so
+    patchelf --replace-needed libgrpc++.so.1.38 libgrpc++.so.1.46 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
+    patchelf --replace-needed libgrpc++.so.1.38 libgrpc++.so.1.46 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
+    patchelf --replace-needed libprotobuf.so.3.15.8.0 libprotobuf.so.30 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
+    patchelf --replace-needed libprotobuf.so.3.15.8.0 libprotobuf.so.30 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
+    patchelf --replace-needed libprotobuf.so.3.15.8.0 libprotobuf.so.30 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_audio_proto.so
     patchelf --replace-needed libnppial.so libnppial.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
     patchelf --replace-needed libnppist.so libnppist.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
     # ---XXX
