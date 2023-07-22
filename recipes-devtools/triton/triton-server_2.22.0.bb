@@ -21,6 +21,8 @@ COMPATIBLE_MACHINE = "(cuda)"
 
 inherit pkgconfig cmake cuda
 
+DEBUG_PREFIX_MAP:remove:class-target = "-fcanon-prefix-map"
+
 EXTRA_OECMAKE:append = ' \
     -DCMAKE_INSTALL_PREFIX="${D}${prefix}" \
     -DCMAKE_PREFIX_PATH="${STAGING_LIBDIR}/cmake/libevhtp;${STAGING_LIBDIR}/cmake/re2" \
