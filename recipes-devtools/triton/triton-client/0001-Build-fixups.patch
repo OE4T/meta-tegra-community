@@ -1,6 +1,6 @@
-From 93143b18f84da42c04c644f8a3b0140131025962 Mon Sep 17 00:00:00 2001
+From 084c3ee9e1979a4d45806598a2ba139304546ab5 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ilies.chergui@gmail.com>
-Date: Thu, 10 Nov 2022 20:38:37 +0000
+Date: Sat, 22 Jul 2023 15:44:29 +0100
 Subject: [PATCH] Build fixups
 
 Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
@@ -14,7 +14,8 @@ Signed-off-by: Roger Knecht <roger@norberthealth.com>
  src/python/CMakeLists.txt                     | 20 ++++-------------
  src/python/library/build_wheel.py             |  1 +
  .../library/tritonclient/utils/CMakeLists.txt |  6 ++---
- 8 files changed, 23 insertions(+), 62 deletions(-)
+ .../cuda_shared_memory/cuda_shared_memory.cc  |  1 +
+ 9 files changed, 24 insertions(+), 62 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
 index d25043c..3e272a0 100644
@@ -281,6 +282,18 @@ index 98e9d19..7b74672 100644
    endif() # TRITON_ENABLE_GPU
  endif() # WIN32
  
+diff --git a/src/python/library/tritonclient/utils/cuda_shared_memory/cuda_shared_memory.cc b/src/python/library/tritonclient/utils/cuda_shared_memory/cuda_shared_memory.cc
+index ea86e50..0efcc8a 100644
+--- a/src/python/library/tritonclient/utils/cuda_shared_memory/cuda_shared_memory.cc
++++ b/src/python/library/tritonclient/utils/cuda_shared_memory/cuda_shared_memory.cc
+@@ -29,6 +29,7 @@
+ #include <cuda_runtime_api.h>
+ #include <cstring>
+ #include <iostream>
++#include <cstdint>
+ #include "../shared_memory/shared_memory_handle.h"
+ 
+ extern "C" {
 -- 
 2.25.1
 
