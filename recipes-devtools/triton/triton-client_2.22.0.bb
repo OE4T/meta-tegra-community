@@ -15,11 +15,12 @@ S = "${WORKDIR}/git"
 DEPENDS = "\
     triton-common \
     triton-core \
+    python3-setuptools-native \
 "
 
 COMPATIBLE_MACHINE = "(cuda)"
 
-inherit pkgconfig cmake python3-dir cuda
+inherit pkgconfig cmake python3-dir setuptools3-base cuda
 
 EXTRA_OECMAKE += '\
     -DCMAKE_INSTALL_PREFIX="${D}${prefix}" \
