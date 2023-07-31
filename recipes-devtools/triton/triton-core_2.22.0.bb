@@ -4,8 +4,8 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=5ad619ba25208ce8a327356e0111bb23"
 SECTION = "libs"
 
 SRC_URI = "\
-    git://github.com/triton-inference-server/core.git;protocol=https;branch=${PV} \
-    file://0001-fix-cmake-build.patch \
+    git://github.com/triton-inference-server/core.git;protocol=https;branch=r22.05 \
+    file://0001-Build-fixups.patch \
 "
 
 SRCREV = "70506c503ac44958d8531a6f51f4f3be8241c362"
@@ -27,7 +27,6 @@ inherit cmake cuda
 
 EXTRA_OECMAKE = "\
     -DTRITON_CORE_HEADERS_ONLY=OFF \
-    -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_CXX_FLAGS='${CMAKE_CXX_FLAGS} -Wno-maybe-uninitialized' \
 "
 
@@ -46,8 +45,10 @@ PACKAGECONFIG[s3] = "-DTRITON_ENABLE_S3=ON,-DTRITON_ENABLE_S3=OFF"
 PACKAGECONFIG[azure] = "-DTRITON_ENABLE_AZURE_STORAGE=ON,-DTRITON_ENABLE_AZURE_STORAGE=OFF"
 
 do_install_append() {
-    DESTDIR='${D}' eval ${DESTDIR:+DESTDIR=${DESTDIR} }${CMAKE_VERBOSE} cmake --build '${B}/triton-core' "$@"  --target ${OECMAKE_TARGET_INSTALL} -- ${EXTRA_OECMAKE_BUILD} 
+    install -d ${D}${libdir}
+    install -m 0644 ${B}/triton-core/libtriton-core.so ${D}${libdir}
     rm -rf ${D}${libdir}/stubs
-    mv ${D}${libdir}/libtriton-core.so ${D}${libdir}/libtriton-core.so.${PV}
-    ln -sr ${D}${libdir}/libtriton-core.so.${PV} ${D}${libdir}/libtriton-core.so
 }
+
+SOLIBS = ".so"
+FILES_SOLIBSDEV = ""

@@ -1,8 +1,10 @@
-From a7eb2512575b93634a979e289534d9771ad6fc9d Mon Sep 17 00:00:00 2001
-From: Roger Knecht <roger@norberthealth.com>
-Date: Fri, 1 Jul 2022 13:04:43 +0200
-Subject: [PATCH] fix cmake build
+From d82de8654d60fd51e001678512fb18cd7ffd9e46 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ilies.chergui@gmail.com>
+Date: Sun, 30 Jul 2023 22:43:45 +0100
+Subject: [PATCH] Build fixups
 
+Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
+Signed-off-by: Roger Knecht <roger@norberthealth.com>
 ---
  CMakeLists.txt     | 35 ++++++-----------------------------
  src/CMakeLists.txt | 32 +++++++++-----------------------
@@ -211,5 +213,5 @@ index 009a612..7a6f8e9 100644
      return Status(
          Status::Code::INTERNAL, "Can't parse " + path + " as binary proto");
 -- 
-2.17.1
+2.25.1
 

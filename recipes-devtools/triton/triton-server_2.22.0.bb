@@ -3,8 +3,8 @@ LICENSE = "BSD-3-Clause"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=1c4cd58940438cc34ebeb4fec0a79ec8"
 
 SRC_URI = "\
-    gitsm://github.com/triton-inference-server/server.git;protocol=https;branch=${PV} \
-    file://0001-fix-cmake-build.patch \
+    git://github.com/triton-inference-server/server.git;protocol=https;branch=r22.05 \
+    file://0001-Build-fixups.patch \
 "
 
 SRCREV = "be579093ac71ce7b55381ff5747a7b9455739cdf"
@@ -21,10 +21,10 @@ COMPATIBLE_MACHINE = "(cuda)"
 
 inherit pkgconfig cmake cuda
 
-EXTRA_OECMAKE = "\
-    -DDESTDIR=${D} \
-    -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH};${RECIPE_SYSROOT}/usr/lib/cmake/libevhtp;${RECIPE_SYSROOT}/usr/lib/cmake/re2" \
-"
+EXTRA_OECMAKE_append = ' \
+    -DCMAKE_INSTALL_PREFIX="${D}${prefix}" \
+    -DCMAKE_PREFIX_PATH="${STAGING_LIBDIR}/cmake/libevhtp;${STAGING_LIBDIR}/cmake/re2" \
+'
 
 PACKAGECONFIG ??= "logging http gpu tensorrt"
 PACKAGECONFIG[logging] = "-DTRITON_ENABLE_LOGGING=ON,-DTRITON_ENABLE_LOGGING=OFF"
@@ -47,5 +47,9 @@ PACKAGECONFIG[tensorrt] = "-DTRITON_ENABLE_TENSORRT=ON,-DTRITON_ENABLE_TENSORRT=
 PACKAGECONFIG[asan] = "-DTRITON_ENABLE_ASAN=ON,-DTRITON_ENABLE_ASAN=OFF"
 
 do_install() {
-    DESTDIR='${D}' eval ${DESTDIR:+DESTDIR=${DESTDIR} }${CMAKE_VERBOSE} cmake --build '${B}/triton-server' "$@"  --target ${OECMAKE_TARGET_INSTALL} -- ${EXTRA_OECMAKE_BUILD} 
+    install -d ${D}${bindir}
+    install -m 0755 ${B}/triton-server/memory_alloc ${D}${bindir}
+    install -m 0755 ${B}/triton-server/multi_server ${D}${bindir}
+    install -m 0755 ${B}/triton-server/simple ${D}${bindir}
+    install -m 0755 ${B}/triton-server/tritonserver ${D}${bindir}
 }

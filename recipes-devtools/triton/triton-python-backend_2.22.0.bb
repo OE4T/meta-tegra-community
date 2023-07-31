@@ -2,9 +2,10 @@ DESCRIPTION = "Triton backend that enables pre-process, post-processing and othe
 LICENSE = "BSD-3-Clause"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=7889848dc86811b06ded7bfa9ba39e02"
 
-SRC_URI = "git://github.com/triton-inference-server/python_backend.git;protocol=https;branch=r22.05 \
-           file://0001-fix-cmake-build.patch \
-           "
+SRC_URI = "\
+    git://github.com/triton-inference-server/python_backend.git;protocol=https;branch=r22.05 \
+    file://0001-Build-fixups.patch \
+"
 
 SRCREV = "6133572a4f090721cc52e79595b70f383397b186"
 
@@ -36,12 +37,9 @@ PACKAGECONFIG[gpu] = "-DTRITON_ENABLE_GPU=ON,-DTRITON_ENABLE_GPU=OFF"
 PACKAGECONFIG[stats] = "-DTRITON_ENABLE_STATS=ON,-DTRITON_ENABLE_STATS=OFF"
 PACKAGECONFIG[nvtx] = "-DTRITON_ENABLE_NVTX=ON,-DTRITON_ENABLE_NVTX=OFF"
 
-do_install_append() {
-    mv ${D}${libdir}/libtriton_python.so ${D}${libdir}/libtriton_python.so.${PV}
-    ln -sr ${D}${libdir}/libtriton_python.so.${PV} ${D}${libdir}/libtriton_python.so
-}
-
-FILES_${PN} = " \
+FILES_${PN} += " \
     ${libdir}/triton_python_backend_utils.py \
-    ${libdir}/libtriton_python.so.${PV} \
 "
+
+SOLIBS = ".so"
+FILES_SOLIBSDEV = ""

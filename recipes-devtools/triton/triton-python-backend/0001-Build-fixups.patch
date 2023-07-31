@@ -1,15 +1,19 @@
-From 46cf0eb8c4a642218b4485984a94d20d9d86152f Mon Sep 17 00:00:00 2001
-From: Roger Knecht <roger@norberthealth.com>
-Date: Fri, 21 Oct 2022 11:59:50 +0200
-Subject: [PATCH] fix cmake build
+From bf8f9f45d22516751aaeccea6b0001b61ae3bbaf Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ilies.chergui@gmail.com>
+Date: Mon, 31 Jul 2023 22:18:13 +0100
+Subject: [PATCH] Build fixups
 
+Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
+Signed-off-by: Roger Knecht <roger@norberthealth.com>
 ---
- CMakeLists.txt | 111 ++++---------------------------------------------
- src/python.cc  |   2 +-
- 2 files changed, 10 insertions(+), 103 deletions(-)
+ CMakeLists.txt    | 113 ++++------------------------------------------
+ src/pb_memory.h   |   2 +
+ src/python.cc     |   4 +-
+ src/shm_manager.h |   1 +
+ 4 files changed, 15 insertions(+), 105 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index e1ea996..8d374d2 100644
+index e1ea996..f16b8bb 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -24,9 +24,9 @@
@@ -135,8 +139,9 @@ index e1ea996..8d374d2 100644
      Threads::Threads
      triton-backend-utils          # from repo-backend
      -ldl                          # dlopen
-     -lrt                          # shared memory 
+-    -lrt                          # shared memory 
 -    triton-core-serverstub        # from repo-core
++    -lrt                          # shared memory
      ZLIB::ZLIB
      -larchive
  )
@@ -191,10 +196,32 @@ index e1ea996..8d374d2 100644
  )
  
  include(CMakePackageConfigHelpers)
+diff --git a/src/pb_memory.h b/src/pb_memory.h
+index 61df776..55320f6 100644
+--- a/src/pb_memory.h
++++ b/src/pb_memory.h
+@@ -26,6 +26,8 @@
+ 
+ #pragma once
+ 
++#include <functional>
++
+ #include "pb_utils.h"
+ #include "shm_manager.h"
+ #include "triton/backend/backend_common.h"
 diff --git a/src/python.cc b/src/python.cc
-index 1a3fd46..89eef9e 100644
+index 1a3fd46..27d64d0 100644
 --- a/src/python.cc
 +++ b/src/python.cc
+@@ -1848,7 +1848,7 @@ ModelInstanceState::ProcessRequests(
+                 shm_pool_, actual_memory_type, actual_memory_type_id,
+                 0 /* byte size */, nullptr /* data ptr */));
+ 
+-        gpu_output_buffers.push_back({std::move(output_buffer), {buffer, r}});
++        gpu_output_buffers.push_back(std::move(std::pair<std::unique_ptr<PbMemory>, std::pair<void*, uint64_t>>(std::move(output_buffer), std::pair<void*, uint64_t>(buffer, r))));
+       }
+ 
+       if (src_memory_type != TRITONSERVER_MEMORY_GPU) {
 @@ -1984,7 +1984,7 @@ ModelInstanceState::~ModelInstanceState()
        }
  
@@ -204,3 +231,18 @@ index 1a3fd46..89eef9e 100644
  
        ipc_message->Command() = PYTHONSTUB_FinalizeRequest;
        stub_message_queue_->Push(ipc_message->ShmHandle());
+diff --git a/src/shm_manager.h b/src/shm_manager.h
+index 705d087..1db3f26 100644
+--- a/src/shm_manager.h
++++ b/src/shm_manager.h
+@@ -26,6 +26,7 @@
+ 
+ #pragma once
+ 
++#include <functional>
+ #include <sys/wait.h>
+ #include <boost/interprocess/allocators/allocator.hpp>
+ #include <boost/interprocess/detail/atomic.hpp>
+-- 
+2.25.1
+
