@@ -1,14 +1,16 @@
-From 7a9143270124321baa5d3579d5996e2b3789bed9 Mon Sep 17 00:00:00 2001
-From: Roger Knecht <roger@norberthealth.com>
-Date: Fri, 24 Jun 2022 19:13:11 +0200
-Subject: [PATCH] fix cmake build
+From 21b11a0d222e4a957363e2c144409d33c09fd08b Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ilies.chergui@gmail.com>
+Date: Sun, 30 Jul 2023 22:28:16 +0100
+Subject: [PATCH] Build fixups
 
+Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
+Signed-off-by: Roger Knecht <roger@norberthealth.com>
 ---
  CMakeLists.txt | 25 ++++++-------------------
  1 file changed, 6 insertions(+), 19 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 622f69a..1fa4c8f 100644
+index 622f69a..a634882 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -24,7 +24,7 @@
@@ -71,5 +73,5 @@ index 622f69a..1fa4c8f 100644
      kernel-library-new
    )
 -- 
-2.17.1
+2.25.1
 
