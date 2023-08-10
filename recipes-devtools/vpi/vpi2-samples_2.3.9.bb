@@ -9,7 +9,7 @@ COMPATIBLE_MACHINE = "(tegra)"
 inherit l4t_deb_pkgfeed cuda cmake
 
 SRC_COMMON_DEBS = "vpi2-samples_${PV}_arm64.deb;subdir=vpi2-samples"
-SRC_URI[sha256sum] = "6c0f4dbca08097b9bb8c19df378d75468776a2ed7dbd1f0e0938a3d5f9f5bd71"
+SRC_URI[sha256sum] = "1d15d6bbb71688a5e00f964603cc53e43064112d2020b133e3b4237e69ac8b1a"
 
 SRC_URI += "file://CMakeLists.txt;subdir=vpi2-samples/opt/nvidia/vpi2/samples"
 
@@ -22,5 +22,7 @@ PACKAGECONFIG[video] = "-DBUILD_VIDEO_SAMPLES=ON,-DBUILD_VIDEO_SAMPLES=OFF,"
 S = "${WORKDIR}/vpi2-samples/opt/nvidia/vpi2/samples"
 
 DEPENDS = "libnvvpi2 opencv"
+
+LDFLAGS += "-Wl,-rpath,/opt/nvidia/cupva-2.3/lib/aarch64-linux-gnu"
 
 FILES:${PN} = "${VPI_PREFIX}"
