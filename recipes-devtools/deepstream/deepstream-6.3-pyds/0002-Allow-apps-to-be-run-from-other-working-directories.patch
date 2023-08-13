@@ -1,28 +1,28 @@
-From e3bd9dfeb3384fa1024d91896d000832fe0e6af2 Mon Sep 17 00:00:00 2001
+From 426becc45c68a56f58770a64119289823b249b6b Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ilies.chergui@gmail.com>
-Date: Sun, 5 Feb 2023 16:33:33 +0000
+Date: Sun, 13 Aug 2023 19:29:37 +0100
 Subject: [PATCH 2/2] Allow apps to be run from other working directories
 
 Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 Signed-off-by: Matt Madison <matt@madison.systems>
 ---
- apps/common/is_aarch_64.py                       |  4 ----
- apps/common/utils.py                             |  2 --
- ...deepstream_imagedata-multistream_redaction.py |  8 ++++----
- .../deepstream_imagedata-multistream.py          |  7 ++++---
- .../deepstream_nvdsanalytics.py                  | 11 ++++++-----
- .../deepstream-opticalflow.py                    |  3 ++-
- .../deepstream_test1_rtsp_in_rtsp_out.py         |  9 +++++----
- .../deepstream_segmentation.py                   |  6 +++---
- .../deepstream_ssd_parser.py                     | 11 ++++++-----
- .../deepstream_test1_rtsp_out.py                 |  7 ++++---
- .../deepstream_test_1_usb.py                     |  7 ++++---
- apps/deepstream-test1/deepstream_test_1.py       |  7 ++++---
- apps/deepstream-test2/deepstream_test_2.py       | 16 +++++++++-------
- apps/deepstream-test3/deepstream_test_3.py       |  7 ++++---
- apps/deepstream-test4/deepstream_test_4.py       | 10 +++++-----
- .../deepstream_rt_src_add_del.py                 | 15 ++++++++-------
- 16 files changed, 68 insertions(+), 62 deletions(-)
+ apps/common/is_aarch_64.py                        |  4 ----
+ apps/common/utils.py                              |  2 --
+ .../deepstream_imagedata-multistream_redaction.py |  8 ++++----
+ .../deepstream_imagedata-multistream.py           |  8 ++++----
+ .../deepstream_nvdsanalytics.py                   | 11 ++++++-----
+ .../deepstream-opticalflow.py                     |  3 ++-
+ .../deepstream_test1_rtsp_in_rtsp_out.py          |  9 +++++----
+ .../deepstream_segmentation.py                    |  6 +++---
+ .../deepstream_ssd_parser.py                      | 11 ++++++-----
+ .../deepstream_test1_rtsp_out.py                  |  7 ++++---
+ .../deepstream_test_1_usb.py                      |  7 ++++---
+ apps/deepstream-test1/deepstream_test_1.py        |  7 ++++---
+ apps/deepstream-test2/deepstream_test_2.py        | 15 ++++++++-------
+ apps/deepstream-test3/deepstream_test_3.py        |  7 ++++---
+ apps/deepstream-test4/deepstream_test_4.py        | 10 +++++-----
+ .../deepstream_rt_src_add_del.py                  | 15 ++++++++-------
+ 16 files changed, 67 insertions(+), 63 deletions(-)
 
 diff --git a/apps/common/is_aarch_64.py b/apps/common/is_aarch_64.py
 index 26276c3..b287613 100644
@@ -79,13 +79,14 @@ index c4397d6..aaa15d1 100644
      if (pgie_batch_size != number_sources):
          print("WARNING: Overriding infer-config batch-size", pgie_batch_size, " with number of sources ",
 diff --git a/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py b/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py
-index b1a2e93..957ab7d 100755
+index b1a2e93..4a3ff65 100755
 --- a/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py
 +++ b/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py
-@@ -18,8 +18,9 @@
+@@ -17,9 +17,9 @@
+ # limitations under the License.
  ################################################################################
  
- import sys
+-import sys
 -
 -sys.path.append('../')
 +import sys, os
@@ -94,7 +95,7 @@ index b1a2e93..957ab7d 100755
  import gi
  import configparser
  
-@@ -362,7 +363,7 @@ def main(args):
+@@ -362,7 +362,7 @@ def main(args):
      streammux.set_property('height', 1080)
      streammux.set_property('batch-size', number_sources)
      streammux.set_property('batched-push-timeout', 4000000)
@@ -104,7 +105,7 @@ index b1a2e93..957ab7d 100755
      if (pgie_batch_size != number_sources):
          print("WARNING: Overriding infer-config batch-size", pgie_batch_size, " with number of sources ",
 diff --git a/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py b/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py
-index 9bafdd5..aea65d4 100755
+index 208ddf3..1a493b4 100755
 --- a/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py
 +++ b/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py
 @@ -17,8 +17,9 @@
@@ -147,7 +148,7 @@ index 9bafdd5..aea65d4 100755
  
      for key in config['tracker']:
 diff --git a/apps/deepstream-opticalflow/deepstream-opticalflow.py b/apps/deepstream-opticalflow/deepstream-opticalflow.py
-index 750a592..1f4fa63 100755
+index 1a67dbf..ccbb9c5 100755
 --- a/apps/deepstream-opticalflow/deepstream-opticalflow.py
 +++ b/apps/deepstream-opticalflow/deepstream-opticalflow.py
 @@ -22,7 +22,8 @@ import os
@@ -161,7 +162,7 @@ index 750a592..1f4fa63 100755
  import numpy as np
  
 diff --git a/apps/deepstream-rtsp-in-rtsp-out/deepstream_test1_rtsp_in_rtsp_out.py b/apps/deepstream-rtsp-in-rtsp-out/deepstream_test1_rtsp_in_rtsp_out.py
-index 88fd89b..645cfff 100755
+index d8af91a..ca58f51 100755
 --- a/apps/deepstream-rtsp-in-rtsp-out/deepstream_test1_rtsp_in_rtsp_out.py
 +++ b/apps/deepstream-rtsp-in-rtsp-out/deepstream_test1_rtsp_in_rtsp_out.py
 @@ -16,8 +16,9 @@
@@ -176,8 +177,8 @@ index 88fd89b..645cfff 100755
  from common.bus_call import bus_call
  from common.is_aarch_64 import is_aarch64
  import pyds
-@@ -302,9 +303,9 @@ def main(args):
-     streammux.set_property("batched-push-timeout", 4000000)
+@@ -287,9 +288,9 @@ def main(args):
+         streammux.set_property("attach-sys-ts", 0)
  
      if gie=="nvinfer":
 -        pgie.set_property("config-file-path", "dstest1_pgie_config.txt")
@@ -325,7 +326,7 @@ index a03d326..d765c57 100755
      print("Adding elements to Pipeline \n")
      pipeline.add(source)
 diff --git a/apps/deepstream-test2/deepstream_test_2.py b/apps/deepstream-test2/deepstream_test_2.py
-index bcafbe2..44f60c1 100755
+index 2968db0..7c74c37 100755
 --- a/apps/deepstream-test2/deepstream_test_2.py
 +++ b/apps/deepstream-test2/deepstream_test_2.py
 @@ -17,8 +17,9 @@
@@ -340,7 +341,7 @@ index bcafbe2..44f60c1 100755
  import platform
  import configparser
  
-@@ -257,14 +258,15 @@ def main(args):
+@@ -254,14 +255,14 @@ def main(args):
      streammux.set_property('batched-push-timeout', 4000000)
  
      #Set properties of pgie and sgie
@@ -352,7 +353,6 @@ index bcafbe2..44f60c1 100755
 +    sgie1.set_property('config-file-path', os.path.join(HERE, "dstest2_sgie1_config.txt"))
 +    sgie2.set_property('config-file-path', os.path.join(HERE, "dstest2_sgie2_config.txt"))
 +    sgie3.set_property('config-file-path', os.path.join(HERE, "dstest2_sgie3_config.txt"))
-+
  
      #Set properties of tracker
      config = configparser.ConfigParser()
@@ -415,7 +415,7 @@ index b22cc64..be33348 100755
  pgie_classes_str = ["Vehicle", "TwoWheeler", "Person", "Roadsign"]
  
 diff --git a/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py b/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py
-index 991bd9a..4eee5bb 100644
+index 1ed7988..2253264 100644
 --- a/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py
 +++ b/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py
 @@ -17,8 +17,9 @@
