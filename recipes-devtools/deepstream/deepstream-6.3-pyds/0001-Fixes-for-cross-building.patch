@@ -1,18 +1,18 @@
-From 9645ecafda0b311e0aa13580d4ba0fa9ca6fac3f Mon Sep 17 00:00:00 2001
+From 0853effb1b2ead74c2413e4b282233cd0f7b51f5 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ilies.chergui@gmail.com>
-Date: Sun, 5 Feb 2023 15:57:11 +0000
+Date: Sun, 13 Aug 2023 19:07:16 +0100
 Subject: [PATCH 1/2] Fixes for cross-building
 
 Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 Signed-off-by: Matt Madison <matt@madison.systems>
 ---
- bindings/CMakeLists.txt    | 67 ++++++++++++--------------------------
- bindings/include/pyds.hpp  |  4 +--
+ bindings/CMakeLists.txt    | 66 ++++++++++++--------------------------
+ bindings/include/pyds.hpp  |  2 +-
  bindings/include/utils.hpp |  2 +-
- 3 files changed, 23 insertions(+), 50 deletions(-)
+ 3 files changed, 22 insertions(+), 48 deletions(-)
 
 diff --git a/bindings/CMakeLists.txt b/bindings/CMakeLists.txt
-index 043324d..a081111 100644
+index d89d5e8..a482f25 100644
 --- a/bindings/CMakeLists.txt
 +++ b/bindings/CMakeLists.txt
 @@ -13,7 +13,8 @@
@@ -20,7 +20,7 @@ index 043324d..a081111 100644
  # limitations under the License.
  
 -cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
-+cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
++cmake_minimum_required(VERSION 3.22 FATAL_ERROR)
 +project(pyds DESCRIPTION "Python bindings for Deepstream")
  
  # Setting values not set by user
@@ -33,7 +33,7 @@ index 043324d..a081111 100644
 -check_variable_set(PYTHON_MINOR_VERSION 8)
 -check_variable_set(PIP_PLATFORM linux_x86_64)
 -check_variable_set(DS_PATH "/opt/nvidia/deepstream/deepstream")
-+check_variable_set(DS_VERSION 6.2)
++check_variable_set(DS_VERSION 6.3)
 +find_package(Python MODULE REQUIRED COMPONENTS Development)
 +check_variable_set(PYTHON_MAJOR_VERSION ${Python_VERSION_MAJOR})
 +check_variable_set(PYTHON_MINOR_VERSION ${Python_VERSION_MINOR})
@@ -41,7 +41,7 @@ index 043324d..a081111 100644
  
  
  # Checking values are allowed
-@@ -36,23 +38,19 @@ macro(check_variable_allowed var_name var_list)
+@@ -36,23 +38,20 @@ macro(check_variable_allowed var_name var_list)
  endmacro()
  set(PYTHON_MAJVERS_ALLOWED 3)
  check_variable_allowed(PYTHON_MAJOR_VERSION PYTHON_MAJVERS_ALLOWED)
@@ -58,19 +58,19 @@ index 043324d..a081111 100644
  
  # Setting python build versions
 -set(PYTHON_VERSION ${PYTHON_MAJOR_VERSION}.${PYTHON_MINOR_VERSION})
--set(PIP_WHEEL pyds-1.1.6-py3-none-${PIP_PLATFORM}.whl)
+-set(PIP_WHEEL pyds-1.1.8-py3-none-${PIP_PLATFORM}.whl)
 +set(PYTHON_VERSION ${Python_VERSION})
 +find_package(PkgConfig REQUIRED)
 +pkg_check_modules(GLIB REQUIRED IMPORTED_TARGET glib-2.0)
 +pkg_check_modules(GSTREAMER REQUIRED IMPORTED_TARGET gstreamer-1.0)
 +find_package(pybind11 REQUIRED)
  
--# Describing pyds build
+ # Describing pyds build
 -project(pyds DESCRIPTION "Python bindings for Deepstream")
  add_compile_options(-Wall -Wextra -pedantic -O3)
  
  include_directories(
-@@ -60,13 +58,7 @@ include_directories(
+@@ -60,13 +59,7 @@ include_directories(
          ${DS_PATH}/sources/includes/
          include/bind
          include/nvds
@@ -85,7 +85,7 @@ index 043324d..a081111 100644
          )
  
  add_library(pyds SHARED src/pyds.cpp src/utils.cpp src/bindanalyticsmeta.cpp
-@@ -78,37 +70,18 @@ add_library(pyds SHARED src/pyds.cpp src/utils.cpp src/bindanalyticsmeta.cpp
+@@ -78,37 +71,18 @@ add_library(pyds SHARED src/pyds.cpp src/utils.cpp src/bindanalyticsmeta.cpp
  set_target_properties(pyds PROPERTIES PREFIX "")
  set_target_properties(pyds PROPERTIES OUTPUT_NAME "pyds")
  
@@ -131,7 +131,7 @@ index 043324d..a081111 100644
 -add_custom_target(pip_wheel ALL DEPENDS ${PIP_WHEEL})
 +target_link_libraries(pyds nvbufsurface nvbufsurftransform)
 diff --git a/bindings/include/pyds.hpp b/bindings/include/pyds.hpp
-index 971b0b4..f0c656f 100644
+index 252b961..6b16668 100644
 --- a/bindings/include/pyds.hpp
 +++ b/bindings/include/pyds.hpp
 @@ -19,7 +19,7 @@
@@ -143,13 +143,6 @@ index 971b0b4..f0c656f 100644
  #include "pybind11/pybind11.h"
  #include "pybind11/cast.h"
  #include "pybind11/pytypes.h"
-@@ -52,4 +52,4 @@ namespace pydeepstream {
-     // rewritting ""_a operator from pybind11 namespace and putting it into
-     // pydeepstream namespace
-     py::arg operator ""_a(const char *str, size_t len);
--}
-\ No newline at end of file
-+}
 diff --git a/bindings/include/utils.hpp b/bindings/include/utils.hpp
 index f713b9b..49d6cca 100644
 --- a/bindings/include/utils.hpp
