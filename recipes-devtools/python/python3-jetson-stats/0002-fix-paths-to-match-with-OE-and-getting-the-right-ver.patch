@@ -1,4 +1,4 @@
-From 712f16f7fd1df493edd1da61d2d5cfaff590ae10 Mon Sep 17 00:00:00 2001
+From 521f9df38b996c46edb40721be17554e777f8e5c Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ilies.chergui@gmail.com>
 Date: Sat, 26 Aug 2023 12:45:21 +0100
 Subject: [PATCH 2/2] fix paths to match with OE and getting the right version

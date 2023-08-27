@@ -1,4 +1,4 @@
-From 92fdbdd01f84378c061c9db45252d6d8bcf15990 Mon Sep 17 00:00:00 2001
+From 3a45387ed5549aa3015c5939d4870b57ee207070 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ilies.chergui@gmail.com>
 Date: Sat, 26 Aug 2023 12:22:15 +0100
 Subject: [PATCH 1/2] fix installation process issue and cleanup
@@ -6,10 +6,14 @@ Subject: [PATCH 1/2] fix installation process issue and cleanup
 Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 ---
  jtop/core/jetson_variables.py |   8 ---
- jtop/jetson_config.py         |   4 +-
- jtop/service.py               | 109 ----------------------------------
- setup.py                      |  94 +----------------------------
- 4 files changed, 3 insertions(+), 212 deletions(-)
+ jtop/github.py                |   2 +-
+ jtop/jetson_config.py         |  10 ++-
+ jtop/jetson_release.py        |   2 +-
+ jtop/jetson_swap.py           |   4 +-
+ jtop/jtop.py                  |   6 +-
+ jtop/service.py               | 112 ----------------------------------
+ setup.py                      |  94 +---------------------------
+ 8 files changed, 13 insertions(+), 225 deletions(-)
 
 diff --git a/jtop/core/jetson_variables.py b/jtop/core/jetson_variables.py
 index a35aed4..24dee29 100644
@@ -30,8 +34,21 @@ index a35aed4..24dee29 100644
  def install_variables(package_root, copy, name=JTOP_VARIABLE_FILE):
      logger.info("Install {name} variables".format(name=name))
      variables_install_path = '/etc/profile.d/{name}'.format(name=name)
+diff --git a/jtop/github.py b/jtop/github.py
+index 3b0fbf8..a7bb12c 100644
+--- a/jtop/github.py
++++ b/jtop/github.py
+@@ -127,7 +127,7 @@ def hyperlink(message, url, text):
+     # 5. https://stackoverflow.com/questions/44078888/clickable-html-links-in-python-3-6-shell
+     # Print starting message
+     print("[{status}] {message}".format(status=bcolors.warning(), message=message))
+-    print("  Please, try: {bold}sudo pip3 install -U jetson-stats{reset} or".format(bold=bcolors.BOLD, reset=bcolors.ENDC))
++    print("  Please, try: {bold}pip3 install -U jetson-stats{reset} or".format(bold=bcolors.BOLD, reset=bcolors.ENDC))
+     # Generate hyperlink for shell
+     # Check type of shell
+     try:
 diff --git a/jtop/jetson_config.py b/jtop/jetson_config.py
-index f4fd44b..a9da92f 100644
+index f4fd44b..c940f18 100644
 --- a/jtop/jetson_config.py
 +++ b/jtop/jetson_config.py
 @@ -31,7 +31,7 @@ from .core.common import get_var
@@ -43,6 +60,15 @@ index f4fd44b..a9da92f 100644
  # Create logger
  logger = logging.getLogger(__name__)
  # Detect user
+@@ -59,7 +59,7 @@ def update_jtop():
+         cmd_update_msg = cmd_update()
+         cmd_update_msg = "JTOP updated!"
+     except (OSError, Command.CommandException):
+-        cmd_update_msg = "Error to update jtop, please run:\n\nsudo pip3 install --no-cache-dir -U jetson_stats"
++        cmd_update_msg = "Error to update jtop, please run:\n\npip3 install --no-cache-dir -U jetson_stats"
+     return cmd_update_msg
+ 
+ 
 @@ -77,7 +77,6 @@ def fix_variables():
  
  def fix_jtop_all():
@@ -59,8 +85,92 @@ index f4fd44b..a9da92f 100644
          (status_variables, fix_variables, "Fix jtop variables"),
      ],
  }
+@@ -227,7 +225,7 @@ def jtop_config():
+         curses.wrapper(JTOPCONFIG, JTOP_MENU)
+         sys.exit(0)
+     # Quit with error
+-    print(bcolors.fail("Please run with sudo"))
++    print(bcolors.fail("Please run jtop with superuser"))
+     sys.exit(1)
+ 
+ 
+@@ -240,7 +238,7 @@ def main():
+             print(bcolors.fail("require reboot"))
+         sys.exit(0)
+     # Quit with error
+-    print(bcolors.fail("Please run with sudo"))
++    print(bcolors.fail("Please run jtop with superuser"))
+     sys.exit(1)
+ 
+ 
+diff --git a/jtop/jetson_release.py b/jtop/jetson_release.py
+index 2140fdb..3ab6079 100644
+--- a/jtop/jetson_release.py
++++ b/jtop/jetson_release.py
+@@ -81,7 +81,7 @@ def main():
+         if not variable:
+             variable = bcolors.fail("Not available")
+             if name == 'Module' and os.getuid() != 0:
+-                variable = bcolors.fail("Check with sudo")
++                variable = bcolors.fail("Check with superuse")
+         print(" - {name}: {variable}".format(name=bcolors.bold(name), variable=variable))
+     # Print platform variables
+     plat = get_platform_variables()
+diff --git a/jtop/jetson_swap.py b/jtop/jetson_swap.py
+index 0b256f0..9f59cfc 100644
+--- a/jtop/jetson_swap.py
++++ b/jtop/jetson_swap.py
+@@ -29,7 +29,7 @@ COPYRIGHT_RE = re.compile(r""".*__copyright__ = ["'](.*?)['"]""", re.S)
+ 
+ def main():
+     parser = argparse.ArgumentParser(
+-        description='Create a swap file and enable on boot (require sudo)',
++        description='Create a swap file and enable on boot',
+         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+     parser.add_argument('-d', '--dir', dest="directory", help='Directory to place swapfile', type=str, default='')
+     parser.add_argument('-n', '--name', dest="name", help='Name swap file', type=str, default='swapfile')
+@@ -58,7 +58,7 @@ def main():
+     # Check if running a root
+     if os.getuid() != 0:
+         # Quit with error
+-        print(bcolors.fail("Please run with sudo"))
++        print(bcolors.fail("Please run jtop with superuser"))
+         parser.print_help(sys.stderr)
+         sys.exit(1)
+     # Define Memory Service
+diff --git a/jtop/jtop.py b/jtop/jtop.py
+index 0237859..3370fdc 100644
+--- a/jtop/jtop.py
++++ b/jtop/jtop.py
+@@ -1113,7 +1113,7 @@ class jtop(Thread):
+             self._broadcaster.connect()
+         except FileNotFoundError as e:
+             if e.errno == 2 or e.errno == 111:  # Message error: 'No such file or directory' or 'Connection refused'
+-                raise JtopException("The jtop.service is not active. Please run:\nsudo systemctl restart jtop.service")
++                raise JtopException("The jtop.service is not active. Please run:\nsystemctl restart jtop.service")
+             elif e.errno == 13:  # Message error: 'Permission denied'
+                 raise JtopException("I can't access jtop.service.\nPlease logout or reboot this board.")
+             else:
+@@ -1121,7 +1121,7 @@ class jtop(Thread):
+         except ConnectionRefusedError as e:
+             if e.errno == 111:  # Connection refused
+                 # When server is off but socket files exists in /run
+-                raise JtopException("The jtop.service is not active. Please run:\nsudo systemctl restart jtop.service")
++                raise JtopException("The jtop.service is not active. Please run:\nsystemctl restart jtop.service")
+             else:
+                 raise ConnectionRefusedError(e)
+         except PermissionError as e:
+@@ -1144,7 +1144,7 @@ class jtop(Thread):
+         service_version = init.get('version', 'unknown')
+         if service_version != get_var(VERSION_RE):
+             raise JtopException("""Mismatch version jtop service: [{service_version}] and client: [{client_version}]. Please run:\n
+-sudo systemctl restart jtop.service""".format(
++systemctl restart jtop.service""".format(
+                 service_version=service_version,
+                 client_version=get_var(VERSION_RE)))
+         # Load server speed
 diff --git a/jtop/service.py b/jtop/service.py
-index b66bf40..09dd3b1 100644
+index b66bf40..7df7260 100644
 --- a/jtop/service.py
 +++ b/jtop/service.py
 @@ -78,78 +78,8 @@ def status_service(service=JTOP_SERVICE_NAME):
@@ -177,7 +287,17 @@ index b66bf40..09dd3b1 100644
  class JtopManager(SyncManager):
  
      def __init__(self, authkey=None):
-@@ -474,12 +376,6 @@ class JtopServer(Process):
+@@ -245,9 +147,6 @@ class JtopServer(Process):
+ 
+     def __init__(self, force=False):
+         self.force = force
+-        # Check if running a root
+-        if os.getuid() != 0:
+-            raise JtopException("jtop service need sudo to work")
+         # Save version jtop
+         self._version = deepcopy(get_var(VERSION_RE))
+         logger.info("jetson_stats {version} - server loaded".format(version=self._version))
+@@ -474,12 +373,6 @@ class JtopServer(Process):
          except KeyError:
              # User does not exist
              raise JtopException("Group {jtop_user} does not exist!".format(jtop_user=JTOP_USER))
@@ -190,7 +310,7 @@ index b66bf40..09dd3b1 100644
          # Start broadcaster
          try:
              self.broadcaster.start()
-@@ -535,7 +431,6 @@ class JtopServer(Process):
+@@ -535,7 +428,6 @@ class JtopServer(Process):
                  raise ex_value
          except queue.Empty:
              pass
@@ -198,7 +318,7 @@ index b66bf40..09dd3b1 100644
          # Switch off jetson_clocks if there are threads alive
          self.jetson_clocks.close()
          # Switch off nvpmodel if there are threads alive
-@@ -544,10 +439,6 @@ class JtopServer(Process):
+@@ -544,10 +436,6 @@ class JtopServer(Process):
          logger.info("Service closed")
          return True
  
