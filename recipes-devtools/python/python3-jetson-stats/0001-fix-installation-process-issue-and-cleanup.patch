@@ -1,0 +1,457 @@
+From 23cf34b547eb90a4a21f1c6bcd61f631f9b6609f Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ilies.chergui@gmail.com>
+Date: Sun, 27 Aug 2023 23:43:06 +0100
+Subject: [PATCH 1/2] fix installation process issue and cleanup
+
+Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
+---
+ jtop/core/jetson_variables.py |   8 ---
+ jtop/github.py                |   2 +-
+ jtop/jetson_config.py         |  10 ++-
+ jtop/jetson_release.py        |   2 +-
+ jtop/jetson_swap.py           |   4 +-
+ jtop/jtop.py                  |   6 +-
+ jtop/service.py               | 112 ----------------------------------
+ setup.py                      |  94 +---------------------------
+ 8 files changed, 13 insertions(+), 225 deletions(-)
+
+diff --git a/jtop/core/jetson_variables.py b/jtop/core/jetson_variables.py
+index a35aed4..24dee29 100644
+--- a/jtop/core/jetson_variables.py
++++ b/jtop/core/jetson_variables.py
+@@ -355,14 +355,6 @@ def status_variables(name=JTOP_VARIABLE_FILE):
+     return os.path.isfile('/etc/profile.d/{name}'.format(name=name))
+ 
+ 
+-def uninstall_variables(name=JTOP_VARIABLE_FILE):
+-    if os.path.isfile('/etc/profile.d/{name}'.format(name=name)):
+-        logger.info("Found {name}".format(name=name))
+-        # Remove old jetson_stats variable
+-        os.remove('/etc/profile.d/{name}'.format(name=name))
+-        logger.info(" - Remove {name} from /etc/profile.d/".format(name=name))
+-
+-
+ def install_variables(package_root, copy, name=JTOP_VARIABLE_FILE):
+     logger.info("Install {name} variables".format(name=name))
+     variables_install_path = '/etc/profile.d/{name}'.format(name=name)
+diff --git a/jtop/github.py b/jtop/github.py
+index 3b0fbf8..a7bb12c 100644
+--- a/jtop/github.py
++++ b/jtop/github.py
+@@ -127,7 +127,7 @@ def hyperlink(message, url, text):
+     # 5. https://stackoverflow.com/questions/44078888/clickable-html-links-in-python-3-6-shell
+     # Print starting message
+     print("[{status}] {message}".format(status=bcolors.warning(), message=message))
+-    print("  Please, try: {bold}sudo pip3 install -U jetson-stats{reset} or".format(bold=bcolors.BOLD, reset=bcolors.ENDC))
++    print("  Please, try: {bold}pip3 install -U jetson-stats{reset} or".format(bold=bcolors.BOLD, reset=bcolors.ENDC))
+     # Generate hyperlink for shell
+     # Check type of shell
+     try:
+diff --git a/jtop/jetson_config.py b/jtop/jetson_config.py
+index f4fd44b..c940f18 100644
+--- a/jtop/jetson_config.py
++++ b/jtop/jetson_config.py
+@@ -31,7 +31,7 @@ from .core.common import get_var
+ from .core.command import Command
+ from .core.jetson_variables import status_variables, install_variables
+ from .core.config import get_config_service
+-from .service import status_service, status_permission, install_service, set_service_permission
++from .service import status_service, status_permission, install_service
+ # Create logger
+ logger = logging.getLogger(__name__)
+ # Detect user
+@@ -59,7 +59,7 @@ def update_jtop():
+         cmd_update_msg = cmd_update()
+         cmd_update_msg = "JTOP updated!"
+     except (OSError, Command.CommandException):
+-        cmd_update_msg = "Error to update jtop, please run:\n\nsudo pip3 install --no-cache-dir -U jetson_stats"
++        cmd_update_msg = "Error to update jtop, please run:\n\npip3 install --no-cache-dir -U jetson_stats"
+     return cmd_update_msg
+ 
+ 
+@@ -77,7 +77,6 @@ def fix_variables():
+ 
+ def fix_jtop_all():
+     fix_service()
+-    set_service_permission()
+     fix_variables()
+ 
+ # -------------------- Graphic ---------------------------------------------
+@@ -191,7 +190,6 @@ JTOP_MENU = {
+     'menu': [
+         (None, fix_jtop_all, "Fix all"),
+         (status_service, fix_service, "Fix jetson-stats service"),
+-        (status_permission, set_service_permission, "Fix permissions for '{user}'".format(user=user)),
+         (status_variables, fix_variables, "Fix jtop variables"),
+     ],
+ }
+@@ -227,7 +225,7 @@ def jtop_config():
+         curses.wrapper(JTOPCONFIG, JTOP_MENU)
+         sys.exit(0)
+     # Quit with error
+-    print(bcolors.fail("Please run with sudo"))
++    print(bcolors.fail("Please run jtop with superuser"))
+     sys.exit(1)
+ 
+ 
+@@ -240,7 +238,7 @@ def main():
+             print(bcolors.fail("require reboot"))
+         sys.exit(0)
+     # Quit with error
+-    print(bcolors.fail("Please run with sudo"))
++    print(bcolors.fail("Please run jtop with superuser"))
+     sys.exit(1)
+ 
+ 
+diff --git a/jtop/jetson_release.py b/jtop/jetson_release.py
+index 2140fdb..3ab6079 100644
+--- a/jtop/jetson_release.py
++++ b/jtop/jetson_release.py
+@@ -81,7 +81,7 @@ def main():
+         if not variable:
+             variable = bcolors.fail("Not available")
+             if name == 'Module' and os.getuid() != 0:
+-                variable = bcolors.fail("Check with sudo")
++                variable = bcolors.fail("Check with superuse")
+         print(" - {name}: {variable}".format(name=bcolors.bold(name), variable=variable))
+     # Print platform variables
+     plat = get_platform_variables()
+diff --git a/jtop/jetson_swap.py b/jtop/jetson_swap.py
+index 0b256f0..9f59cfc 100644
+--- a/jtop/jetson_swap.py
++++ b/jtop/jetson_swap.py
+@@ -29,7 +29,7 @@ COPYRIGHT_RE = re.compile(r""".*__copyright__ = ["'](.*?)['"]""", re.S)
+ 
+ def main():
+     parser = argparse.ArgumentParser(
+-        description='Create a swap file and enable on boot (require sudo)',
++        description='Create a swap file and enable on boot',
+         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+     parser.add_argument('-d', '--dir', dest="directory", help='Directory to place swapfile', type=str, default='')
+     parser.add_argument('-n', '--name', dest="name", help='Name swap file', type=str, default='swapfile')
+@@ -58,7 +58,7 @@ def main():
+     # Check if running a root
+     if os.getuid() != 0:
+         # Quit with error
+-        print(bcolors.fail("Please run with sudo"))
++        print(bcolors.fail("Please run jtop with superuser"))
+         parser.print_help(sys.stderr)
+         sys.exit(1)
+     # Define Memory Service
+diff --git a/jtop/jtop.py b/jtop/jtop.py
+index 0237859..3370fdc 100644
+--- a/jtop/jtop.py
++++ b/jtop/jtop.py
+@@ -1113,7 +1113,7 @@ class jtop(Thread):
+             self._broadcaster.connect()
+         except FileNotFoundError as e:
+             if e.errno == 2 or e.errno == 111:  # Message error: 'No such file or directory' or 'Connection refused'
+-                raise JtopException("The jtop.service is not active. Please run:\nsudo systemctl restart jtop.service")
++                raise JtopException("The jtop.service is not active. Please run:\nsystemctl restart jtop.service")
+             elif e.errno == 13:  # Message error: 'Permission denied'
+                 raise JtopException("I can't access jtop.service.\nPlease logout or reboot this board.")
+             else:
+@@ -1121,7 +1121,7 @@ class jtop(Thread):
+         except ConnectionRefusedError as e:
+             if e.errno == 111:  # Connection refused
+                 # When server is off but socket files exists in /run
+-                raise JtopException("The jtop.service is not active. Please run:\nsudo systemctl restart jtop.service")
++                raise JtopException("The jtop.service is not active. Please run:\nsystemctl restart jtop.service")
+             else:
+                 raise ConnectionRefusedError(e)
+         except PermissionError as e:
+@@ -1144,7 +1144,7 @@ class jtop(Thread):
+         service_version = init.get('version', 'unknown')
+         if service_version != get_var(VERSION_RE):
+             raise JtopException("""Mismatch version jtop service: [{service_version}] and client: [{client_version}]. Please run:\n
+-sudo systemctl restart jtop.service""".format(
++systemctl restart jtop.service""".format(
+                 service_version=service_version,
+                 client_version=get_var(VERSION_RE)))
+         # Load server speed
+diff --git a/jtop/service.py b/jtop/service.py
+index b66bf40..7df7260 100644
+--- a/jtop/service.py
++++ b/jtop/service.py
+@@ -78,78 +78,8 @@ def status_service(service=JTOP_SERVICE_NAME):
+     return os.system('systemctl is-active --quiet {service}'.format(service=service)) == 0
+ 
+ 
+-def remove_service_pipe():
+-    # Remove old pipes if exists
+-    if os.path.isdir(JTOP_PIPE):
+-        logger.info("Remove folder {pipe}".format(pipe=JTOP_PIPE))
+-        rmtree(JTOP_PIPE)
+-    elif os.path.exists(JTOP_PIPE):
+-        logger.info("Remove pipe {pipe}".format(pipe=JTOP_PIPE))
+-        os.remove(JTOP_PIPE)
+-
+-
+-def uninstall_service(name=JTOP_SERVICE_NAME):
+-    if os.path.isfile('/etc/systemd/system/{name}'.format(name=name)) or os.path.islink('/etc/systemd/system/{name}'.format(name=name)):
+-        logger.info("Found {name}".format(name=name))
+-        # Check if service is active
+-        if status_service(service=name):
+-            # Stop service
+-            logger.info(" - STOP {name}".format(name=name))
+-            sp.call(shlex.split('systemctl stop {name}'.format(name=name)))
+-        # Disable service
+-        logger.info(" - DISABLE {name}".format(name=name))
+-        sp.call(shlex.split('systemctl disable {name}'.format(name=name)))
+-        # Remove jetson_performance service from /etc/init.d
+-        if os.path.isfile('/etc/systemd/system/{name}'.format(name=name)) or os.path.islink('/etc/systemd/system/{name}'.format(name=name)):
+-            logger.info(" - REMOVE {name} from /etc/systemd/system".format(name=name))
+-            os.remove('/etc/systemd/system/{name}'.format(name=name))
+-        # Update service list
+-        logger.info(" - Reload all daemons")
+-        sp.call(shlex.split('systemctl daemon-reload'))
+-        return True
+-    return False
+-
+-
+ def install_service(package_root, copy, name=JTOP_SERVICE_NAME):
+     logger.info("Install {name}".format(name=name))
+-    # Copy or link file
+-    service_install_path = '/etc/systemd/system/{name}'.format(name=name)
+-    service_package_path = '{package_root}/services/{name}'.format(package_root=package_root, name=name)
+-    # remove if exist file
+-    if os.path.isfile(service_install_path) or os.path.islink(service_install_path):
+-        logger.info(" - Remove old {path}".format(path=service_install_path))
+-        os.remove(service_install_path)
+-    if copy:
+-        type_service = "Copying"
+-        copyfile(service_package_path, service_install_path)
+-    else:
+-        type_service = "Linking"
+-        os.symlink(service_package_path, service_install_path)
+-    # Prompt message
+-    logger.info(" - {type} {file} -> {path}".format(type=type_service.upper(), file=name, path=service_install_path))
+-    # Update service list
+-    cmd_daemon_reload = Command(shlex.split('systemctl daemon-reload'))
+-    try:
+-        cmd_daemon_reload()
+-        logger.info(" - Reload all daemons")
+-    except (OSError, Command.CommandException):
+-        logger.error("Fail reload all daemons")
+-    # Enable jetson_stats at startup
+-    cmd_service_enable = Command(shlex.split('systemctl enable {name}'.format(name=name)))
+-    try:
+-        cmd_service_enable()
+-        logger.info(" - ENABLE {name}".format(name=name))
+-        # logger.info(lines)
+-    except (OSError, Command.CommandException):
+-        logger.error("Fail enable service {name}".format(name=name))
+-    # Start service
+-    cmd_service_start = Command(shlex.split('systemctl start {name}'.format(name=name)))
+-    try:
+-        cmd_service_start()
+-        logger.info(" - START {name}".format(name=name))
+-        # logger.info(lines)
+-    except (OSError, Command.CommandException):
+-        logger.error("Fail start service {name}".format(name=name))
+ 
+ 
+ def status_permission_user(group=JTOP_USER):
+@@ -188,34 +118,6 @@ def status_permission(group=JTOP_USER):
+     return status_permission_user(group) and status_permission_group(group)
+ 
+ 
+-def unset_service_permission(group=JTOP_USER):
+-    user = os.environ.get('USER', '')
+-    # Get user from sudo
+-    if 'SUDO_USER' in os.environ:
+-        user = os.environ['SUDO_USER']
+-    # Check if user is in group
+-    if status_permission_user(group):
+-        logger.info("Remove {user} from group {group}".format(group=group, user=user))
+-        sp.call(shlex.split('gpasswd -d {user} {group}'.format(group=group, user=user)))
+-    if status_permission_group(group):
+-        logger.info("Delete group {group}".format(group=group))
+-        sp.call(shlex.split('groupdel {group}'.format(group=group)))
+-
+-
+-def set_service_permission(group=JTOP_USER):
+-    user = os.environ.get('USER', '')
+-    # Get user from sudo
+-    if 'SUDO_USER' in os.environ:
+-        user = os.environ['SUDO_USER']
+-    # Make jetson_stats group
+-    if not status_permission_group(group):
+-        logger.info("Add new group {group}".format(group=group))
+-        sp.call(shlex.split('groupadd {group}'.format(group=group)))
+-    if not status_permission_user(group):
+-        logger.info("Add {user} to group {group}".format(group=group, user=user))
+-        sp.call(shlex.split('usermod -a -G {group} {user}'.format(group=group, user=user)))
+-
+-
+ class JtopManager(SyncManager):
+ 
+     def __init__(self, authkey=None):
+@@ -245,9 +147,6 @@ class JtopServer(Process):
+ 
+     def __init__(self, force=False):
+         self.force = force
+-        # Check if running a root
+-        if os.getuid() != 0:
+-            raise JtopException("jtop service need sudo to work")
+         # Save version jtop
+         self._version = deepcopy(get_var(VERSION_RE))
+         logger.info("jetson_stats {version} - server loaded".format(version=self._version))
+@@ -474,12 +373,6 @@ class JtopServer(Process):
+         except KeyError:
+             # User does not exist
+             raise JtopException("Group {jtop_user} does not exist!".format(jtop_user=JTOP_USER))
+-        # Remove old pipes if exists
+-        if self.force:
+-            self.remove_files()
+-        # If exist JTOP pipe raise exception
+-        if os.path.exists(JTOP_PIPE):
+-            raise JtopException("Service already active! Please check before run it again")
+         # Start broadcaster
+         try:
+             self.broadcaster.start()
+@@ -535,7 +428,6 @@ class JtopServer(Process):
+                 raise ex_value
+         except queue.Empty:
+             pass
+-        self.remove_files()
+         # Switch off jetson_clocks if there are threads alive
+         self.jetson_clocks.close()
+         # Switch off nvpmodel if there are threads alive
+@@ -544,10 +436,6 @@ class JtopServer(Process):
+         logger.info("Service closed")
+         return True
+ 
+-    def remove_files(self):
+-        # If exist remove pipe
+-        remove_service_pipe()
+-
+     def config_clear(self):
+         self.config.clear()
+ 
+diff --git a/setup.py b/setup.py
+index 20f8db6..e721d82 100644
+--- a/setup.py
++++ b/setup.py
+@@ -29,8 +29,8 @@
+ from setuptools import setup, find_packages
+ from setuptools.command.develop import develop
+ from setuptools.command.install import install
+-from jtop.service import status_service, remove_service_pipe, uninstall_service, set_service_permission, unset_service_permission, install_service
+-from jtop.core.jetson_variables import uninstall_variables, install_variables
++from jtop.service import status_service
++from jtop.core.jetson_variables import install_variables
+ from jtop.terminal_colors import bcolors
+ # io.open is needed for projects that support Python 2.7
+ # It ensures open() defaults to text mode with universal newlines,
+@@ -68,32 +68,6 @@ with open(os.path.join(here, "jtop", "__init__.py")) as fp:
+ version = VERSION
+ 
+ 
+-def is_virtualenv():
+-    # https://stackoverflow.com/questions/1871549/determine-if-python-is-running-inside-virtualenv
+-    if os.path.exists(os.path.join(sys.prefix, 'conda-meta')):
+-        # Conda virtual environments
+-        return True
+-    if hasattr(sys, 'real_prefix'):
+-        return True
+-    if hasattr(sys, 'base_prefix'):
+-        return sys.prefix != sys.base_prefix
+-    return False
+-
+-
+-def is_docker():
+-    # https://gist.github.com/anantkamath/623ce7f5432680749e087cf8cfba9b69
+-    with open('/proc/self/cgroup', 'r') as procfile:
+-        for line in procfile:
+-            fields = line.strip().split('/')
+-            if 'docker' in fields or 'buildkit' in fields:
+-                return True
+-    return False
+-
+-
+-def is_superuser():
+-    return os.getuid() == 0
+-
+-
+ def remove_data(file_name):
+     # Remove old pipes if exists
+     if os.path.isfile(file_name):
+@@ -104,74 +78,10 @@ def remove_data(file_name):
+         shutil.rmtree(file_name)
+ 
+ 
+-def remove_deprecated_data():
+-    """
+-    This function uninstall the service
+-    """
+-    # If exist, remove old services names if they exists
+-    uninstall_service('jetson_performance.service')
+-    uninstall_service('jetson_stats_boot.service')
+-    uninstall_service('jetson_stats.service')
+-    # Remove old variable definitions
+-    uninstall_variables('jetson_env.sh')
+-    # Remove old permission and group
+-    unset_service_permission('jetson_stats')
+-    # Remove old script if they exists
+-    remove_data("/usr/local/bin/jetson-docker")
+-    remove_data("/usr/local/bin/jetson-release")
+-    # Remove old folders
+-    remove_data("/usr/local/jetson_stats")
+-    remove_data("/opt/jetson_stats")
+-    remove_data("/etc/jetson-swap")
+-    remove_data("/etc/jetson_easy")
+-
+-
+ def pypi_installer(installer, obj, copy):
+     print("Install status:")
+-    print(" - [{status}] super_user".format(status="X" if is_superuser() else " "))
+-    print(" - [{status}] virtualenv".format(status="X" if is_virtualenv() else " "))
+-    print(" - [{status}] docker".format(status="X" if is_docker() else " "))
+-    # Run the uninstaller before to copy all scripts
+-    if not is_virtualenv() and not is_docker():
+-        if is_superuser():
+-            # Remove all deprecated data
+-            # - This function should do nothing
+-            remove_deprecated_data()
+-            # remove service jtop.service
+-            uninstall_service()
+-            # Remove service path
+-            remove_service_pipe()
+-            # Uninstall variables
+-            uninstall_variables()
+-        else:
+-            print("----------------------------------------")
+-            print("Install on your host using superuser permission, like:")
+-            print(bcolors.bold("sudo pip3 install -U jetson-stats"))
+-            sys.exit(1)
+-    elif is_docker():
+-        print("Skip uninstall in docker")
+-    else:
+-        if is_superuser():
+-            print("Skip uninstall on virtual environment")
+-        elif not status_service():
+-            print("----------------------------------------")
+-            print("Please, before install in your virtual environment, install jetson-stats on your host with superuser permission, like:")
+-            print(bcolors.bold("sudo pip3 install -U jetson-stats"))
+-            sys.exit(1)
+     # Run the default installation script
+     installer.run(obj)
+-    # Run the restart all services before to close the installer
+-    if not is_virtualenv() and not is_docker() and is_superuser():
+-        folder, _ = os.path.split(os.path.realpath(__file__))  # This folder
+-        # Install variables
+-        install_variables(folder, copy=copy)
+-        # Set service permissions
+-        set_service_permission()
+-        # Install service (linking only for develop)
+-        install_service(folder, copy=copy)
+-    else:
+-        print("Skip install service")
+-
+ 
+ class JTOPInstallCommand(install):
+     """Installation mode."""
+-- 
+2.25.1
+
