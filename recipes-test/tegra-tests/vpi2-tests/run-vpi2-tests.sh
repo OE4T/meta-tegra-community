@@ -166,15 +166,19 @@ TESTS="$TESTS klt_tracker fft tnr perspwarp fisheye optflow_lk optflow_dense"
 TESTS="$TESTS background_subtractor image_view template_matching orb_feature_detector"
 
 # List of VPI backend per sample app
-convolve_2d=("cpu" "cuda" "pva")
 if [ "$TEGRACHIPID" = "0x19" ]; then
+    convolve_2d=("cpu" "cuda" "pva")
     stereo_disparity=("cpu" "cuda" "pva" "pva-nvenc-vic")
+    harris_corners=("cpu" "cuda" "pva")
+    benchmark=("cpu" "cuda" "pva")
 else
-    stereo_disparity=("cpu" "cuda" "pva" "ofa" "ofa-pva-vic")
+    convolve_2d=("cpu" "cuda")
+    stereo_disparity=("cpu" "cuda" "ofa")
+    harris_corners=("cpu" "cuda")
+    benchmark=("cpu" "cuda")
 fi
-harris_corners=("cpu" "cuda" "pva")
+
 rescale=("cpu" "cuda" "vic")
-benchmark=("cpu" "cuda" "pva")
 klt_tracker=("cpu" "cuda")
 fft=("cpu" "cuda")
 tnr=("cuda" "vic")
