@@ -1,18 +1,19 @@
-From 0853effb1b2ead74c2413e4b282233cd0f7b51f5 Mon Sep 17 00:00:00 2001
+From f9a37f85ca1d259458a9116cad39280f5ae833e8 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ilies.chergui@gmail.com>
 Date: Sun, 13 Aug 2023 19:07:16 +0100
-Subject: [PATCH 1/2] Fixes for cross-building
+Subject: [PATCH] Fixes for cross-building
 
 Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 Signed-off-by: Matt Madison <matt@madison.systems>
+
 ---
- bindings/CMakeLists.txt    | 66 ++++++++++++--------------------------
+ bindings/CMakeLists.txt    | 69 ++++++++++++--------------------------
  bindings/include/pyds.hpp  |  2 +-
  bindings/include/utils.hpp |  2 +-
- 3 files changed, 22 insertions(+), 48 deletions(-)
+ 3 files changed, 23 insertions(+), 50 deletions(-)
 
 diff --git a/bindings/CMakeLists.txt b/bindings/CMakeLists.txt
-index d89d5e8..a482f25 100644
+index d89d5e8..7426793 100644
 --- a/bindings/CMakeLists.txt
 +++ b/bindings/CMakeLists.txt
 @@ -13,7 +13,8 @@
@@ -41,7 +42,7 @@ index d89d5e8..a482f25 100644
  
  
  # Checking values are allowed
-@@ -36,23 +38,20 @@ macro(check_variable_allowed var_name var_list)
+@@ -36,37 +38,27 @@ macro(check_variable_allowed var_name var_list)
  endmacro()
  set(PYTHON_MAJVERS_ALLOWED 3)
  check_variable_allowed(PYTHON_MAJOR_VERSION PYTHON_MAJVERS_ALLOWED)
@@ -67,11 +68,12 @@ index d89d5e8..a482f25 100644
  
  # Describing pyds build
 -project(pyds DESCRIPTION "Python bindings for Deepstream")
- add_compile_options(-Wall -Wextra -pedantic -O3)
+-add_compile_options(-Wall -Wextra -pedantic -O3)
++add_compile_options(-Wall -Wextra -pedantic -O3 -I=${DS_PATH}/sources/includes/)
  
  include_directories(
-@@ -60,13 +59,7 @@ include_directories(
-         ${DS_PATH}/sources/includes/
+         include/
+-        ${DS_PATH}/sources/includes/
          include/bind
          include/nvds
 -        ../3rdparty/pybind11/include/pybind11/
@@ -85,7 +87,7 @@ index d89d5e8..a482f25 100644
          )
  
  add_library(pyds SHARED src/pyds.cpp src/utils.cpp src/bindanalyticsmeta.cpp
-@@ -78,37 +71,18 @@ add_library(pyds SHARED src/pyds.cpp src/utils.cpp src/bindanalyticsmeta.cpp
+@@ -78,37 +70,18 @@ add_library(pyds SHARED src/pyds.cpp src/utils.cpp src/bindanalyticsmeta.cpp
  set_target_properties(pyds PROPERTIES PREFIX "")
  set_target_properties(pyds PROPERTIES OUTPUT_NAME "pyds")
  
@@ -156,6 +158,3 @@ index f713b9b..49d6cca 100644
  
  namespace py = pybind11;
  
--- 
-2.25.1
-
