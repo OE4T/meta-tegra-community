@@ -41,7 +41,7 @@ B = "${WORKDIR}/build"
 
 DEEPSTREAM_BASEDIR = "/opt/nvidia/deepstream"
 DEEPSTREAM_PATH = "${DEEPSTREAM_BASEDIR}/deepstream-6.3"
-SYSROOT_DIRS += "${DEEPSTREAM_PATH}/lib/"
+SYSROOT_DIRS += "${DEEPSTREAM_PATH}/lib/ ${DEEPSTREAM_PATH}/sources/includes/"
 
 do_configure() {
     for feature in azure amqp kafka redis triton rivermax realsense; do
@@ -88,10 +88,6 @@ do_install() {
     install -m 0644 ${S}${DEEPSTREAM_PATH}/lib/gst-plugins/* ${D}${libdir}/gstreamer-1.0/deepstream/
 
     cp -R --preserve=mode,timestamps ${S}${DEEPSTREAM_PATH}/samples ${D}${DEEPSTREAM_PATH}/
-
-    install -d ${D}${includedir}/deepstream
-    cp -R --preserve=mode,timestamps ${S}${DEEPSTREAM_PATH}/sources/includes/* ${D}${includedir}/
-
     cp -R --preserve=mode,timestamps ${S}${DEEPSTREAM_PATH}/sources/ ${D}${DEEPSTREAM_PATH}/
 
     # XXX---
@@ -128,7 +124,7 @@ def pkgconf_packages(d):
 
 PKGCONF_PACKAGES = "${@pkgconf_packages(d)}"
 
-PACKAGES =+ "${PN}-samples-data ${PN}-samples ${PN}-sources ${PKGCONF_PACKAGES}"
+PACKAGES = "${PN}-samples-data ${PN}-samples ${PN}-dev ${PN}-sources ${PN}-dbg ${PKGCONF_PACKAGES} ${PACKAGE_BEFORE_PN} ${PN}"
 
 FILES:${PN} = "\
     ${sysconfdir}/ld.so.conf.d/  \
@@ -137,7 +133,7 @@ FILES:${PN} = "\
     ${DEEPSTREAM_BASEDIR} \
 "
 
-FILES:${PN}-dev = "${includedir}"
+FILES:${PN}-dev = "${DEEPSTREAM_PATH}/sources/includes"
 
 FILES:${PN}-samples = "${bindir}/*"
 FILES:${PN}-samples-data = "\
@@ -167,4 +163,5 @@ RDEPENDS:${PN} = "libgstnvcustomhelper"
 RDEPENDS:${PN}-samples = "${PN}-samples-data libgstnvcustomhelper"
 RDEPENDS:${PN}-samples-data = "bash"
 RDEPENDS:${PN}-sources = "bash ${PN}-samples-data ${PN}"
+RRECOMMENDS:${PN}-sources += "${PN}-dev"
 RRECOMMENDS:${PN} = "liberation-fonts"
