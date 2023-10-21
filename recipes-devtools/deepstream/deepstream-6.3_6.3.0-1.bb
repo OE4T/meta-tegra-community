@@ -94,15 +94,19 @@ do_install() {
     # Some of the libraries are not using the right SONAME
     # in its DT_NEEDED ELF header, so we have to rewrite it to prevent
     # a broken runtime dependency.
+    grpc_soname=$(${OBJDUMP} -p ${STAGING_LIBDIR}/libgrpc.so | grep SONAME | awk '{print $2}')
+    protobuf_soname=$(${OBJDUMP} -p ${STAGING_LIBDIR}/libprotobuf.so | grep SONAME | awk '{print $2}')
     patchelf --replace-needed libdns_sd.so.1.0.0 libdns_sd.so.1 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nmos.so
     patchelf --replace-needed libcufft.so libcufft.so.10 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
     patchelf --replace-needed libcublas.so libcublas.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
     patchelf --replace-needed libcufft.so libcufft.so.10 ${D}${DEEPSTREAM_PATH}/lib/libnvds_audiotransform.so
-    patchelf --replace-needed libgrpc++.so.1.38 libgrpc++.so.1.50 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
-    patchelf --replace-needed libgrpc++.so.1.38 libgrpc++.so.1.50 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
-    patchelf --replace-needed libprotobuf.so.3.15.8.0 libprotobuf.so.32 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
-    patchelf --replace-needed libprotobuf.so.3.15.8.0 libprotobuf.so.32 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
-    patchelf --replace-needed libprotobuf.so.3.15.8.0 libprotobuf.so.32 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_audio_proto.so
+    bbnote "Patching libgrpc++ NEEDED to $grpc_soname"
+    patchelf --replace-needed libgrpc++.so.1.38 $grpc_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
+    patchelf --replace-needed libgrpc++.so.1.38 $grpc_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
+    bbnote "Patching libprotobuf NEEDED to $protobuf_soname"
+    patchelf --replace-needed libprotobuf.so.3.15.8.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
+    patchelf --replace-needed libprotobuf.so.3.15.8.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
+    patchelf --replace-needed libprotobuf.so.3.15.8.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_audio_proto.so
     patchelf --replace-needed libnppial.so libnppial.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
     patchelf --replace-needed libnppist.so libnppist.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
     patchelf --replace-needed libjsoncpp.so.1 libjsoncpp.so.25 ${D}${DEEPSTREAM_PATH}/lib/libnvds_rest_server.so
@@ -124,7 +128,7 @@ def pkgconf_packages(d):
 
 PKGCONF_PACKAGES = "${@pkgconf_packages(d)}"
 
-PACKAGES = "${PN}-samples-data ${PN}-samples ${PN}-dev ${PN}-sources ${PN}-dbg ${PKGCONF_PACKAGES} ${PACKAGE_BEFORE_PN} ${PN}"
+PACKAGES = "${PN}-samples-data ${PN}-samples ${PN}-dev ${PN}-staticdev ${PN}-sources ${PN}-dbg ${PKGCONF_PACKAGES} ${PACKAGE_BEFORE_PN} ${PN}"
 
 FILES:${PN} = "\
     ${sysconfdir}/ld.so.conf.d/  \
