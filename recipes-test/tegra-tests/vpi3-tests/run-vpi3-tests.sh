@@ -11,9 +11,7 @@
 
 chipid_from_compatible() {
     local compatible=$(tr '\0' ':' < /sys/firmware/devicetree/base/compatible)
-    if echo "$compatible" | grep -q "nvidia,tegra194"; then
-	echo "0x19"
-    elif echo "$compatible" | grep -q "nvidia,tegra234"; then
+    if echo "$compatible" | grep -q "nvidia,tegra234"; then
 	echo "0x23"
     else
 	echo "UNKNOWN"
@@ -38,7 +36,7 @@ find_cuda_libdir() {
 }
 
 TEGRACHIPID="$(chipid_from_compatible)"
-SAMPLEROOT="/opt/nvidia/vpi2"
+SAMPLEROOT="/opt/nvidia/vpi3"
 PATH="$SAMPLEROOT/bin:$PATH"
 SAMPLEASSETS="$SAMPLEROOT/assets"
 SKIPCODE=97
@@ -121,7 +119,7 @@ run_optflow_dense() {
         return $SKIPCODE
     fi
     echo "Running 13_optflow_dense"
-    vpi_sample_13_optflow_dense "$1" "$SAMPLEASSETS/pedestrians.mp4" high
+    vpi_sample_13_optflow_dense "$1" "$SAMPLEASSETS/pedestrians.mp4" high 1 5
 }
 
 run_background_subtractor() {
@@ -166,18 +164,10 @@ TESTS="$TESTS klt_tracker fft tnr perspwarp fisheye optflow_lk optflow_dense"
 TESTS="$TESTS background_subtractor image_view template_matching orb_feature_detector"
 
 # List of VPI backend per sample app
-if [ "$TEGRACHIPID" = "0x19" ]; then
-    convolve_2d=("cpu" "cuda" "pva")
-    stereo_disparity=("cpu" "cuda" "pva" "pva-nvenc-vic")
-    harris_corners=("cpu" "cuda" "pva")
-    benchmark=("cpu" "cuda" "pva")
-else
-    convolve_2d=("cpu" "cuda")
-    stereo_disparity=("cpu" "cuda" "ofa")
-    harris_corners=("cpu" "cuda")
-    benchmark=("cpu" "cuda")
-fi
-
+convolve_2d=("cpu" "cuda")
+stereo_disparity=("cuda" "ofa" "ofa-pva-vic")
+harris_corners=("cpu" "cuda")
+benchmark=("cpu" "cuda")
 rescale=("cpu" "cuda" "vic")
 klt_tracker=("cpu" "cuda")
 fft=("cpu" "cuda")
@@ -185,7 +175,7 @@ tnr=("cuda" "vic")
 perspwarp=("cpu" "cuda" "vic")
 fisheye=("cuda")
 optflow_lk=("cpu" "cuda")
-optflow_dense=("nvenc")
+optflow_dense=("ofa")
 background_subtractor=("cpu" "cuda")
 image_view=("cpu")
 template_matching=("cpu" "cuda")
