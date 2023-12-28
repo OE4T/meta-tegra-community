@@ -1,4 +1,4 @@
-DESCRIPTION = "Scripts for testing Tegra DeepStream 6.3 samples"
+DESCRIPTION = "Scripts for testing Tegra DeepStream 6.4 samples"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COREBASE}/meta/COPYING.MIT;md5=3da9cfbcb788c80a0384361b4de20420"
 
@@ -17,9 +17,9 @@ do_install() {
 
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"
 RDEPENDS:${PN} = " \
-    deepstream-6.3 \
-    deepstream-6.3-samples \
-    deepstream-6.3-pyds \
-    deepstream-6.3-pyds-samples \
+    deepstream-6.4 \
+    deepstream-6.4-samples \
+    deepstream-6.4-pyds \
+    deepstream-6.4-pyds-samples \
     tegra-tools-jetson-clocks \
 "

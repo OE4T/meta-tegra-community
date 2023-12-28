@@ -8,7 +8,7 @@
 # Some of these tests work better if you use jetson_clocks to
 # speed things up.
 
-DEEPSTREAM_PATH="/opt/nvidia/deepstream/deepstream-6.3"
+DEEPSTREAM_PATH="/opt/nvidia/deepstream/deepstream-6.4"
 SAMPLEROOT="${DEEPSTREAM_PATH}/sources/apps/sample_apps"
 PYSAMPLEROOT="${DEEPSTREAM_PATH}/sources/deepstream_python_apps/apps"
 STREAMS="${DEEPSTREAM_PATH}/samples/streams"
