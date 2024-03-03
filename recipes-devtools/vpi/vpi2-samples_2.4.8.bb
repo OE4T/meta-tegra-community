@@ -9,7 +9,7 @@ COMPATIBLE_MACHINE = "(tegra)"
 inherit l4t_deb_pkgfeed cuda cmake
 
 SRC_COMMON_DEBS = "vpi2-samples_${PV}_arm64.deb;subdir=vpi2-samples"
-SRC_URI[sha256sum] = "1d15d6bbb71688a5e00f964603cc53e43064112d2020b133e3b4237e69ac8b1a"
+SRC_URI[sha256sum] = "b47ddf20b00e0de8c4513101c3559dadd915ceb0cbf78e7ca5e45b75c6904410"
 
 SRC_URI += "file://CMakeLists.txt;subdir=vpi2-samples/opt/nvidia/vpi2/samples"
 
