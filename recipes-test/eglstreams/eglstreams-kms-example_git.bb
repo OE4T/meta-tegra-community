@@ -9,7 +9,7 @@ SRC_REPO ?= "github.com/madisongh/eglstreams-kms-example"
 SRCBRANCH ?= "master"
 SRC_URI = "git://${SRC_REPO};branch=${SRCBRANCH};protocol=https"
 SRCREV = "1667ca369fb2ae5df6b7360a4bece26acc333568"
-PV = "1.0+git${SRCPV}"
+PV = "1.0+git"
 
 COMPATIBLE_MACHINE = "(tegra)"
 PACKAGE_ARCH:tegra = "${TEGRA_PKGARCH}"

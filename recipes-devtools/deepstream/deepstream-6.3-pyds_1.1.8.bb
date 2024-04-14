@@ -12,7 +12,7 @@ SRC_URI = "git://${SRC_REPO};branch=${SRCBRANCH} \
 # v1.1.8 tag
 SRCREV = "8178b5e611ccdc23bef39caf2f1f07b14d39a7cb"
 
-#PV .= "+git${SRCPV}"
+#PV .= "+git"
 
 COMPATIBLE_MACHINE = "(tegra)"
 

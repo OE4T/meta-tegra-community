@@ -6,7 +6,7 @@ SRC_REPO ?= "github.com/dusty-nv/jetson-containers"
 SRCBRANCH ?= "master"
 SRC_URI = "git://${SRC_REPO};branch=${SRCBRANCH};protocol=https"
 SRCREV = "4636fc6400607d8e60729d14055a0e26ab8d3ba6"
-PV = "1.0+git${SRCPV}"
+PV = "1.0+git"
 
 SRC_URI += "\
     file://0001-Distro-agnostic-support-for-Test-ML-script.patch \
