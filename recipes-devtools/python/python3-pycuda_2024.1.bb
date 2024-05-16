@@ -5,7 +5,7 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=8dd9e67c46dbe605fba6aeb236b48c8a"
 
 DEPENDS = "python3-setuptools-native python3-cython-native python3-cython python3-numpy-native cuda-profiler-api"
 
-SRC_URI[sha256sum] = "cd92e7246bb45ac3452955a110714112674cdf3b4a9e2f4ff25a4159c684e6bb"
+SRC_URI[sha256sum] = "d50d23ff6371482cff7d4b953ef40ab81c9df038ecb614484f9fd5347327327e"
 SRC_URI:append = " file://0001-add-nvcc-flag-allow-unsupported-compiler-to-allow-cu.patch"
 
 COMPATIBLE_MACHINE = "(tegra)"
