@@ -1,16 +1,16 @@
-From e027555027b80faceaabc8a6ad0a053f8e4db7da Mon Sep 17 00:00:00 2001
-From: Ilies CHERGUI <ilies.chergui@gmail.com>
-Date: Sun, 19 Feb 2023 15:51:52 +0000
+From adb6df842db6dbb3e6ce771151f45795e5e1d632 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 13 May 2024 18:00:54 +0100
 Subject: [PATCH] add nvcc flag "-allow-unsupported-compiler" to allow cuda
  compilation and update nvcc binary path
 
-Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
  pycuda/compiler.py | 11 +++++++----
  1 file changed, 7 insertions(+), 4 deletions(-)
 
 diff --git a/pycuda/compiler.py b/pycuda/compiler.py
-index 96aa1b1..3828f45 100644
+index 96aa1b1..64b70b5 100644
 --- a/pycuda/compiler.py
 +++ b/pycuda/compiler.py
 @@ -301,6 +301,9 @@ def compile(
@@ -28,7 +28,7 @@ index 96aa1b1..3828f45 100644
          self,
          source,
 -        nvcc="nvcc",
-+        nvcc="/usr/local/cuda-11.4/bin/nvcc",
++        nvcc="/usr/local/cuda-12.2/bin/nvcc",
          options=None,
          keep=False,
          no_extern_c=False,
@@ -37,7 +37,7 @@ index 96aa1b1..3828f45 100644
  @memoize
  def _find_nvcc_on_path():
 -    return _search_on_path(["nvcc", "nvcc.exe"])
-+    return _search_on_path(["/usr/local/cuda-11.4/bin/nvcc", "nvcc.exe"])
++    return _search_on_path(["/usr/local/cuda-12.2/bin/nvcc", "nvcc.exe"])
  
  
  class DynamicModule(CudaModule):
@@ -46,7 +46,7 @@ index 96aa1b1..3828f45 100644
      def __init__(
          self,
 -        nvcc="nvcc",
-+        nvcc="/usr/local/cuda-11.4/bin/nvcc",
++        nvcc="/usr/local/cuda-12.2/bin/nvcc",
          link_options=None,
          keep=False,
          no_extern_c=False,
@@ -55,10 +55,10 @@ index 96aa1b1..3828f45 100644
          self,
          source,
 -        nvcc="nvcc",
-+        nvcc="/usr/local/cuda-11.4/bin/nvcc",
++        nvcc="/usr/local/cuda-12.2/bin/nvcc",
          options=None,
          keep=False,
          no_extern_c=False,
 -- 
-2.25.1
+2.34.1
 
