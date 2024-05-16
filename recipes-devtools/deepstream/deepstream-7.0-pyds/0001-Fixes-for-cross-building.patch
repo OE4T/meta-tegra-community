@@ -1,19 +1,20 @@
-From f9a37f85ca1d259458a9116cad39280f5ae833e8 Mon Sep 17 00:00:00 2001
-From: Ilies CHERGUI <ilies.chergui@gmail.com>
-Date: Sun, 13 Aug 2023 19:07:16 +0100
-Subject: [PATCH] Fixes for cross-building
+From 8df0b616e3919cb373b67210a4896b8addec5e18 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 13 May 2024 15:31:07 +0100
+Subject: [PATCH 1/2] Fixes for cross-building
 
-Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
+Upstream-Status: Inappropriate [OE specific]
+
 Signed-off-by: Matt Madison <matt@madison.systems>
-
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- bindings/CMakeLists.txt    | 69 ++++++++++++--------------------------
+ bindings/CMakeLists.txt    | 66 ++++++++++++--------------------------
  bindings/include/pyds.hpp  |  2 +-
  bindings/include/utils.hpp |  2 +-
- 3 files changed, 23 insertions(+), 50 deletions(-)
+ 3 files changed, 23 insertions(+), 47 deletions(-)
 
 diff --git a/bindings/CMakeLists.txt b/bindings/CMakeLists.txt
-index d89d5e8..7426793 100644
+index 7b01fb2..1039873 100644
 --- a/bindings/CMakeLists.txt
 +++ b/bindings/CMakeLists.txt
 @@ -13,7 +13,8 @@
@@ -31,22 +32,22 @@ index d89d5e8..7426793 100644
  endfunction()
  
 -check_variable_set(PYTHON_MAJOR_VERSION 3)
--check_variable_set(PYTHON_MINOR_VERSION 8)
+-check_variable_set(PYTHON_MINOR_VERSION 10)
 -check_variable_set(PIP_PLATFORM linux_x86_64)
 -check_variable_set(DS_PATH "/opt/nvidia/deepstream/deepstream")
-+check_variable_set(DS_VERSION 6.3)
++check_variable_set(DS_VERSION 7.0)
 +find_package(Python MODULE REQUIRED COMPONENTS Development)
 +check_variable_set(PYTHON_MAJOR_VERSION ${Python_VERSION_MAJOR})
 +check_variable_set(PYTHON_MINOR_VERSION ${Python_VERSION_MINOR})
 +check_variable_set(DS_PATH "/opt/nvidia/deepstream/deepstream-${DS_VERSION}")
- 
- 
- # Checking values are allowed
-@@ -36,37 +38,27 @@ macro(check_variable_allowed var_name var_list)
+ if (DEFINED IS_SBSA)
+ 	message("IS_SBSA is set. Enabling definitions for ARM_SBSA")
+ 	add_compile_definitions(IS_SBSA)
+@@ -39,37 +41,27 @@ macro(check_variable_allowed var_name var_list)
  endmacro()
  set(PYTHON_MAJVERS_ALLOWED 3)
  check_variable_allowed(PYTHON_MAJOR_VERSION PYTHON_MAJVERS_ALLOWED)
--set(PYTHON_MINVERS_ALLOWED 6 8)
+-set(PYTHON_MINVERS_ALLOWED 10)
 -check_variable_allowed(PYTHON_MINOR_VERSION PYTHON_MINVERS_ALLOWED)
 -set(PIP_PLATFORM_ALLOWED linux_x86_64 linux_aarch64)
 -check_variable_allowed(PIP_PLATFORM PIP_PLATFORM_ALLOWED)
@@ -59,7 +60,7 @@ index d89d5e8..7426793 100644
  
  # Setting python build versions
 -set(PYTHON_VERSION ${PYTHON_MAJOR_VERSION}.${PYTHON_MINOR_VERSION})
--set(PIP_WHEEL pyds-1.1.8-py3-none-${PIP_PLATFORM}.whl)
+-set(PIP_WHEEL pyds-1.1.11-py3-none-${PIP_PLATFORM}.whl)
 +set(PYTHON_VERSION ${Python_VERSION})
 +find_package(PkgConfig REQUIRED)
 +pkg_check_modules(GLIB REQUIRED IMPORTED_TARGET glib-2.0)
@@ -87,14 +88,11 @@ index d89d5e8..7426793 100644
          )
  
  add_library(pyds SHARED src/pyds.cpp src/utils.cpp src/bindanalyticsmeta.cpp
-@@ -78,37 +70,18 @@ add_library(pyds SHARED src/pyds.cpp src/utils.cpp src/bindanalyticsmeta.cpp
+@@ -81,34 +73,18 @@ add_library(pyds SHARED src/pyds.cpp src/utils.cpp src/bindanalyticsmeta.cpp
  set_target_properties(pyds PROPERTIES PREFIX "")
  set_target_properties(pyds PROPERTIES OUTPUT_NAME "pyds")
  
 -set(PYTHON_LIB python${PYTHON_VERSION})
--if(${PYTHON_MINOR_VERSION} EQUAL 6)
--        set(PYTHON_LIB python${PYTHON_VERSION}m)
--endif()
 -
 -target_link_libraries(pyds pthread dl ${PYTHON_LIB} gstreamer-1.0 glib-2.0)
 +target_link_libraries(pyds pthread dl Python::Python PkgConfig::GSTREAMER PkgConfig::GLIB)
@@ -158,3 +156,6 @@ index f713b9b..49d6cca 100644
  
  namespace py = pybind11;
  
+-- 
+2.34.1
+
