@@ -2,16 +2,16 @@ DESCRIPTION = "NVIDIA Deepstream SDK"
 HOMEPAGE = "https://developer.nvidia.com/deepstream-sdk"
 LICENSE = "Proprietary"
 LIC_FILES_CHKSUM = " \
-    file://usr/share/doc/deepstream-6.3/copyright;md5=165df2c88b1df616c8599ed83276c92b \
-    file://opt/nvidia/deepstream/deepstream-6.3/LICENSE.txt;md5=8defc274ed63a1a47ea251872da763ce \
-    file://opt/nvidia/deepstream/deepstream-6.3/doc/nvidia-tegra/LICENSE.iothub_client;md5=4f8c6347a759d246b5f96281726b8611 \
-    file://opt/nvidia/deepstream/deepstream-6.3/doc/nvidia-tegra/LICENSE.nvds_amqp_protocol_adaptor;md5=8b4b651fa4090272b2e08e208140a658 \
+    file://usr/share/doc/deepstream-7.0/copyright;md5=7bfc1fcf29db1bc3d6c60300028516ee \
+    file://opt/nvidia/deepstream/deepstream-7.0/LICENSE.txt;md5=64d6d7920d0e8ce012409c4ef1434061 \
+    file://opt/nvidia/deepstream/deepstream-7.0/doc/nvidia-tegra/LICENSE.iothub_client;md5=4f8c6347a759d246b5f96281726b8611 \
+    file://opt/nvidia/deepstream/deepstream-7.0/doc/nvidia-tegra/LICENSE.nvds_amqp_protocol_adaptor;md5=8b4b651fa4090272b2e08e208140a658 \
 "
 
 inherit l4t_deb_pkgfeed
 
 SRC_COMMON_DEBS = "${BPN}_${PV}_arm64.deb;subdir=${BPN}"
-SRC_URI[sha256sum] = "f3961bc473312d46f5e2568f41b37913cb09a5aef69d905451eaea9cb5ad42cf"
+SRC_URI[sha256sum] = "2d8a1f3cb235a5e665ab1392d89b16ccc738a88c136341e6eeb05532e6bf5fb8"
 
 COMPATIBLE_MACHINE = "(tegra)"
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"
@@ -21,16 +21,20 @@ PACKAGECONFIG[amqp] = ",,rabbitmq-c"
 PACKAGECONFIG[kafka] = ",,librdkafka"
 # NB: requires hiredis 1.0.0+
 PACKAGECONFIG[redis] = ",,hiredis"
+# NB: requires avahi to be built with 'libdns_sd' in PACKAGECONFIG
+#     which is not the default
+PACKAGECONFIG[nmos] = ",,avahi"
+# NB: requires Azure IoT Hub client library Azure IoT SDK
+PACKAGECONFIG[azure] = ",,azure-iot-sdk"
 # NB: need recipes for these dependencies
-PACKAGECONFIG[azure] = ""
 PACKAGECONFIG[triton] = ""
 PACKAGECONFIG[rivermax] = ""
 PACKAGECONFIG[realsense] = ""
 
 DEPENDS = "glib-2.0 gstreamer1.0 gstreamer1.0-plugins-base gstreamer1.0-rtsp-server \
-    tensorrt-core tensorrt-plugins libnvvpi2 libcufft libcublas libnpp json-glib \
-    openssl111 tegra-libraries-multimedia-ds tegra-libraries-multimedia yaml-cpp-060 mdns \
-    grpc protobuf tegra-libraries-nvdsseimeta libgstnvcustomhelper mosquitto jsoncpp \
+    tensorrt-core tensorrt-plugins libnvvpi3 libcufft libcublas libnpp json-glib \
+    openssl111 tegra-libraries-multimedia-ds tegra-libraries-multimedia yaml-cpp-070 \
+    grpc protobuf tegra-libraries-nvdsseimeta libgstnvcustomhelper mosquitto jsoncpp cuda-nvrtc \
 "
 # XXX--- see hack in do_install
 DEPENDS += "patchelf-native"
@@ -40,15 +44,21 @@ S = "${WORKDIR}/${BPN}"
 B = "${WORKDIR}/build"
 
 DEEPSTREAM_BASEDIR = "/opt/nvidia/deepstream"
-DEEPSTREAM_PATH = "${DEEPSTREAM_BASEDIR}/deepstream-6.3"
+DEEPSTREAM_PATH = "${DEEPSTREAM_BASEDIR}/deepstream-7.0"
 SYSROOT_DIRS += "${DEEPSTREAM_PATH}/lib/ ${DEEPSTREAM_PATH}/sources/includes/"
 
 do_configure() {
-    for feature in azure amqp kafka redis triton rivermax realsense; do
+    for feature in azure amqp kafka nmos redis triton rivermax realsense; do
         if ! echo "${PACKAGECONFIG}" | grep -q "$feature"; then
             rm -f ${S}${DEEPSTREAM_PATH}/lib/libnvds_${feature}*
             if [ "$feature" = "azure" ]; then
-                rm -f ${S}${DEEPSTREAM_PATH}/lib/libiothub_client.so
+                rm -f ${D}${DEEPSTREAM_PATH}/lib/libnvds_azure*
+            fi
+            if [ "$feature" = "nmos" ]; then
+                rm -f ${S}${DEEPSTREAM_PATH}/lib/libnvds_nmos.so*
+                rm -f ${S}${DEEPSTREAM_PATH}/sources/includes/nvdsnmos.h
+                rm -f ${S}${DEEPSTREAM_PATH}/bin/deepstream-nmos-app
+                rm -rf ${S}${DEEPSTREAM_PATH}/sources/apps/sample_apps/deepstream-nmos
             fi
             if [ "$feature" = "triton" ]; then
                 rm -f ${S}${DEEPSTREAM_PATH}/lib/gst-plugins/libnvdsgst_inferserver.so
@@ -64,6 +74,7 @@ do_configure() {
     done
     rm -rf ${S}${DEEPSTREAM_PATH}/sources/libs/gstnvcustomhelper
     rm -f ${S}${DEEPSTREAM_PATH}/sources/includes/gst-nvcustomevent.h
+    rm -f ${S}${DEEPSTREAM_PATH}/lib/libiothub_client.so*
 }
 
 do_install() {
@@ -96,23 +107,22 @@ do_install() {
     # a broken runtime dependency.
     grpc_soname=$(${OBJDUMP} -p ${STAGING_LIBDIR}/libgrpc.so | grep SONAME | awk '{print $2}')
     protobuf_soname=$(${OBJDUMP} -p ${STAGING_LIBDIR}/libprotobuf.so | grep SONAME | awk '{print $2}')
-    patchelf --replace-needed libdns_sd.so.1.0.0 libdns_sd.so.1 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nmos.so
-    patchelf --replace-needed libcufft.so libcufft.so.10 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
-    patchelf --replace-needed libcublas.so libcublas.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
-    patchelf --replace-needed libcufft.so libcufft.so.10 ${D}${DEEPSTREAM_PATH}/lib/libnvds_audiotransform.so
+    patchelf --replace-needed libcufft.so libcufft.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
+    patchelf --replace-needed libcublas.so libcublas.so.12 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
+    patchelf --replace-needed libcufft.so libcufft.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_audiotransform.so
     bbnote "Patching libgrpc++ NEEDED to $grpc_soname"
-    patchelf --replace-needed libgrpc++.so.1.38 $grpc_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
-    patchelf --replace-needed libgrpc++.so.1.38 $grpc_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
+    patchelf --replace-needed libgrpc++.so.1.48 $grpc_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
+    patchelf --replace-needed libgrpc++.so.1.48 $grpc_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
     bbnote "Patching libprotobuf NEEDED to $protobuf_soname"
-    patchelf --replace-needed libprotobuf.so.3.15.8.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
-    patchelf --replace-needed libprotobuf.so.3.15.8.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
-    patchelf --replace-needed libprotobuf.so.3.15.8.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_audio_proto.so
-    patchelf --replace-needed libnppial.so libnppial.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
-    patchelf --replace-needed libnppist.so libnppist.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
+    patchelf --replace-needed libprotobuf.so.3.19.4.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
+    patchelf --replace-needed libprotobuf.so.3.19.4.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
+    patchelf --replace-needed libprotobuf.so.3.19.4.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_audio_proto.so
+    patchelf --replace-needed libnppial.so libnppial.so.12 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
+    patchelf --replace-needed libnppist.so libnppist.so.12 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
     patchelf --replace-needed libjsoncpp.so.1 libjsoncpp.so.25 ${D}${DEEPSTREAM_PATH}/lib/libnvds_rest_server.so
     # ---XXX
     cd ${D}${DEEPSTREAM_BASEDIR}
-    ln -s deepstream-6.3 deepstream
+    ln -s deepstream-7.0 deepstream
     cd -
 }
 
@@ -122,7 +132,7 @@ INHIBIT_SYSROOT_STRIP = "1"
 INSANE_SKIP = "dev-so ldflags"
 
 def pkgconf_packages(d):
-    pkgconf = bb.utils.filter('PACKAGECONFIG', 'azure amqp kafka redis triton rivermax realsense', d).split()
+    pkgconf = bb.utils.filter('PACKAGECONFIG', 'azure amqp kafka nmos redis triton rivermax realsense', d).split()
     pn = d.getVar('PN')
     return ' '.join(['{}-{}'.format(pn, p) for p in pkgconf])
 
@@ -151,7 +161,8 @@ FILES:${PN}-samples-data = "\
 
 FILES:${PN}-sources = "${DEEPSTREAM_PATH}/sources"
 
-FILES:${PN}-azure = "${DEEPSTREAM_PATH}/lib/libiothub_client.so ${DEEPSTREAM_PATH}/lib/libnvds_azure*"
+FILES:${PN}-azure = "${DEEPSTREAM_PATH}/lib/libnvds_azure*"
+FILES:${PN}-nmos = "${DEEPSTREAM_PATH}/lib/lib/libnvds_nmos*"
 FILES:${PN}-triton = "\
     ${libdir}/gstreamer-1.0/deepstream/libnvdsgst_inferserver.so \
     ${DEEPSTREAM_PATH}/lib/libnvds_infer_server.so \
@@ -161,7 +172,10 @@ FILES:${PN}-kafka = "${DEEPSTREAM_PATH}/lib/libnvds_kafka*"
 FILES:${PN}-redis = "${DEEPSTREAM_PATH}/lib/libnvds_redis*"
 FILES:${PN}-rivermax = "${libdir}/gstreamer-1.0/deepstream/libnvdsgst_udp.so"
 FILES:${PN}-realsense = "${DEEPSTREAM_PATH}/lib/libnvds_3d_dataloader_realsense.so"
-FILES:${PN}-staticdev = "${libdir}/gstreamer-1.0/deepstream/libnvdsgst_multistream_legacy.a"
+FILES:${PN}-staticdev = " \
+    ${libdir}/gstreamer-1.0/deepstream/libnvdsgst_multistream_legacy.a \
+    ${DEEPSTREAM_PATH}/lib/libnvds_service_maker_utils.a \
+"
 
 RDEPENDS:${PN} = "libgstnvcustomhelper"
 RDEPENDS:${PN}-samples = "${PN}-samples-data libgstnvcustomhelper"
