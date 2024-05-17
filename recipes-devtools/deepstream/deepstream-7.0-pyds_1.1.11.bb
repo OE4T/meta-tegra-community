@@ -48,7 +48,7 @@ do_install() {
 }
 
 PACKAGES += "${PN}-samples"
-RDEPENDS:${PN} = "python3-pygobject gstreamer1.0-python"
+RDEPENDS:${PN} = "python3-pygobject gstreamer1.0-python python3-cuda"
 FILES:${PN}-samples = "${DS_PATH}/sources/deepstream_python_apps"
 RDEPENDS:${PN}-samples = "${PN} deepstream-7.0-samples-data python3-opencv python3-numpy gobject-introspection"
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"
