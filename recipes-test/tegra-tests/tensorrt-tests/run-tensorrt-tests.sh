@@ -75,12 +75,11 @@ run_trtexec(){
         echo "Skipping trtexec"
         return $SKIPCODE
     fi
-    copy_mnist_data
-    echo "Running trtexec: A Simple mnist model from Caffe"
-    trtexec --deploy=${SAMPLEDATA}/mnist/mnist.prototxt \
-      --model=${SAMPLEDATA}/mnist/mnist.caffemodel --output=prob \
-      --batch=16 --saveEngine=mnist16.trt && \
-	trtexec --loadEngine=mnist16.trt --batch=16
+    copy_resnet50_data
+    echo "Running trtexec: Running an ONNX model with full dimensions"
+    trtexec --onnx=${SAMPLEDATA}/resnet50/ResNet50.onnx \
+      --saveEngine=ResNet50.trt && \
+    trtexec --loadEngine=ResNet50.trt --batch=1
 }
 
 TESTS="algorithm_selector char-rnn dynamic_reshape"
