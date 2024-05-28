@@ -8,12 +8,9 @@ SRC_URI = "\
 
 COMPATIBLE_MACHINE = "(tegra)"
 
-S = "${WORKDIR}"
-
-
 do_install() {
     install -d ${D}${bindir}
-    install -m 0755 ${S}/run-vpi2-tests.sh ${D}${bindir}/run-vpi2-tests
+    install -m 0755 ${UNPACKDIR}/run-vpi2-tests.sh ${D}${bindir}/run-vpi2-tests
 }
 
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"

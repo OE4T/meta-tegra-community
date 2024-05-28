@@ -36,8 +36,8 @@ do_install() {
     install -m 0644 ${S}/test/data/test_0.jpg ${D}/opt/nvidia-docker-tests/test/data
 
     install -d ${D}${bindir}
-    install -m 0755 ${WORKDIR}/run-docker-tests.sh.in ${D}${bindir}/run-docker-tests
-    install -m 0755 ${WORKDIR}/l4t_version_remap.sh.in ${D}/opt/nvidia-docker-tests/scripts/l4t_version_remap.sh
+    install -m 0755 ${UNPACKDIR}/run-docker-tests.sh.in ${D}${bindir}/run-docker-tests
+    install -m 0755 ${UNPACKDIR}/l4t_version_remap.sh.in ${D}/opt/nvidia-docker-tests/scripts/l4t_version_remap.sh
 }
 
 FILES:${PN} = " \

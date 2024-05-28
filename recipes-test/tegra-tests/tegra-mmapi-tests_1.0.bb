@@ -8,15 +8,13 @@ SRC_URI = "\
 
 COMPATIBLE_MACHINE = "(tegra)"
 
-S = "${WORKDIR}"
-
 do_compile() {
     :
 }
 
 do_install() {
     install -d ${D}${bindir}
-    install -m 0755 ${S}/run-mmapi-tests.sh ${D}${bindir}/run-mmapi-tests
+    install -m 0755 ${UNPACKDIR}/run-mmapi-tests.sh ${D}${bindir}/run-mmapi-tests
 }
 
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"

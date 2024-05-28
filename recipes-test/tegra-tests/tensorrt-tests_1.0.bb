@@ -8,11 +8,9 @@ SRC_URI = "\
 
 COMPATIBLE_MACHINE = "(tegra)"
 
-S = "${WORKDIR}"
-
 do_install() {
     install -d ${D}${bindir}
-    install -m 0755 ${S}/run-tensorrt-tests.sh ${D}${bindir}/run-tensorrt-tests
+    install -m 0755 ${UNPACKDIR}/run-tensorrt-tests.sh ${D}${bindir}/run-tensorrt-tests
 }
 
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"

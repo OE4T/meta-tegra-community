@@ -15,13 +15,12 @@ SRC_URI[sha256sum] = "34bbd52a4b89fdf63c8ace50b268da26653a59508288100cd3c23de276
 
 COMPATIBLE_MACHINE = "(tegra)"
 
-S = "${WORKDIR}"
 B = "${WORKDIR}/build"
 
 do_compile() {
     for f in sinteltest.sh capturetest.sh nvjpegtest.sh confvars; do
 	sed -e's,@DATADIR@,${datadir},g' \
-	    ${S}/${f}.in > ${B}/${f}
+	    ${UNPACKDIR}/${f}.in > ${B}/${f}
     done
 }
 
@@ -32,11 +31,11 @@ do_install() {
     install -m 0755 ${B}/nvjpegtest.sh ${D}${bindir}/nvjpegtest
     install -d ${D}${datadir}/gstreamer-tests
     install -m 0644 ${B}/confvars ${D}${datadir}/gstreamer-tests/confvars
-    install -m 0644 ${S}/sintel_trailer-1080p.mp4 ${D}${datadir}/gstreamer-tests
+    install -m 0644 ${UNPACKDIR}/sintel_trailer-1080p.mp4 ${D}${datadir}/gstreamer-tests
 }
 
 PACKAGE_ARCH = "${MACHINE_ARCH}"
 RDEPENDS:${PN} = "gst-player gstreamer1.0 gstreamer1.0-plugins-nveglgles gstreamer1.0-plugins-base-videotestsrc \
                   gstreamer1.0-plugins-nvvideo4linux2 gstreamer1.0-plugins-nvvideosinks gstreamer1.0-plugins-nvjpeg \
                   gstreamer1.0-plugins-nvvidconv gstreamer1.0-plugins-good-imagefreeze gstreamer1.0-plugins-bad-waylandsink \
-                  gstreamer1.0-plugins-good-video4linux2 gstreamer1.0-plugins-nvdrmvideosink"
+                  gstreamer1.0-plugins-good-video4linux2 gstreamer1.0-plugins-nvdrmvideosink gstreamer1.0-plugins-nvarguscamerasrc"

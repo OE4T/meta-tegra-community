@@ -8,11 +8,9 @@ SRC_URI = "\
 
 COMPATIBLE_MACHINE = "(tegra)"
 
-S = "${WORKDIR}"
-
 do_install() {
     install -d ${D}${bindir}
-    install -m 0755 ${S}/run-deepstream-tests.sh ${D}${bindir}/run-deepstream-tests
+    install -m 0755 ${UNPACKDIR}/run-deepstream-tests.sh ${D}${bindir}/run-deepstream-tests
 }
 
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"
