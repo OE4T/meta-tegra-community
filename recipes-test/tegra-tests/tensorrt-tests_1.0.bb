@@ -6,6 +6,9 @@ SRC_URI = "\
     file://run-tensorrt-tests.sh \
 "
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 COMPATIBLE_MACHINE = "(tegra)"
 
 do_install() {

@@ -6,6 +6,9 @@ SRC_URI = "\
     file://run-vpi2-tests.sh \
 "
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 COMPATIBLE_MACHINE = "(tegra)"
 
 do_install() {

@@ -6,6 +6,9 @@ SRC_URI = "\
 	file://run-mmapi-tests.sh \
 "
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 COMPATIBLE_MACHINE = "(tegra)"
 
 do_compile() {

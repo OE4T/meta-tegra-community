@@ -6,6 +6,9 @@ SRC_URI = "\
     file://run-deepstream-tests.sh \
 "
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 COMPATIBLE_MACHINE = "(tegra)"
 
 do_install() {
