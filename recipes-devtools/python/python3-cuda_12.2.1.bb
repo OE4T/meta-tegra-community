@@ -20,5 +20,7 @@ S = "${WORKDIR}/git"
 
 inherit cuda setuptools3
 
-CUDA_PATH = "/usr/local/cuda-${CUDA_VERSION}"
-CFLAGS += "-I=${CUDA_PATH}/include"
+export CUDA_HOME = "${STAGING_DIR_HOST}/usr/local/cuda-${CUDA_VERSION}"
+export PARALLEL_LEVEL = "${@oe.utils.cpu_count()}"
+PARALLEL_VALUE[vardepvalue] = "1"
+CFLAGS += "-I=/usr/local/cuda-${CUDA_VERSION}/include"
