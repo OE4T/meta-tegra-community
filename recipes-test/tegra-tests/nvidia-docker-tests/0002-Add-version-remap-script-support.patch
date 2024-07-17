@@ -7,6 +7,7 @@ Since NGC doesn't include tags for every L4T revision,
 add support for a remap script which can remap L4T_VERSION
 to one which is supported by NGC.
 
+Upstream-Status: Pending
 Signed-off-by: Dan Walkes <danwalkes@trellis-logic.com>
 ---
  scripts/docker_test_ml.sh | 4 ++++

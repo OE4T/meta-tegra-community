@@ -3,6 +3,8 @@ From: Roger Knecht <roger@norberthealth.com>
 Date: Wed, 22 Jun 2022 11:17:05 +0200
 Subject: [PATCH] fix cmake build
 
+Upstream-Status: Pending
+Signed-off-by: Khem Raj <raj.khem@gmail.com>
 ---
  CMakeLists.txt        | 4 ++--
  cmake/Config.cmake.in | 3 +++

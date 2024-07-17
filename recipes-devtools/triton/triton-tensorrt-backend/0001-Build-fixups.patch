@@ -3,6 +3,7 @@ From: Ilies CHERGUI <ilies.chergui@gmail.com>
 Date: Sat, 22 Jul 2023 15:05:32 +0100
 Subject: [PATCH 1/2] Build fixups
 
+Upstream-Status: Inappropriate [OE-Specific]
 Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 Signed-off-by: Roger Knecht <roger@norberthealth.com>
 ---

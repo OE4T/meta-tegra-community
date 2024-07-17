@@ -10,6 +10,7 @@ Subject: [PATCH] Distro agnostic support for Test ML script
 - added DOCKER_REPO parameter for using upstream containers
 - Removed unsupported l4t-tensorflow 1.15 tag reference
 
+Upstream-Status: Pending
 Signed-off-by: Atharva Nandanwar <anandanwar@sighthound.com>
 Signed-off-by: Dan Walkes <danwalkes@trellis-logic.com>
 ---
