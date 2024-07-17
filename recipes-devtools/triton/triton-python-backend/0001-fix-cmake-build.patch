@@ -3,6 +3,8 @@ From: Roger Knecht <roger@norberthealth.com>
 Date: Fri, 21 Oct 2022 11:59:50 +0200
 Subject: [PATCH] fix cmake build
 
+Upstream-Status: Inappropriate [OE-Specific]
+Signed-off-by: Khem Raj <raj.khem@gmail.com>
 ---
  CMakeLists.txt    | 111 ++++------------------------------------------
  src/pb_memory.h   |   2 +

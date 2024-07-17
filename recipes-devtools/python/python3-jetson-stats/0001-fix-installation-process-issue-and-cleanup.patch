@@ -3,6 +3,7 @@ From: Ilies CHERGUI <ilies.chergui@gmail.com>
 Date: Sat, 26 Aug 2023 12:22:15 +0100
 Subject: [PATCH 1/2] fix installation process issue and cleanup
 
+Upstream-Status: Pending
 Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 ---
  jtop/core/jetson_variables.py |   8 ---

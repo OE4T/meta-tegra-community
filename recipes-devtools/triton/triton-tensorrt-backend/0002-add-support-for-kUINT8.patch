@@ -6,6 +6,8 @@ Subject: [PATCH 2/2] add support for kUINT8
 Based on the following commit:
 https://github.com/triton-inference-server/tensorrt_backend/commit/114d0cd241eecb2ff78bb5ad4cdb4c138b2ef845
 
+Upstream-Status: Backport [https://github.com/triton-inference-server/tensorrt_backend/commit/114d0cd241eecb2ff78bb5ad4cdb4c138b2ef845
+]
 Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 ---
  src/tensorrt_utils.cc | 15 +++++++++++----
