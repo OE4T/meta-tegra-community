@@ -3,6 +3,7 @@ From: Ilies CHERGUI <ichergui@nvidia.com>
 Date: Fri, 17 May 2024 18:59:13 +0100
 Subject: [PATCH] OE cross build fixups
 
+Upstream-Status: Inappropriate [OE-Specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
  setup.py | 23 +++--------------------
