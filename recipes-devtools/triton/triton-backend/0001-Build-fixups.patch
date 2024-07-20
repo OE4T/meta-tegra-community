@@ -1,4 +1,4 @@
-From 7abd2221ed42d34a814d2afa86777347b20cdb7d Mon Sep 17 00:00:00 2001
+From 487abc42f0080f3dac1e4908857d913298cc7a4b Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ilies.chergui@gmail.com>
 Date: Thu, 10 Nov 2022 19:33:38 +0000
 Subject: [PATCH] Build fixups
@@ -6,15 +6,16 @@ Subject: [PATCH] Build fixups
 Upstream-Status: Inappropriate [OE-Specific]
 Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 Signed-off-by: Roger Knecht <roger@norberthealth.com>
+Signed-off-by: Matt Madison <matt@madison.systems>
 ---
- CMakeLists.txt | 23 +++++------------------
- 1 file changed, 5 insertions(+), 18 deletions(-)
+ CMakeLists.txt | 27 ++++++---------------------
+ 1 file changed, 6 insertions(+), 21 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 622f69a..68e8f6c 100644
+index 622f69a..de10095 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -45,28 +45,15 @@ endif()
+@@ -45,30 +45,17 @@ endif()
  #
  # Dependencies
  #
@@ -44,9 +45,21 @@ index 622f69a..68e8f6c 100644
 +  include_directories(${CUDA_INCLUDE_DIRS})
 +  link_directories(${CUDA_LIBRARIES})
    message(STATUS "Using CUDA ${CUDA_VERSION}")
-   set(CUDA_NVCC_FLAGS -std=c++11)
+-  set(CUDA_NVCC_FLAGS -std=c++11)
++  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -std=c++11")
  
-@@ -171,7 +158,7 @@ set_target_properties(
+   if(CUDA_VERSION VERSION_GREATER "10.1" OR CUDA_VERSION VERSION_EQUAL "10.1")
+     add_definitions(-DTRITON_ENABLE_CUDA_GRAPH=1)
+@@ -110,8 +97,6 @@ if(${TRITON_ENABLE_GPU})
+   cuda_add_library(
+     kernel-library-new
+     src/kernel.cu src/kernel.h
+-    OPTIONS -arch compute_53
+-    OPTIONS -code compute_53,sm_53,sm_60,sm_61,sm_62,sm_70,sm_72,sm_75
+     OPTIONS -Xcompiler ${HOST_COMPILER_FLAGS}
+   )
+ endif() # TRITON_ENABLE_GPU
+@@ -171,7 +156,7 @@ set_target_properties(
    triton-backend-utils PROPERTIES
    WINDOWS_EXPORT_ALL_SYMBOLS TRUE
    POSITION_INDEPENDENT_CODE ON
@@ -55,7 +68,7 @@ index 622f69a..68e8f6c 100644
  )
  
  target_link_libraries(
-@@ -187,7 +174,7 @@ if(${TRITON_ENABLE_GPU})
+@@ -187,7 +172,7 @@ if(${TRITON_ENABLE_GPU})
    target_link_libraries(
      triton-backend-utils
      PUBLIC
@@ -64,6 +77,3 @@ index 622f69a..68e8f6c 100644
      PRIVATE
      kernel-library-new
    )
--- 
-2.25.1
-

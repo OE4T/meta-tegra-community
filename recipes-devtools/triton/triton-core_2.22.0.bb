@@ -25,7 +25,6 @@ COMPATIBLE_MACHINE = "(cuda)"
 
 inherit cmake cuda
 
-DEBUG_PREFIX_MAP:remove:class-target = "-fcanon-prefix-map"
 
 EXTRA_OECMAKE = "\
     -DTRITON_CORE_HEADERS_ONLY=OFF \

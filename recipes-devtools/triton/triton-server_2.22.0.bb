@@ -15,17 +15,17 @@ DEPENDS = "\
     triton-core \
     triton-common \
     triton-backend \
+    re2 \
 "
 
 COMPATIBLE_MACHINE = "(cuda)"
 
 inherit pkgconfig cmake cuda
 
-DEBUG_PREFIX_MAP:remove:class-target = "-fcanon-prefix-map"
+CXXFLAGS += "${CUDA_CXXFLAGS}"
 
 EXTRA_OECMAKE:append = ' \
     -DCMAKE_INSTALL_PREFIX="${D}${prefix}" \
-    -DCMAKE_PREFIX_PATH="${STAGING_LIBDIR}/cmake/libevhtp;${STAGING_LIBDIR}/cmake/re2" \
 '
 
 PACKAGECONFIG ??= "logging http gpu tensorrt"
