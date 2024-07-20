@@ -21,7 +21,6 @@ COMPATIBLE_MACHINE = "(cuda)"
 
 inherit pkgconfig cmake python3-dir cuda
 
-DEBUG_PREFIX_MAP:remove:class-target = "-fcanon-prefix-map"
 
 EXTRA_OECMAKE += '\
     -DCMAKE_INSTALL_PREFIX="${D}${prefix}" \

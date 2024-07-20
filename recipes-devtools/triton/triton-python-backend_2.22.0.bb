@@ -32,7 +32,6 @@ COMPATIBLE_MACHINE = "(cuda)"
 
 inherit cmake pkgconfig cuda
 
-DEBUG_PREFIX_MAP:remove:class-target = "-fcanon-prefix-map"
 
 PACKAGECONFIG ?= "gpu"
 PACKAGECONFIG[gpu] = "-DTRITON_ENABLE_GPU=ON,-DTRITON_ENABLE_GPU=OFF"

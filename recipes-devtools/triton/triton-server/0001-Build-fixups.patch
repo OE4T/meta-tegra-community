@@ -1,4 +1,4 @@
-From bb1349c681814f2d624106ec2f0f0f2060830acc Mon Sep 17 00:00:00 2001
+From 775efe0c0760bab44992f9b74a8a3687646d0f95 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ilies.chergui@gmail.com>
 Date: Thu, 10 Nov 2022 16:17:11 +0000
 Subject: [PATCH] Build fixups
@@ -6,10 +6,11 @@ Subject: [PATCH] Build fixups
 Upstream-Status: Inappropriate [OE-Specific]
 Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 Signed-off-by: Roger Knecht <roger@norberthealth.com>
+Signed-off-by: Matt Madison <matt@madison.systems>
 ---
- CMakeLists.txt     |  42 +------------------
- src/CMakeLists.txt | 100 +++++++++++++++++----------------------------
- 2 files changed, 39 insertions(+), 103 deletions(-)
+ CMakeLists.txt     |  42 +-----------------
+ src/CMakeLists.txt | 107 ++++++++++++++++-----------------------------
+ 2 files changed, 38 insertions(+), 111 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
 index 6d4ec543..cb1b1b66 100644
@@ -79,10 +80,10 @@ index 6d4ec543..cb1b1b66 100644
 +    -DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH}
  )
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index d17392b8..c9982d5b 100644
+index d17392b8..643b9270 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -36,35 +36,18 @@ include(GNUInstallDirs)
+@@ -36,35 +36,16 @@ include(GNUInstallDirs)
  # We must include the transitive closure of all repos so that we can
  # override the tag. The backend repo is needed for the tests.
  #
@@ -113,22 +114,18 @@ index d17392b8..c9982d5b 100644
 -
  # CUDA
  #
++find_package(PkgConfig REQUIRED)
  if(${TRITON_ENABLE_GPU})
 -  find_package(CUDAToolkit REQUIRED)
 +  enable_language(CUDA)
-+  find_package(CUDA REQUIRED)
-+  include_directories(${CUDA_INCLUDE_DIRS})
-+  link_directories(${CUDA_LIBRARIES})
    message(STATUS "Using CUDA ${CUDA_VERSION}")
  endif() # TRITON_ENABLE_GPU
  
-@@ -79,13 +62,15 @@ endif()
+@@ -79,13 +60,13 @@ endif()
  #
  if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
      ${TRITON_ENABLE_SAGEMAKER} OR ${TRITON_ENABLE_VERTEX_AI})
 -  find_package(Libevent CONFIG REQUIRED)
-+  #find_package(Libevent REQUIRED)
-+  find_package(PkgConfig REQUIRED)
 +  pkg_check_modules(LIBEVENT REQUIRED libevent)
    message(STATUS "Using libevent ${Libevent_VERSION}")
  endif()
@@ -136,11 +133,11 @@ index d17392b8..c9982d5b 100644
  # re2
  #
 -find_library(RE2_LIBRARY NAMES re2)
-+find_package(re2 CONFIG REQUIRED)
++pkg_check_modules(re2 REQUIRED IMPORTED_TARGET re2)
  
  #
  # tritonserver executable
-@@ -127,7 +112,7 @@ else()
+@@ -127,7 +108,7 @@ else()
    target_compile_options(
      main
      PRIVATE
@@ -149,7 +146,7 @@ index d17392b8..c9982d5b 100644
    )
  endif()
  
-@@ -147,8 +132,9 @@ target_link_libraries(
+@@ -147,8 +128,9 @@ target_link_libraries(
      triton-common-async-work-queue  # from repo-common
      triton-common-error             # from repo-common
      triton-common-logging           # from repo-common
@@ -161,7 +158,7 @@ index d17392b8..c9982d5b 100644
  )
  
  if(${TRITON_ENABLE_ASAN})
-@@ -172,7 +158,7 @@ if(${TRITON_ENABLE_GPU})
+@@ -172,7 +154,7 @@ if(${TRITON_ENABLE_GPU})
    target_link_libraries(
      main
      PRIVATE
@@ -170,7 +167,7 @@ index d17392b8..c9982d5b 100644
    )
  endif() # TRITON_ENABLE_GPU
  
-@@ -266,7 +252,7 @@ endif() # NOT WIN32
+@@ -266,7 +248,7 @@ endif() # NOT WIN32
  if (NOT WIN32)
    install(
      TARGETS main
@@ -179,7 +176,7 @@ index d17392b8..c9982d5b 100644
    )
  else()
    # See explanation above as to why we need to rename main.exe to
-@@ -298,7 +284,7 @@ if(${TRITON_ENABLE_GRPC})
+@@ -298,7 +280,7 @@ if(${TRITON_ENABLE_GRPC})
      target_compile_options(
        grpc-endpoint-library
        PRIVATE
@@ -188,7 +185,7 @@ index d17392b8..c9982d5b 100644
      )
    endif()
  
-@@ -313,10 +299,10 @@ if(${TRITON_ENABLE_GRPC})
+@@ -313,10 +295,10 @@ if(${TRITON_ENABLE_GRPC})
      PUBLIC
        proto-library           # from repo-common
        triton-common-logging   # from repo-common
@@ -202,7 +199,7 @@ index d17392b8..c9982d5b 100644
        gRPC::grpc++
        gRPC::grpc
        protobuf::libprotobuf
-@@ -343,7 +329,7 @@ if(${TRITON_ENABLE_GRPC})
+@@ -343,7 +325,7 @@ if(${TRITON_ENABLE_GRPC})
      target_link_libraries(
        grpc-endpoint-library
        PUBLIC
@@ -211,7 +208,18 @@ index d17392b8..c9982d5b 100644
      )
    endif() # TRITON_ENABLE_GPU
  
-@@ -446,7 +432,7 @@ if(${TRITON_ENABLE_HTTP}
+@@ -395,8 +377,8 @@ if(${TRITON_ENABLE_HTTP}
+       OR ${TRITON_ENABLE_METRICS}
+       OR ${TRITON_ENABLE_SAGEMAKER}
+       OR ${TRITON_ENABLE_VERTEX_AI})
+-  find_package(libevhtp CONFIG REQUIRED)
+-  message(STATUS "Using libevhtp ${libevhtp_VERSION}")
++  pkg_check_modules(evhtp REQUIRED IMPORTED_TARGET evhtp)
++  message(STATUS "Using libevhtp ${evhtp_VERSION}")
+ 
+   list(APPEND
+     HTTP_ENDPOINT_SRCS
+@@ -446,7 +428,7 @@ if(${TRITON_ENABLE_HTTP}
      target_compile_options(
        http-endpoint-library
        PRIVATE
@@ -220,7 +228,7 @@ index d17392b8..c9982d5b 100644
      )
    endif()
  
-@@ -459,13 +445,11 @@ if(${TRITON_ENABLE_HTTP}
+@@ -459,18 +441,11 @@ if(${TRITON_ENABLE_HTTP}
    target_link_libraries(
      http-endpoint-library
      PUBLIC
@@ -230,13 +238,19 @@ index d17392b8..c9982d5b 100644
 -      triton-core-serverstub  # from repo-core
 +      triton-core             # from repo-core
        ${LIBEVENT_LIBRARIES}
-       libevhtp::evhtp
+-      libevhtp::evhtp
 -      ${RE2_LIBRARY}
-+      re2
+-  )
+-
+-  target_include_directories(
+-    http-endpoint-library
+-    PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
++      PkgConfig::evhtp
++      PkgConfig::re2
    )
  
-   target_include_directories(
-@@ -483,7 +467,7 @@ if(${TRITON_ENABLE_HTTP}
+   if(${TRITON_ENABLE_GPU})
+@@ -483,7 +458,7 @@ if(${TRITON_ENABLE_HTTP}
      target_link_libraries(
        http-endpoint-library
        PUBLIC
@@ -245,7 +259,7 @@ index d17392b8..c9982d5b 100644
      )
    endif() # TRITON_ENABLE_GPU
  
-@@ -583,8 +567,7 @@ if(${TRITON_ENABLE_TRACING})
+@@ -583,8 +558,7 @@ if(${TRITON_ENABLE_TRACING})
      tracing-library
      PUBLIC
        triton-common-logging    # from repo-common
@@ -255,7 +269,7 @@ index d17392b8..c9982d5b 100644
    )
  
    target_compile_definitions(
-@@ -602,7 +585,7 @@ if(${TRITON_ENABLE_TRACING})
+@@ -602,7 +576,7 @@ if(${TRITON_ENABLE_TRACING})
      target_link_libraries(
        tracing-library
        PUBLIC
@@ -264,7 +278,7 @@ index d17392b8..c9982d5b 100644
      )
    endif() # TRITON_ENABLE_GPU
  
-@@ -664,7 +647,7 @@ if (NOT WIN32)
+@@ -664,7 +638,7 @@ if (NOT WIN32)
      target_compile_options(
        simple
        PRIVATE
@@ -273,7 +287,7 @@ index d17392b8..c9982d5b 100644
      )
    endif()
  
-@@ -683,8 +666,7 @@ if (NOT WIN32)
+@@ -683,8 +657,7 @@ if (NOT WIN32)
      PRIVATE
        triton-common-async-work-queue  # from repo-common
        triton-common-error             # from repo-common
@@ -283,7 +297,7 @@ index d17392b8..c9982d5b 100644
      )
  
    if(${TRITON_ENABLE_GPU})
-@@ -697,13 +679,13 @@ if (NOT WIN32)
+@@ -697,13 +670,13 @@ if (NOT WIN32)
      target_link_libraries(
        simple
        PRIVATE
@@ -299,7 +313,7 @@ index d17392b8..c9982d5b 100644
    )
  
    #
-@@ -728,7 +710,7 @@ if (NOT WIN32)
+@@ -728,7 +701,7 @@ if (NOT WIN32)
      target_compile_options(
        multi_server
        PRIVATE
@@ -308,7 +322,7 @@ index d17392b8..c9982d5b 100644
      )
    endif()
  
-@@ -747,8 +729,8 @@ if (NOT WIN32)
+@@ -747,8 +720,8 @@ if (NOT WIN32)
      PRIVATE
        triton-common-async-work-queue  # from repo-common
        triton-common-error             # from repo-common
@@ -319,7 +333,7 @@ index d17392b8..c9982d5b 100644
      )
  
    if(${TRITON_ENABLE_GPU})
-@@ -761,13 +743,13 @@ if (NOT WIN32)
+@@ -761,13 +734,13 @@ if (NOT WIN32)
      target_link_libraries(
        multi_server
        PRIVATE
@@ -335,7 +349,7 @@ index d17392b8..c9982d5b 100644
    )
  
    if(${TRITON_ENABLE_GPU})
-@@ -793,7 +775,7 @@ if (NOT WIN32)
+@@ -793,7 +766,7 @@ if (NOT WIN32)
        target_compile_options(
          memory_alloc
          PRIVATE
@@ -344,7 +358,7 @@ index d17392b8..c9982d5b 100644
        )
      endif()
  
-@@ -818,19 +800,13 @@ if (NOT WIN32)
+@@ -818,19 +791,13 @@ if (NOT WIN32)
        PRIVATE
          triton-common-async-work-queue  # from repo-common
          triton-common-error             # from repo-common
@@ -367,6 +381,3 @@ index d17392b8..c9982d5b 100644
 -if (NOT WIN32)
 -  add_subdirectory(test test)
 -endif() # NOT WIN32
--- 
-2.25.1
-
