@@ -1,0 +1,110 @@
+#!/bin/sh
+#
+# nvbootctrl-rauc: rauc script to get/set the bootloader status
+#
+# SPDX-License-Identifier: MIT
+
+usage() {
+    cat >&2 <<EOF
+Usage: $0 <ACTION> <BOOTNAME> <STATUS>
+Options:
+    -h,                             Print this usage message
+    ACTION
+Actions:
+    get-current                     Returns the current booted bootname
+    get-primary                     Returns the primary bootname
+    get-state <BOOTNAME>            Returns the BOOTNAME status ("good", "bad")
+    set-primary <BOOTNAME>          Set the primary slot to BOOTNAME (needs reboot)
+    set-state <BOOTNAME> <STATUS>   Apply the STATUS ("good", "bad") to BOOTNAME
+EOF
+exit 1; }
+
+SLOT_A="APP"
+SLOT_B="APP_b"
+
+function get_status(){
+    { nvbootctrl dump-slots-info | grep "slot: ${1}" | grep -q "normal"; } && \
+    { nvbootctrl -trootfs dump-slots-info | grep "slot: ${1}" | grep -q "normal"; } && \
+    echo 0 || echo 1
+}
+
+function get_slot(){
+    case "${1}" in
+        *_b)
+            echo 1;
+            ;;
+        *)
+            echo 0;
+            ;;
+    esac
+}
+
+function get_slot_AB(){
+    case "${1}" in
+        *_b)
+            echo B;
+            ;;
+        *)
+            echo A;
+            ;;
+    esac
+}
+
+function get_slot_err_code(){
+    case "${1}" in
+        good)
+            echo "00";
+            ;;
+        bad)
+            echo "FF";
+            ;;
+    esac
+}
+
+while getopts ":h" o; do
+    case "${o}" in
+        *)
+            usage
+            ;;
+    esac
+done
+shift $((OPTIND-1))
+
+if [ -z "${1}" ] ; then
+    usage
+fi
+
+case "${1}" in
+    get-current|get-primary)
+        [ $(nvbootctrl get-current-slot) == "0" ] && echo "${SLOT_A}" || echo "${SLOT_B}"
+        exit 0
+        ;;
+    get-state)
+        if [ -z "${2}" ] ; then
+            usage
+        fi
+        SLOT="$(get_slot ${2})"
+        [ "$(get_status ${SLOT})" == "0" ] && echo "good" || echo "bad"
+        exit 0
+        ;;
+    set-primary)
+        if [ -z "${2}" ] ; then
+            usage
+        fi
+        SLOT="$(get_slot ${2})"
+        nvbootctrl set-active-boot-slot "${SLOT}"; exit $?
+        ;;
+    set-state)
+        if [ -z "${2}" ] || [ -z "${3}" ] ; then
+            usage
+        fi
+        SLOT="$(get_slot_AB ${2})"
+        ERRCODE="$(get_slot_err_code ${3})"
+        printf "\x07\x00\x00\x00\x${ERRCODE}\x00\x00\x00" > \
+            "/opt/nvidia/esp/EFI/NVDA/Variables/RootfsStatusSlot${SLOT}-781e084c-a330-417c-b678-38e696380cb9"
+        exit $?
+        ;;
+    *)
+        usage
+        ;;
+esac
