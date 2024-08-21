@@ -18,9 +18,9 @@ COMPATIBLE_MACHINE = "(tegra)"
 
 S = "${WORKDIR}/git"
 
-inherit cuda setuptools3
+inherit cuda python_setuptools_build_meta
 
 export CUDA_HOME = "${STAGING_DIR_HOST}/usr/local/cuda-${CUDA_VERSION}"
 export PARALLEL_LEVEL = "${@oe.utils.cpu_count()}"
 PARALLEL_VALUE[vardepvalue] = "1"
-CFLAGS += "-I=/usr/local/cuda-${CUDA_VERSION}/include"
+CXXFLAGS += "-I${RECIPE_SYSROOT}/usr/local/cuda-${CUDA_VERSION}/include"
