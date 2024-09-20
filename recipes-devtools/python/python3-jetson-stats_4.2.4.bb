@@ -5,7 +5,7 @@ SECTION = "devel/python"
 LICENSE = "AGPL-3.0-only"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=8763b57f0092c337eb12c354870a324a"
 
-SRC_URI[sha256sum] = "0e4b347583a68406919b3d7fc5509db1ff785ae97839cb1e0f72e9460c977153"
+SRC_URI[sha256sum] = "63fa224b61c65d2faa31e5e9b3406e87164dffc472d3ec2c168480d9d0337020"
 SRC_URI:append = " \
     file://0001-fix-installation-process-issue-and-cleanup.patch \
     file://0002-fix-paths-to-match-with-OE-and-getting-the-right-ver.patch \
