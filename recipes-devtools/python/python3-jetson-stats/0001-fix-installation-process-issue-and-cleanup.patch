@@ -1,4 +1,4 @@
-From 3a45387ed5549aa3015c5939d4870b57ee207070 Mon Sep 17 00:00:00 2001
+From c26118c2c3f4590e01d937545a69fac3cede3ac5 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ilies.chergui@gmail.com>
 Date: Sat, 26 Aug 2023 12:22:15 +0100
 Subject: [PATCH 1/2] fix installation process issue and cleanup
@@ -17,10 +17,10 @@ Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
  8 files changed, 13 insertions(+), 225 deletions(-)
 
 diff --git a/jtop/core/jetson_variables.py b/jtop/core/jetson_variables.py
-index a35aed4..24dee29 100644
+index 5cd9187..adf26fd 100644
 --- a/jtop/core/jetson_variables.py
 +++ b/jtop/core/jetson_variables.py
-@@ -355,14 +355,6 @@ def status_variables(name=JTOP_VARIABLE_FILE):
+@@ -360,14 +360,6 @@ def status_variables(name=JTOP_VARIABLE_FILE):
      return os.path.isfile('/etc/profile.d/{name}'.format(name=name))
  
  
@@ -49,7 +49,7 @@ index 3b0fbf8..a7bb12c 100644
      # Check type of shell
      try:
 diff --git a/jtop/jetson_config.py b/jtop/jetson_config.py
-index f4fd44b..c940f18 100644
+index 594f607..f11e4f7 100644
 --- a/jtop/jetson_config.py
 +++ b/jtop/jetson_config.py
 @@ -31,7 +31,7 @@ from .core.common import get_var
@@ -140,7 +140,7 @@ index 0b256f0..9f59cfc 100644
          sys.exit(1)
      # Define Memory Service
 diff --git a/jtop/jtop.py b/jtop/jtop.py
-index 0237859..3370fdc 100644
+index f9a9736..3e7fbd2 100644
 --- a/jtop/jtop.py
 +++ b/jtop/jtop.py
 @@ -1113,7 +1113,7 @@ class jtop(Thread):
@@ -454,5 +454,5 @@ index 20f8db6..e721d82 100644
  class JTOPInstallCommand(install):
      """Installation mode."""
 -- 
-2.25.1
+2.46.0
 
