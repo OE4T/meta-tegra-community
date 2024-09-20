@@ -1,4 +1,4 @@
-From 521f9df38b996c46edb40721be17554e777f8e5c Mon Sep 17 00:00:00 2001
+From ceb4287e479b6f68efdecbd773eeaca11ecb4d3a Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ilies.chergui@gmail.com>
 Date: Sat, 26 Aug 2023 12:45:21 +0100
 Subject: [PATCH 2/2] fix paths to match with OE and getting the right version
@@ -130,5 +130,5 @@ index 2839a27..c97ff3c 100644
      os_variables = get_libraries()
      for name, value in os_variables.items():
 -- 
-2.25.1
+2.46.0
 
