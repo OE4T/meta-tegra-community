@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2021, OpenEmbedded for Tegra Project
+# Copyright (c) 2021-2024, OpenEmbedded for Tegra Project
 #
 # WARNING: make sure you have at least a couple of GiB of free
 # space availabe in the current working directory, as some of
@@ -68,7 +68,8 @@ run_video_dec_trt() {
     fi
     local rc=0
     echo "Running 04_video_dec_trt"
-    video_dec_trt 2 "$SAMPLEVID" "$SAMPLEVID" H264 --trt-onnxmodel "$SAMPLEROOT/data/Model/resnet10/resnet10_dynamic_batch.onnx" --trt-mode 0 || rc=1
+    /usr/src/tensorrt/bin/trtexec --onnx="$SAMPLEMODELS/resnet10/resnet10_dynamic_batch.onnx" --saveEngine=resnet10.trt
+    video_dec_trt 2 "$SAMPLEVID" "$SAMPLEVID" H264 --trt-engine resnet10.trt || rc=1
     [ $rc -ne 0 ] || run_video_dec_cuda "$SAMPLEVID" "result0.txt" || rc=1
     [ $rc -ne 0 ] || run_video_dec_cuda "$SAMPLEVID" "result1.txt" || rc=1
     rm -f result0.txt result1.txt trtModel.cache
@@ -221,34 +222,6 @@ run_transform_sample() {
     return $rc
 }
 
-run_backend() {
-    if [ ! -x "$SAMPLEROOT/bin/backend" ]; then
-	echo "Skipping backend"
-	return $SKIPCODE
-    fi
-    mbase="$SAMPLEMODELS/GoogleNet_one_class/GoogleNet_modified_oneClass_halfHD"
-    echo "Running backend"
-    backend 1 "$SAMPLEVID" H264 --trt-deployfile "${mbase}.prototxt" --trt-modelfile "${mbase}.caffemodel" \
-        --trt-mode 0 --trt-proc-interval 1 -fps 10
-    rm -f trtModel.cache
-}
-
-run_frontend() {
-    if [ ! -x "$SAMPLEROOT/bin/frontend" ]; then
-	echo "Skipping frontend"
-	return $SKIPCODE
-    fi
-    local mipicam=$(find_argus_camera)
-    if [ -z "$mipicam" ]; then
-	echo "Skipping frontend - no camera"
-	return $SKIPCODE
-    fi
-    echo "Running frontend"
-    mbase="$SAMPLEMODELS/GoogleNet_three_class/GoogleNet_modified_threeClass_VGA"
-    frontend --deploy "${mbase}.prototxt" --model "${mbase}.caffemodel" --no-preview -t 10
-    rm -f output*.h265 trt.h264 trtModel.cache
-}
-
 run_v4l2_camera_cuda_rgb() {
     local usbcam=$(find_usb_camera)
     if [ -z "$usbcam" ]; then
@@ -263,7 +236,7 @@ run_v4l2_camera_cuda_rgb() {
 TESTS="video_decode video_encode video_dec_cuda video_cuda_enc video_dec_trt jpeg_encode"
 TESTS="$TESTS jpeg_decode video_convert video_dec_drm argus_camera_jpeg argus_camera_recording"
 TESTS="$TESTS v4l2_camera_cuda camera_sample decode_sample encode_sample transform_sample"
-TESTS="$TESTS backend frontend v4l2_camera_cuda_rgb"
+TESTS="$TESTS v4l2_camera_cuda_rgb"
 
 find_test() {
     for t in $TESTS; do
