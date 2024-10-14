@@ -79,7 +79,7 @@ run_trtexec(){
     echo "Running trtexec: Running an ONNX model with full dimensions"
     trtexec --onnx=${SAMPLEDATA}/resnet50/ResNet50.onnx \
       --saveEngine=ResNet50.trt && \
-    trtexec --loadEngine=ResNet50.trt --batch=1
+    trtexec --loadEngine=ResNet50.trt
 }
 
 TESTS="algorithm_selector char-rnn dynamic_reshape"
