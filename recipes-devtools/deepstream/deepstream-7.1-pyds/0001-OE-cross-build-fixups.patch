@@ -1,0 +1,104 @@
+From 131d21d2d674d1c82ce0f48bac68d9dbea69d5d4 Mon Sep 17 00:00:00 2001
+From: Matt Madison <matt@madison.systems>
+Date: Sat, 19 Oct 2024 07:32:18 -0700
+Subject: [PATCH] OE cross build fixups
+
+* Use dependencies installed in sysroot
+* Fix locations of libnvbuf* libraries
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Matt Madison <matt@madison.systems>
+---
+ bindings/CMakeLists.txt | 23 ++++++++++-------------
+ bindings/MANIFEST.in    |  1 -
+ bindings/pyproject.toml |  2 --
+ 3 files changed, 10 insertions(+), 16 deletions(-)
+
+diff --git a/bindings/CMakeLists.txt b/bindings/CMakeLists.txt
+index 0901ef8..e6d46ef 100644
+--- a/bindings/CMakeLists.txt
++++ b/bindings/CMakeLists.txt
+@@ -15,6 +15,11 @@
+ 
+ cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+ 
++find_package(PkgConfig REQUIRED)
++pkg_check_modules(gstreamer REQUIRED IMPORTED_TARGET gstreamer-1.0)
++pkg_check_modules(glib REQUIRED IMPORTED_TARGET glib-2.0)
++find_package(Python MODULE REQUIRED COMPONENTS Development)
++
+ # Setting values not set by user
+ function(check_variable_set variable_name default_value)
+         if (NOT DEFINED ${variable_name})
+@@ -46,7 +51,6 @@ check_variable_allowed(PYTHON_MINOR_VERSION PYTHON_MINVERS_ALLOWED)
+ set(CMAKE_CXX_STANDARD 17)
+ set(CMAKE_CXX_STANDARD_REQUIRED True)
+ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+-set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
+ 
+ # Setting python build versions
+ set(PYTHON_VERSION ${PYTHON_MAJOR_VERSION}.${PYTHON_MINOR_VERSION})
+@@ -59,15 +63,9 @@ add_compile_options(-Wall -Wextra -pedantic -O3)
+ include_directories(
+         include/
+         ${DS_PATH}/sources/includes/
++	${PYBIND11_INCLUDE_DIR}
+         include/bind
+         include/nvds
+-        3rdparty/pybind11/include/pybind11/
+-        3rdparty/pybind11/include/
+-        /usr/include/python${PYTHON_VERSION}
+-        /usr/include/gstreamer-1.0
+-        /usr/include/glib-2.0
+-        /usr/lib/aarch64-linux-gnu/glib-2.0/include/
+-        /usr/lib/x86_64-linux-gnu/glib-2.0/include
+         )
+ 
+ add_library(pyds SHARED src/pyds.cpp src/utils.cpp src/bindanalyticsmeta.cpp
+@@ -79,9 +77,8 @@ add_library(pyds SHARED src/pyds.cpp src/utils.cpp src/bindanalyticsmeta.cpp
+ set_target_properties(pyds PROPERTIES PREFIX "")
+ set_target_properties(pyds PROPERTIES OUTPUT_NAME "pyds")
+ 
+-set(PYTHON_LIB python${PYTHON_VERSION})
+-
+-target_link_libraries(pyds pthread dl ${PYTHON_LIB} gstreamer-1.0 glib-2.0)
++target_link_libraries(pyds pthread dl Python::Python PkgConfig::gstreamer PkgConfig::glib nvbufsurface nvbufsurftransform)
++target_link_options(pyds PUBLIC "-Wl,--no-undefined")
+ 
+ # Checking deepstream shared libraries and linking them
+ function(add_ds_lib libname)
+@@ -96,6 +93,6 @@ function(add_ds_lib libname)
+         target_link_libraries(pyds ${libname})
+ endfunction()
+ 
+-foreach(nvds_lib nvds_osd nvds_meta nvds_infer nvdsgst_meta nvbufsurface nvbufsurftransform nvdsgst_helper nvdsgst_customhelper nvds_batch_jpegenc)
++foreach(nvds_lib nvds_osd nvds_meta nvds_infer nvdsgst_meta nvdsgst_helper nvdsgst_customhelper nvds_batch_jpegenc)
+         add_ds_lib(${nvds_lib})
+-endforeach()
+\ No newline at end of file
++endforeach()
+diff --git a/bindings/MANIFEST.in b/bindings/MANIFEST.in
+index bde57d6..ad9e9f8 100644
+--- a/bindings/MANIFEST.in
++++ b/bindings/MANIFEST.in
+@@ -13,7 +13,6 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-graft 3rdparty/pybind11/include/pybind11
+ graft src
+ graft include
+ graft docstrings
+diff --git a/bindings/pyproject.toml b/bindings/pyproject.toml
+index 649dffc..c24fc04 100644
+--- a/bindings/pyproject.toml
++++ b/bindings/pyproject.toml
+@@ -17,8 +17,6 @@
+ requires = [
+     "setuptools>=42",
+     "wheel",
+-    "ninja",
+-    "cmake>=3.12",
+ ]
+ build-backend = "setuptools.build_meta"
+ 
