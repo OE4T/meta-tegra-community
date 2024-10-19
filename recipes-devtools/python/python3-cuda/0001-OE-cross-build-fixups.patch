@@ -1,26 +1,26 @@
-From 5b2ec50170abdad6e8930343e7b259b497a0d26f Mon Sep 17 00:00:00 2001
-From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Fri, 17 May 2024 18:59:13 +0100
-Subject: [PATCH] OE cross build fixups
+From fcc6c2b7974a42ac8f9466e1cd8e29bb4734c9c6 Mon Sep 17 00:00:00 2001
+From: Matt Madison <matt@madison.systems>
+Date: Sat, 19 Oct 2024 08:02:15 -0700
+Subject: [PATCH] OE cross-build fixups
 
-Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Matt Madison <matt@madison.systems>
 ---
- setup.py | 23 +++--------------------
- 1 file changed, 3 insertions(+), 20 deletions(-)
+ cuda/setup.py | 15 ++-------------
+ 1 file changed, 2 insertions(+), 13 deletions(-)
 
-diff --git a/setup.py b/setup.py
-index 3ef6763..7180027 100644
---- a/setup.py
-+++ b/setup.py
-@@ -148,32 +148,15 @@ for file in input_files:
+diff --git a/cuda/setup.py b/cuda/setup.py
+index ec52362..12565e5 100644
+--- a/cuda/setup.py
++++ b/cuda/setup.py
+@@ -155,26 +155,15 @@ for file in input_files:
  # Prepare compile arguments
  
  # For Cython
 -include_dirs = [
 -    os.path.dirname(sysconfig.get_path("include")),
--    f'{CUDA_HOME}/include',
--]
--library_dirs = [get_python_lib(), os.path.join(os.sys.prefix, "lib")]
+-] + include_path_list
+-library_dirs = [sysconfig.get_path("platlib"), os.path.join(os.sys.prefix, "lib")]
 +include_dirs = []
 +library_dirs = []
  
@@ -29,25 +29,16 @@ index 3ef6763..7180027 100644
  if sys.platform != 'win32':
      extra_compile_args += [
 -        '-std=c++14',
--        '-fpermissive',
+         '-fpermissive',
 -        '-Wno-deprecated-declarations',
 -        '-D _GLIBCXX_ASSERTIONS',
 -        '-fno-var-tracking-assignments'
-+        '-fpermissive'
      ]
 -    if '--debug' in sys.argv:
 -        extra_cythonize_kwargs['gdb_debug'] = True
 -        extra_compile_args += ['-g', '-O0']
 -    else:
 -        extra_compile_args += ['-O3']
--
--# For Setup
--if sys.platform == 'win32':
--    from distutils import _msvccompiler
--    _msvccompiler.PLAT_TO_VCVARS['win-amd64'] = 'amd64'
  
- setup_requires = ["cython"]
- install_requires = ["cython"]
--- 
-2.34.1
-
+ # For Setup
+ extensions = []
