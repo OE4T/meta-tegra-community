@@ -2,16 +2,16 @@ DESCRIPTION = "NVIDIA Deepstream SDK"
 HOMEPAGE = "https://developer.nvidia.com/deepstream-sdk"
 LICENSE = "Proprietary"
 LIC_FILES_CHKSUM = " \
-    file://usr/share/doc/deepstream-7.0/copyright;md5=7bfc1fcf29db1bc3d6c60300028516ee \
-    file://opt/nvidia/deepstream/deepstream-7.0/LICENSE.txt;md5=64d6d7920d0e8ce012409c4ef1434061 \
-    file://opt/nvidia/deepstream/deepstream-7.0/doc/nvidia-tegra/LICENSE.iothub_client;md5=4f8c6347a759d246b5f96281726b8611 \
-    file://opt/nvidia/deepstream/deepstream-7.0/doc/nvidia-tegra/LICENSE.nvds_amqp_protocol_adaptor;md5=8b4b651fa4090272b2e08e208140a658 \
+    file://usr/share/doc/deepstream-7.1/copyright;md5=9be828ca67cebbca30ff5d0580233ccb \
+    file://opt/nvidia/deepstream/deepstream-7.1/LICENSE.txt;md5=23fdb7b78fafef50c1ed5dc073862c6d \
+    file://opt/nvidia/deepstream/deepstream-7.1/doc/nvidia-tegra/LICENSE.iothub_client;md5=4f8c6347a759d246b5f96281726b8611 \
+    file://opt/nvidia/deepstream/deepstream-7.1/doc/nvidia-tegra/LICENSE.nvds_amqp_protocol_adaptor;md5=8b4b651fa4090272b2e08e208140a658 \
 "
 
 inherit l4t_deb_pkgfeed
 
 SRC_COMMON_DEBS = "${BPN}_${PV}_arm64.deb;subdir=${BPN}"
-SRC_URI[sha256sum] = "2d8a1f3cb235a5e665ab1392d89b16ccc738a88c136341e6eeb05532e6bf5fb8"
+SRC_URI[sha256sum] = "8cc657e4784108c1a17da9bb8fbf736bc2ae4017065bb493486548c274465ca4"
 
 COMPATIBLE_MACHINE = "(tegra)"
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"
@@ -44,7 +44,7 @@ S = "${WORKDIR}/${BPN}"
 B = "${WORKDIR}/build"
 
 DEEPSTREAM_BASEDIR = "/opt/nvidia/deepstream"
-DEEPSTREAM_PATH = "${DEEPSTREAM_BASEDIR}/deepstream-7.0"
+DEEPSTREAM_PATH = "${DEEPSTREAM_BASEDIR}/deepstream-7.1"
 SYSROOT_DIRS += "${DEEPSTREAM_PATH}/lib/ ${DEEPSTREAM_PATH}/sources/includes/"
 
 do_configure() {
@@ -89,8 +89,6 @@ do_install() {
     ln -sf libnvds_msgconv.so.1.0.0 ${D}${DEEPSTREAM_PATH}/lib/libnvds_msgconv.so
     ln -sf libnvds_msgconv_audio.so.1.0.0 ${D}${DEEPSTREAM_PATH}/lib/libnvds_msgconv_audio.so
 
-    cp -R --preserve=mode,timestamps ${S}${DEEPSTREAM_PATH}/lib/cvcore_libs/ ${D}${DEEPSTREAM_PATH}/lib/
-
     install -d ${D}/${sysconfdir}/ld.so.conf.d/
     echo "${DEEPSTREAM_PATH}/lib" > ${D}/${sysconfdir}/ld.so.conf.d/deepstream.conf
     echo "${libdir}/gstreamer-1.0/deepstream" >> ${D}/${sysconfdir}/ld.so.conf.d/deepstream.conf
@@ -119,10 +117,9 @@ do_install() {
     patchelf --replace-needed libprotobuf.so.3.19.4.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_audio_proto.so
     patchelf --replace-needed libnppial.so libnppial.so.12 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
     patchelf --replace-needed libnppist.so libnppist.so.12 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
-    patchelf --replace-needed libjsoncpp.so.1 libjsoncpp.so.25 ${D}${DEEPSTREAM_PATH}/lib/libnvds_rest_server.so
     # ---XXX
     cd ${D}${DEEPSTREAM_BASEDIR}
-    ln -s deepstream-7.0 deepstream
+    ln -s deepstream-7.1 deepstream
     cd -
 }
 
