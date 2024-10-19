@@ -1,7 +1,7 @@
-From db5f9a18117ed23a15ad17bb2239082036747ab5 Mon Sep 17 00:00:00 2001
+From a9b9ad49e7c4ed3f05b6cfebbd62cb139e5159e1 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
 Date: Mon, 13 May 2024 16:06:28 +0100
-Subject: [PATCH 2/2] Allow apps to be run from other working directories
+Subject: [PATCH] Allow apps to be run from other working directories
 
 Signed-off-by: Matt Madison <matt@madison.systems>
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
@@ -345,7 +345,7 @@ index f787a7f..fc64556 100755
  
      for key in config['tracker']:
 diff --git a/apps/deepstream-test3/deepstream_test_3.py b/apps/deepstream-test3/deepstream_test_3.py
-index 6625881..8d9730b 100755
+index 1d04ebc..d6580f4 100755
 --- a/apps/deepstream-test3/deepstream_test_3.py
 +++ b/apps/deepstream-test3/deepstream_test_3.py
 @@ -17,8 +17,9 @@
@@ -398,7 +398,7 @@ index 22675a5..d038c13 100755
  pgie_classes_str = ["Vehicle", "TwoWheeler", "Person", "Roadsign"]
  
 diff --git a/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py b/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py
-index 5ef0441..83c7d6d 100644
+index cde259d..3c37601 100644
 --- a/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py
 +++ b/apps/runtime_source_add_delete/deepstream_rt_src_add_del.py
 @@ -17,8 +17,9 @@
@@ -429,6 +429,3 @@ index 5ef0441..83c7d6d 100644
  
  CONFIG_GPU_ID = "gpu-id"
  CONFIG_GROUP_TRACKER = "tracker"
--- 
-2.34.1
-
