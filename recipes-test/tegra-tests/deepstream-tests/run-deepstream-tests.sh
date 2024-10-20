@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2022, OpenEmbedded for Tegra Project
+# Copyright (c) 2022-2024, OpenEmbedded for Tegra Project
 #
 # WARNING: make sure you have at least a couple of GiB of free
 # space availabe, as some of these samples need to download models/data.
@@ -8,7 +8,7 @@
 # Some of these tests work better if you use jetson_clocks to
 # speed things up.
 
-DEEPSTREAM_PATH="/opt/nvidia/deepstream/deepstream-7.0"
+DEEPSTREAM_PATH="/opt/nvidia/deepstream/deepstream-7.1"
 SAMPLEROOT="${DEEPSTREAM_PATH}/sources/apps/sample_apps"
 PYSAMPLEROOT="${DEEPSTREAM_PATH}/sources/deepstream_python_apps/apps"
 STREAMS="${DEEPSTREAM_PATH}/samples/streams"
