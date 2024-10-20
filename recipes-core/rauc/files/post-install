@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# post-install: execute custom post install code
+#
+# SPDX-License-Identifier: MIT
+
+nvbootctrl-rauc set-state APP good && \
+    nvbootctrl-rauc set-state APP_b good && \
+    echo "Rebooting ..." &&\
+    reboot
