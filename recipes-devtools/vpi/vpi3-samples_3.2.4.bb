@@ -9,7 +9,7 @@ COMPATIBLE_MACHINE = "(tegra)"
 inherit l4t_deb_pkgfeed cuda cmake
 
 SRC_COMMON_DEBS = "vpi3-samples_${PV}_arm64.deb;subdir=vpi3-samples"
-SRC_URI[sha256sum] = "49d8940ae39ff4cc9db75da67ff42ab703443ff350697b2c20de90293a69f7cb"
+SRC_URI[sha256sum] = "e7850f6675856507b5064c23315934a025e811ebf1264f059670730e45885eec"
 
 SRC_URI += "file://CMakeLists.txt;subdir=vpi3-samples/opt/nvidia/vpi3/samples"
 
@@ -23,6 +23,6 @@ S = "${WORKDIR}/vpi3-samples/opt/nvidia/vpi3/samples"
 
 DEPENDS = "libnvvpi3 opencv"
 
-LDFLAGS += "-Wl,-rpath,/opt/nvidia/cupva-2.3/lib/aarch64-linux-gnu"
+LDFLAGS += "-Wl,-rpath,/opt/nvidia/cupva-2.5/lib/aarch64-linux-gnu"
 
 FILES:${PN} = "${VPI_PREFIX}"
