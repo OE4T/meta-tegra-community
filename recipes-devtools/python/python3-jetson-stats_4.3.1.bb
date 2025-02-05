@@ -8,7 +8,7 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=8763b57f0092c337eb12c354870a324a"
 SRC_URI += "file://0001-fix-installation-process-issue-and-cleanup.patch \
             file://0002-fix-paths-to-match-with-OE-and-getting-the-right-ver.patch \
            "
-SRC_URI[sha256sum] = "b0501ed58771f145d1825b51dbbcf003946eed7d7616e61e874fabd2f9cff527"
+SRC_URI[sha256sum] = "38b11fcb6a27d59a194bc587e7665bccfc0c658979171969974550013e62afeb"
 
 COMPATIBLE_MACHINE = "(tegra)"
 

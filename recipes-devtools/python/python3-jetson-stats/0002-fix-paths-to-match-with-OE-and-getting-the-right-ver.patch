@@ -1,18 +1,19 @@
-From da1d76b8ad6c9b4803c05d94d06f60c9088706c1 Mon Sep 17 00:00:00 2001
-From: Ilies CHERGUI <ilies.chergui@gmail.com>
-Date: Sun, 20 Oct 2024 07:37:52 -0700
-Subject: [PATCH] fix paths to match with OE and getting the right version of
- libraries
+From 9c47d91bd03927c6f87033734f601c796a8a4e2e Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Wed, 5 Feb 2025 19:46:20 +0000
+Subject: [PATCH 2/2] fix paths to match with OE and getting the right version
+ of libraries
 
 Upstream-Status: Pending
+
 Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 Signed-off-by: Matt Madison <matt@madison.systems>
 ---
- jtop/core/jetson_libraries.py | 75 ++++++++++++++++-------------------
- 1 file changed, 35 insertions(+), 40 deletions(-)
+ jtop/core/jetson_libraries.py | 75 ++++++++++++++---------------------
+ 1 file changed, 30 insertions(+), 45 deletions(-)
 
 diff --git a/jtop/core/jetson_libraries.py b/jtop/core/jetson_libraries.py
-index f79ade3..82e4353 100644
+index 7db9dab..5dd8542 100644
 --- a/jtop/core/jetson_libraries.py
 +++ b/jtop/core/jetson_libraries.py
 @@ -17,6 +17,7 @@
@@ -20,10 +21,10 @@ index f79ade3..82e4353 100644
  import os
  import re
 +from pathlib import Path
+ import subprocess
  from .common import cat
  from .command import Command
- # Fix connection refused for python 2.7
-@@ -26,20 +27,19 @@ except NameError:
+@@ -27,20 +28,19 @@ except NameError:
      FileNotFoundError = IOError
  
  
@@ -48,25 +49,27 @@ index f79ade3..82e4353 100644
          try:
              lines = cmd()
              for line in lines:
-@@ -49,6 +49,17 @@ def get_cuda():
+@@ -50,14 +50,14 @@ def get_cuda():
                      break
          except (OSError, Command.CommandException):
              pass
+-    elif subprocess.call(["which", "nvcc"], stdout=subprocess.DEVNULL) == 0:
+-        cmd = Command(['nvcc', '--version'])
 +    elif os.path.isfile("/usr/bin/cuda-samples/deviceQuery"):
 +        cmd = Command(['/usr/bin/cuda-samples/deviceQuery'])
-+        try:
-+            lines = cmd()
-+            for line in lines:
+         try:
+             lines = cmd()
+             for line in lines:
+-                match = re.search(CUDA_NVCC_RE, line)
+-                if match:
+-                    cuda_version = match.group(1)
 +                if "CUDA Driver Version" in line:
 +                    temp = line.split("/")
 +                    cuda_version = temp[-1].strip()
-+                    break
-+        except (OSError, Command.CommandException):
-+            pass
-     return cuda_version
- 
- 
-@@ -75,42 +86,26 @@ def get_opencv():
+                     break
+         except (OSError, Command.CommandException):
+             pass
+@@ -87,42 +87,27 @@ def get_opencv():
      return opencv_version, opencv_cuda
  
  
@@ -119,15 +122,16 @@ index f79ade3..82e4353 100644
 +    else:
 +        os_variables['cuDNN'] = 'not Installed!'
 +
-+    vpi_match = re.search(r'libnvvpi.so.(\d+.\d+.\d+)',str(list(Path('/opt/nvidia/vpi2/lib/aarch64-linux-gnu/').glob("libnvvpi.so.*.*"))))
++    vpi_match = re.search(r'libnvvpi.so.(\d+.\d+.\d+)',str(list(Path('/opt/nvidia/vpi3/lib/aarch64-linux-gnu').glob("libnvvpi.so.*.*"))))
 +    if vpi_match is not None:
 +        os_variables['VPI'] = vpi_match.group(1)
 +    else:
 +        os_variables['VPI'] = 'not Installed!'
++
      # Get Vulkan output
      cmd_vulkaninfo = Command(['which', 'vulkaninfo'])
      try:
-@@ -142,7 +137,7 @@ if __name__ == "__main__":
+@@ -154,7 +139,7 @@ if __name__ == "__main__":
          opencv_cuda_string = "YES" if opencv_cuda else "NO"
          print("OPENCV: {opencv_version} - with CUDA: {opencv_cuda}".format(opencv_version=opencv_version, opencv_cuda=opencv_cuda_string))
      else:
@@ -136,3 +140,6 @@ index f79ade3..82e4353 100644
      # Get all libraries
      os_variables = get_libraries()
      for name, value in os_variables.items():
+-- 
+2.34.1
+
