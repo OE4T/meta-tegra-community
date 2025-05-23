@@ -1,0 +1,283 @@
+From 103f776156751247bb76abb5f2f91964b96eea85 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Fri, 23 May 2025 15:40:22 +0100
+Subject: [PATCH] Fixups for cross building in OE
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ cupy/_core/dlpack.pxd                    |  2 +-
+ cupy/cuda/cupy_jitify.h                  |  2 +-
+ install/cupy_builder/_features.py        | 35 ++++++-------------
+ install/cupy_builder/_preflight.py       | 43 ------------------------
+ install/cupy_builder/cupy_setup_build.py | 36 +-------------------
+ 5 files changed, 13 insertions(+), 105 deletions(-)
+
+diff --git a/cupy/_core/dlpack.pxd b/cupy/_core/dlpack.pxd
+index a28b842e2..6346ae8c2 100644
+--- a/cupy/_core/dlpack.pxd
++++ b/cupy/_core/dlpack.pxd
+@@ -5,7 +5,7 @@ from libc.stdint cimport (
+ )
+ 
+ 
+-cdef extern from './include/cupy/_dlpack/dlpack.h' nogil:
++cdef extern from 'dlpack/dlpack.h' nogil:
+     int DLPACK_MAJOR_VERSION
+     int DLPACK_MINOR_VERSION
+     int DLPACK_FLAG_BITMASK_READ_ONLY
+diff --git a/cupy/cuda/cupy_jitify.h b/cupy/cuda/cupy_jitify.h
+index d734e9fca..e444667c0 100644
+--- a/cupy/cuda/cupy_jitify.h
++++ b/cupy/cuda/cupy_jitify.h
+@@ -6,7 +6,7 @@
+ 
+ #if !defined(CUPY_NO_CUDA) && !defined(CUPY_USE_HIP)
+ 
+-#include <cupy/_jitify/jitify.hpp>
++#include <jitify.hpp>
+ namespace jitify {
+ namespace detail {
+ const char* jitify_ver = _xstr_(CUPY_JITIFY_VERSION_CODE);
+diff --git a/install/cupy_builder/_features.py b/install/cupy_builder/_features.py
+index 4d732fdf8..afa5940d8 100644
+--- a/install/cupy_builder/_features.py
++++ b/install/cupy_builder/_features.py
+@@ -1,4 +1,5 @@
+ import sys
++import os, re
+ from typing import Any, Dict, List
+ 
+ import cupy_builder.install_build as build
+@@ -216,8 +217,6 @@ def get_features(ctx: Context) -> Dict[str, Feature]:
+         'libraries': [
+             'cudnn',
+         ],
+-        'check_method': build.check_cudnn_version,
+-        'version_method': build.get_cudnn_version,
+     }
+     CUDA_nccl = {
+         'name': 'nccl',
+@@ -230,8 +229,6 @@ def get_features(ctx: Context) -> Dict[str, Feature]:
+         'libraries': [
+             'nccl',
+         ],
+-        'check_method': build.check_nccl_version,
+-        'version_method': build.get_nccl_version,
+     }
+     CUDA_nvtx = {
+         'name': 'nvtx',
+@@ -272,8 +269,6 @@ def get_features(ctx: Context) -> Dict[str, Feature]:
+         ],
+         'libraries': list(_cudart_static_libs),
+         'static_libraries': ['cudart_static'],
+-        'check_method': build.check_cub_version,
+-        'version_method': build.get_cub_version,
+     }
+     CUDA_jitify = {
+         'name': 'jitify',
+@@ -292,8 +287,6 @@ def get_features(ctx: Context) -> Dict[str, Feature]:
+             'nvrtc',
+         ] + _cudart_static_libs,
+         'static_libraries': ['cudart_static'],
+-        'check_method': build.check_jitify_version,
+-        'version_method': build.get_jitify_version,
+     }
+     CUDA_random = {
+         'name': 'random',
+@@ -369,8 +362,6 @@ def get_features(ctx: Context) -> Dict[str, Feature]:
+         'libraries': [
+             'rccl',
+         ],
+-        'check_method': build.check_nccl_version,
+-        'version_method': build.get_nccl_version,
+     }
+     HIP_thrust = {
+         'name': 'thrust',
+@@ -396,8 +387,6 @@ def get_features(ctx: Context) -> Dict[str, Feature]:
+         ],
+         'libraries': list(_cudart_static_libs),
+         'static_libraries': ['cudart_static'],
+-        'check_method': build.check_thrust_version,
+-        'version_method': build.get_thrust_version,
+     }
+     COMMON_dlpack = {
+         'name': 'dlpack',
+@@ -406,7 +395,7 @@ def get_features(ctx: Context) -> Dict[str, Feature]:
+             'cupy._core.dlpack',
+         ],
+         'include': [
+-            'cupy/_dlpack/dlpack.h',
++            'dlpack/dlpack.h',
+         ],
+         'libraries': [],
+     }
+@@ -424,15 +413,12 @@ def get_features(ctx: Context) -> Dict[str, Feature]:
+         features = [
+             CUDA_cuda(ctx),
+             _from_dict(CUDA_cusolver, ctx),
+-            _from_dict(CUDA_cudnn, ctx),
+             _from_dict(CUDA_nccl, ctx),
+             _from_dict(CUDA_nvtx, ctx),
+-            _from_dict(CUDA_cutensor, ctx),
+             _from_dict(CUDA_cub, ctx),
+             _from_dict(CUDA_jitify, ctx),
+             _from_dict(CUDA_random, ctx),
+             _from_dict(CUDA_thrust, ctx),
+-            _from_dict(CUDA_cusparselt, ctx),
+             _from_dict(COMMON_dlpack, ctx),
+         ]
+     return {f.name: f for f in features}
+@@ -467,19 +453,18 @@ class CUDA_cuda(Feature):
+ 
+     def configure(self, compiler: Any, settings: Any) -> bool:
+         try:
+-            out = build.build_and_run(compiler, '''
+-            #include <cuda.h>
+-            #include <stdio.h>
+-            int main() {
+-              printf("%d", CUDA_VERSION);
+-              return 0;
+-            }
+-            ''', include_dirs=settings['include_dirs'])  # type: ignore[no-untyped-call] # NOQA
++            cuda_version_str = os.getenv('CUDA_VERSION')
++            match = re.match(r'^(\d+)\.(\d+)', cuda_version_str)
++            if match:
++                major, minor = match.groups()
++                out = 1000*int(major) + 10*int(minor)
++            else:
++                return False
+         except Exception as e:
+             utils.print_warning('Cannot check CUDA version', str(e))
+             return False
+ 
+-        self._version = int(out)
++        self._version = out
+ 
+         if self._version < self.minimum_cuda_version:
+             utils.print_warning(
+diff --git a/install/cupy_builder/_preflight.py b/install/cupy_builder/_preflight.py
+index ad5273bf0..6ef35a95c 100644
+--- a/install/cupy_builder/_preflight.py
++++ b/install/cupy_builder/_preflight.py
+@@ -5,47 +5,4 @@ from cupy_builder import Context
+ 
+ 
+ def preflight_check(ctx: Context) -> bool:
+-    if sys.platform not in ('linux', 'win32'):
+-        print('Error: macOS is no longer supported', file=sys.stderr)
+-        return False
+-
+-    source_root = ctx.source_root
+-    is_git = os.path.isdir(os.path.join(source_root, '.git'))
+-    for submodule in ('third_party/cccl',
+-                      'third_party/jitify',
+-                      'third_party/dlpack'):
+-        dirpath = os.path.join(source_root, submodule)
+-        if os.path.isdir(dirpath):
+-            if 0 < len(os.listdir(dirpath)):
+-                continue
+-        else:
+-            if not is_git:
+-                # sdist does not contain third_party directory
+-                continue
+-
+-        if is_git:
+-            msg = f'''
+-===========================================================================
+-The directory {submodule} is a git submodule but is currently empty.
+-Please use the command:
+-
+-    $ git submodule update --init
+-
+-to populate the directory before building from source.
+-===========================================================================
+-        '''
+-        else:
+-            msg = f'''
+-===========================================================================
+-The directory {submodule} is a git submodule but is currently empty.
+-Instead of using ZIP/TAR archive downloaded from GitHub, use
+-
+-    $ git clone --recursive https://github.com/cupy/cupy.git
+-
+-to get a buildable CuPy source tree.
+-===========================================================================
+-        '''
+-
+-        print(msg, file=sys.stderr)
+-        return False
+     return True
+diff --git a/install/cupy_builder/cupy_setup_build.py b/install/cupy_builder/cupy_setup_build.py
+index 54c77792f..9ff8463e2 100644
+--- a/install/cupy_builder/cupy_setup_build.py
++++ b/install/cupy_builder/cupy_setup_build.py
+@@ -214,10 +214,6 @@ def preconfigure_modules(ctx: Context, MODULES, compiler, settings):
+             if module['name'] == 'cuda':
+                 break
+ 
+-    # Get a list of the CC of the devices connected to this node
+-    if not ctx.use_hip:
+-        build.check_compute_capabilities(compiler, settings)
+-
+     if len(ret) != len(MODULES):
+         if 'cuda' in ret:
+             lines = [
+@@ -305,10 +301,6 @@ def make_extensions(ctx: Context, compiler, use_cython):
+     settings['library_dirs'] = [
+         x for x in settings['library_dirs'] if os.path.exists(x)]
+ 
+-    # Adjust rpath to use CUDA libraries in `cupy/.data/lib/*.so`) from CuPy.
+-    use_wheel_libs_rpath = (
+-        0 < len(ctx.wheel_libs) and not PLATFORM_WIN32)
+-
+     # In the environment with CUDA 7.5 on Ubuntu 16.04, gcc5.3 does not
+     # automatically deal with memcpy because string.h header file has
+     # been changed. This is a workaround for that environment.
+@@ -415,20 +407,9 @@ def make_extensions(ctx: Context, compiler, use_cython):
+             if compiler.compiler_type == 'msvc':
+                 compile_args.append('-D_USE_MATH_DEFINES')
+ 
+-        if module['name'] == 'jitify':
+-            # this fixes RTD (no_cuda) builds...
+-            compile_args.append('--std=c++11')
+-            # suppress printing Jitify logging to stdout
+-            compile_args.append('-DJITIFY_PRINT_LOG=0')
+-            # Uncomment to diagnose Jitify issues.
+-            # compile_args.append('-DJITIFY_PRINT_ALL')
+-
+-            # if any change is made to the Jitify header, we force recompiling
+-            s['depends'] = ['./cupy/_core/include/cupy/_jitify/jitify.hpp']
+-
+         if module['name'] == 'dlpack':
+             # if any change is made to the DLPack header, we force recompiling
+-            s['depends'] = ['./cupy/_core/include/cupy/_dlpack/dlpack.h']
++            s['depends'] = ['dlpack/dlpack.h']
+ 
+         for f in module['file']:
+             s_file = copy.deepcopy(s)
+@@ -438,21 +419,6 @@ def make_extensions(ctx: Context, compiler, use_cython):
+                 continue
+ 
+             rpath = []
+-            if not ctx.no_rpath:
+-                # Add library directories (e.g., `/usr/local/cuda/lib64`) to
+-                # RPATH.
+-                rpath += s_file['library_dirs']
+-
+-            if use_wheel_libs_rpath:
+-                # Add `cupy/.data/lib` (where shared libraries included in
+-                # wheels reside) to RPATH.
+-                # The path is resolved relative to the module, e.g., use
+-                # `$ORIGIN/../cupy/.data/lib` for `cupy/cudnn.so` and
+-                # `$ORIGIN/../../../cupy/.data/lib` for
+-                # `cupy_backends/cuda/libs/cudnn.so`.
+-                depth = name.count('.')
+-                rpath.append(
+-                    '{}{}/cupy/.data/lib'.format(_rpath_base(), '/..' * depth))
+ 
+             if (PLATFORM_LINUX and len(rpath) != 0):
+                 ldflag = '-Wl,'
+-- 
+2.34.1
+
