@@ -1,0 +1,27 @@
+From 18c26a4c0c58fcbce8bae39bd7cbac798fafcce9 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Tue, 29 Apr 2025 10:51:35 +0100
+Subject: [PATCH 2/2] update tl-expected project version
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index e2c897f..410b489 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.14)
+ project(tl-expected
+   HOMEPAGE_URL https://tl.tartanllama.xyz
+   DESCRIPTION "C++11/14/17 std::expected with functional-style extensions"
+-  VERSION 1.0.0
++  VERSION 1.1.0
+   LANGUAGES CXX)
+ 
+ include(CMakePackageConfigHelpers)
+-- 
+2.34.1
+
