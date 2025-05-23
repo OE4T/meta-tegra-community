@@ -1,0 +1,27 @@
+From 1ad32e1e25268c655fcb501794365f048f805bf0 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Wed, 30 Apr 2025 17:22:31 +0100
+Subject: [PATCH] Update CPM.cmake md5sum
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ rapids-cmake/cpm/detail/download.cmake | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/rapids-cmake/cpm/detail/download.cmake b/rapids-cmake/cpm/detail/download.cmake
+index 1f67704..8e0ed08 100644
+--- a/rapids-cmake/cpm/detail/download.cmake
++++ b/rapids-cmake/cpm/detail/download.cmake
+@@ -43,7 +43,7 @@ function(rapids_cpm_download)
+ 
+   # When changing version verify no new variables needs to be propagated
+   set(CPM_DOWNLOAD_VERSION 0.38.5)
+-  set(CPM_DOWNLOAD_MD5_HASH c98d14a13dfd1952e115979c095f6794)
++  set(CPM_DOWNLOAD_MD5_HASH 4fd11e0f185bb9c6dc9931f2ae6248d7)
+ 
+   if(CPM_SOURCE_CACHE)
+     # Expand relative path. This is important if the provided path contains a tilde (~)
+-- 
+2.34.1
+
