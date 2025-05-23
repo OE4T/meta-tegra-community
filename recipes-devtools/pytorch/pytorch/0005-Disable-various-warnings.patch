@@ -1,0 +1,111 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ian Stewart <istewart@nvidia.com>
+Date: Fri, 19 Jan 2024 11:19:30 -0700
+Subject: Disable various warnings
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ian Stewart <istewart@nvidia.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index dea7f648c..662fa783a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1042,8 +1042,6 @@ if(NOT MSVC)
+ 
+   append_cxx_flag_if_supported("-Wno-error=old-style-cast" CMAKE_CXX_FLAGS)
+   append_cxx_flag_if_supported("-Wconstant-conversion" CMAKE_CXX_FLAGS)
+-  append_cxx_flag_if_supported("-Wno-aligned-allocation-unavailable"
+-                               CMAKE_CXX_FLAGS)
+   append_cxx_flag_if_supported("-Wno-missing-braces" CMAKE_CXX_FLAGS)
+   append_cxx_flag_if_supported("-Qunused-arguments" CMAKE_CXX_FLAGS)
+ 
+@@ -1076,6 +1074,11 @@ if(NOT MSVC)
+   append_cxx_flag_if_supported("-fno-math-errno" CMAKE_CXX_FLAGS)
+   append_cxx_flag_if_supported("-fno-trapping-math" CMAKE_CXX_FLAGS)
+   append_cxx_flag_if_supported("-Werror=format" CMAKE_CXX_FLAGS)
++  append_cxx_flag_if_supported("-Wno-redundant-move" CMAKE_CXX_FLAGS)
++  append_cxx_flag_if_supported("-Wno-infinite-recursion" CMAKE_CXX_FLAGS)
++  append_cxx_flag_if_supported("-Wno-dangling-reference" CMAKE_CXX_FLAGS)
++  append_cxx_flag_if_supported("-Wno-narrowing" CMAKE_CXX_FLAGS)
++  append_cxx_flag_if_supported("-Wno-deprecated-declarations" CMAKE_CXX_FLAGS)
+ else()
+   # skip unwanted includes from windows.h
+   add_compile_definitions(WIN32_LEAN_AND_MEAN)
+diff --git a/third_party/NNPACK/CMakeLists.txt b/third_party/NNPACK/CMakeLists.txt
+index 5ecd2df1b..d808915a4 100644
+--- a/third_party/NNPACK/CMakeLists.txt
++++ b/third_party/NNPACK/CMakeLists.txt
+@@ -31,6 +31,7 @@ MACRO(NNPACK_TARGET_ENABLE_C99 target)
+       C_STANDARD 99
+       C_EXTENSIONS YES)
+   ENDIF()
++  TARGET_COMPILE_OPTIONS(${target} PRIVATE -Wno-stringop-overflow)
+ ENDMACRO()
+ 
+ MACRO(NNPACK_TARGET_ENABLE_CXX11 target)
+diff --git a/third_party/cpuinfo/CMakeLists.txt b/third_party/cpuinfo/CMakeLists.txt
+index bd9f77f87..94f947da1 100644
+--- a/third_party/cpuinfo/CMakeLists.txt
++++ b/third_party/cpuinfo/CMakeLists.txt
+@@ -263,6 +263,7 @@ ADD_LIBRARY(cpuinfo_internals STATIC ${CPUINFO_SRCS})
+ CPUINFO_TARGET_ENABLE_C99(cpuinfo)
+ CPUINFO_TARGET_ENABLE_C99(cpuinfo_internals)
+ CPUINFO_TARGET_RUNTIME_LIBRARY(cpuinfo)
++CPUINFO_TARGET_RUNTIME_LIBRARY(cpuinfo_internals)
+ IF(CMAKE_SYSTEM_NAME MATCHES "^(Windows|WindowsStore|CYGWIN|MSYS)$")
+   # Target Windows 7+ API
+   TARGET_COMPILE_DEFINITIONS(cpuinfo PRIVATE _WIN32_WINNT=0x0601 _CRT_SECURE_NO_WARNINGS)
+diff --git a/third_party/cpuinfo/deps/clog/CMakeLists.txt b/third_party/cpuinfo/deps/clog/CMakeLists.txt
+index 6e50c41c3..4d38de2fc 100644
+--- a/third_party/cpuinfo/deps/clog/CMakeLists.txt
++++ b/third_party/cpuinfo/deps/clog/CMakeLists.txt
+@@ -32,6 +32,7 @@ MACRO(CLOG_TARGET_RUNTIME_LIBRARY target)
+         "/MT$<$<CONFIG:Debug>:d>")
+     ENDIF()
+   ENDIF()
++  TARGET_COMPILE_OPTIONS(${target} PRIVATE -Wno-unused-result)
+ ENDMACRO()
+ 
+ # ---[ Download deps
+diff --git a/third_party/kineto/libkineto/CMakeLists.txt b/third_party/kineto/libkineto/CMakeLists.txt
+index 140ee6882..ece40262b 100644
+--- a/third_party/kineto/libkineto/CMakeLists.txt
++++ b/third_party/kineto/libkineto/CMakeLists.txt
+@@ -193,6 +193,8 @@ endif()
+ target_compile_options(kineto_base PRIVATE "${KINETO_COMPILE_OPTIONS}")
+ target_compile_options(kineto_api PRIVATE "${KINETO_COMPILE_OPTIONS}")
+ 
++target_compile_options(kineto_base PRIVATE -Wno-terminate)
++
+ if(NOT TARGET fmt)
+   if(NOT FMT_SOURCE_DIR)
+     set(FMT_SOURCE_DIR "${LIBKINETO_THIRDPARTY_DIR}/fmt"
+diff --git a/third_party/onnx/CMakeLists.txt b/third_party/onnx/CMakeLists.txt
+index b666eec48..3f1c5b58b 100644
+--- a/third_party/onnx/CMakeLists.txt
++++ b/third_party/onnx/CMakeLists.txt
+@@ -697,6 +697,7 @@ elseif(APPLE)
+ 
+ else()
+   target_compile_options(onnx PRIVATE -Wall -Wextra)
++  target_compile_options(onnx PRIVATE -Wno-maybe-uninitialized)
+ endif()
+ 
+ if(APPLE)
+diff --git a/third_party/tensorpipe/third_party/libuv/CMakeLists.txt b/third_party/tensorpipe/third_party/libuv/CMakeLists.txt
+index c8e881d18..09996d2ab 100644
+--- a/third_party/tensorpipe/third_party/libuv/CMakeLists.txt
++++ b/third_party/tensorpipe/third_party/libuv/CMakeLists.txt
+@@ -105,6 +105,9 @@ list(APPEND uv_cflags ${lint-utf8-msvc} )
+ check_c_compiler_flag(-fno-strict-aliasing UV_F_STRICT_ALIASING)
+ list(APPEND uv_cflags $<$<BOOL:${UV_F_STRICT_ALIASING}>:-fno-strict-aliasing>)
+ 
++list(APPEND uv_cflags -Wno-dangling-pointer)
++list(APPEND uv_cflags -Wno-sign-compare)
++
+ set(uv_sources
+     src/fs-poll.c
+     src/idna.c
+-- 
+2.34.1
+

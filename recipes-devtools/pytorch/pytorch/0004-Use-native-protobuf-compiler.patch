@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ian Stewart <istewart@nvidia.com>
+Date: Fri, 19 Jan 2024 12:36:09 -0700
+Subject: Use native protobuf compiler
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ian Stewart <istewart@nvidia.com>
+
+diff --git a/cmake/public/protobuf.cmake b/cmake/public/protobuf.cmake
+index 77ec3622b..e64f92bca 100644
+--- a/cmake/public/protobuf.cmake
++++ b/cmake/public/protobuf.cmake
+@@ -6,12 +6,19 @@ if(NOT Protobuf_FOUND)
+   find_package(Protobuf MODULE QUIET)
+ endif()
+ 
+-if((TARGET protobuf::libprotobuf OR TARGET protobuf::libprotobuf-lite) AND TARGET protobuf::protoc)
++if(TARGET protobuf::libprotobuf OR TARGET protobuf::libprotobuf-lite)
+   # Hooray. This is the most ideal situation, meaning that you either have a
+   # Protobuf config file installed (like on Windows), or you are using a
+   # modern CMake that ships with a FindProtobuf.cmake file that produces
+   # modern targets.
+   message(STATUS "Caffe2: Found protobuf with new-style protobuf targets.")
++
++  # Use the native protobuf compiler.
++  if(NOT TARGET protobuf::protoc)
++    add_executable(protobuf::protoc IMPORTED)
++    set_property(TARGET protobuf::protoc PROPERTY
++        IMPORTED_LOCATION ${PROTOBUF_PROTOC_EXECUTABLE})
++  endif()
+ elseif(Protobuf_FOUND OR PROTOBUF_FOUND)
+   # If the modern targets are not present, we will generate them for you for
+   # backward compatibility. This is backported from CMake's new FindProtobuf.cmake
+-- 
+2.34.1
+
