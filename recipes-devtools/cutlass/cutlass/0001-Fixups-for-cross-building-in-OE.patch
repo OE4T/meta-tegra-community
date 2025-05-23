@@ -1,0 +1,105 @@
+From dfc2e61a0ff83a6abf3e6db69903a1ff2d79d6ea Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 28 Apr 2025 10:55:04 +0100
+Subject: [PATCH] Fixups for cross building in OE
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ CMakeLists.txt                 | 23 -----------------------
+ cmake/googletest.cmake         | 24 +-----------------------
+ python/cutlass/emit/pytorch.py |  5 -----
+ 3 files changed, 1 insertion(+), 51 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 7419bdf5..5fd29087 100755
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -146,16 +146,6 @@ endif()
+ 
+ ################################################################################
+ 
+-set(CUTLASS_NVCC_ARCHS_SUPPORTED "")
+-if (CUDA_VERSION VERSION_GREATER_EQUAL 11.4 AND NOT CUDA_COMPILER MATCHES "[Cc]lang")
+-  list(APPEND CUTLASS_NVCC_ARCHS_SUPPORTED 70 72 75 80 86 87)
+-endif()
+-if (CUDA_VERSION VERSION_GREATER_EQUAL 11.8 AND NOT CUDA_COMPILER MATCHES "[Cc]lang")
+-  list(APPEND CUTLASS_NVCC_ARCHS_SUPPORTED 89 90)
+-endif()
+-if (CUDA_VERSION VERSION_GREATER_EQUAL 12.0 AND NOT CUDA_COMPILER MATCHES "[Cc]lang")
+-  list(APPEND CUTLASS_NVCC_ARCHS_SUPPORTED 90a)
+-endif()
+ set(CUTLASS_NVCC_ARCHS ${CUTLASS_NVCC_ARCHS_SUPPORTED} CACHE STRING "The SM architectures requested.")
+ set(CUTLASS_NVCC_ARCHS_ENABLED ${CUTLASS_NVCC_ARCHS} CACHE STRING "The SM architectures to build code for.")
+ 
+@@ -716,19 +706,6 @@ if (DOXYGEN_FOUND)
+     )
+ endif()
+ 
+-if(NOT WIN32)
+-  # Add common library search paths so executables and libraries can load and run
+-  # without LD_LIBRARY_PATH being set.
+-  link_libraries(
+-    "-Wl,-rpath,'$ORIGIN'"
+-    "-Wl,-rpath,'$ORIGIN/../lib64'"
+-    "-Wl,-rpath,'$ORIGIN/../lib'"
+-    "-Wl,-rpath,'${CUDA_TOOLKIT_ROOT_DIR}/lib64'"
+-    "-Wl,-rpath,'${CUDA_TOOLKIT_ROOT_DIR}/lib'"
+-    ${CMAKE_DL_LIBS}
+-    )
+-endif()
+-
+ ################################################################################
+ 
+ include(CTest)
+diff --git a/cmake/googletest.cmake b/cmake/googletest.cmake
+index 0350fb2d..f675eb03 100644
+--- a/cmake/googletest.cmake
++++ b/cmake/googletest.cmake
+@@ -26,26 +26,4 @@
+ # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-include(FetchContent)
+-
+-set(GOOGLETEST_DIR "" CACHE STRING "Location of local GoogleTest repo to build against")
+-
+-if(GOOGLETEST_DIR)
+-  set(FETCHCONTENT_SOURCE_DIR_GOOGLETEST ${GOOGLETEST_DIR} CACHE STRING "GoogleTest source directory override")
+-endif()
+-
+-FetchContent_Declare(
+-  googletest
+-  GIT_REPOSITORY https://github.com/google/googletest.git
+-  GIT_TAG        v1.14.0
+-  )
+-
+-FetchContent_GetProperties(googletest)
+-
+-if(NOT googletest_POPULATED)
+-  FetchContent_Populate(googletest)
+-  if (MSVC)
+-    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+-  endif()
+-  add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR} EXCLUDE_FROM_ALL)
+-endif()
++find_package(GTest 1.16.0 REQUIRED)
+diff --git a/python/cutlass/emit/pytorch.py b/python/cutlass/emit/pytorch.py
+index ac13e866..75acfb6c 100644
+--- a/python/cutlass/emit/pytorch.py
++++ b/python/cutlass/emit/pytorch.py
+@@ -766,11 +766,6 @@ def _pytorch_gemm(op, name: str, cc: int, jit: bool = False, sourcedir: str = ""
+     with open(cpp_file, "w") as outfile:
+         outfile.write(cpp_source)
+ 
+-    extra_compile_args = ""
+-    if cc == 90:
+-        extra_compile_args = "'--generate-code=arch=compute_90a,code=[sm_90a]'"
+-    _generate_setup(name, sourcedir, extra_compile_args)
+-
+     if jit:
+         return _jit(name, cc, cpp_file, cuda_file)
+ 
+-- 
+2.34.1
+
