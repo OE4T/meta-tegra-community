@@ -1,0 +1,934 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ian Stewart <istewart@nvidia.com>
+Date: Thu, 18 Jan 2024 16:03:50 -0700
+Subject: Fix CUDA build rules
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ian Stewart <istewart@nvidia.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index fdcb891ed..dea7f648c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -62,18 +62,10 @@ if(CMAKE_COMPILER_IS_GNUCXX AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.3)
+   )
+ endif()
+ 
+-# This define is needed to preserve behavior given anticpated changes to
+-# cccl/thrust
+-# https://nvidia.github.io/libcudacxx/standard_api/numerics_library/complex.html
+-string(APPEND CMAKE_CUDA_FLAGS
+-       " -DLIBCUDACXX_ENABLE_SIMPLIFIED_COMPLEX_OPERATIONS")
+-
+ if(LINUX)
+   include(cmake/CheckAbi.cmake)
+   string(APPEND CMAKE_CXX_FLAGS
+          " -D_GLIBCXX_USE_CXX11_ABI=${GLIBCXX_USE_CXX11_ABI}")
+-  string(APPEND CMAKE_CUDA_FLAGS
+-         " -D_GLIBCXX_USE_CXX11_ABI=${GLIBCXX_USE_CXX11_ABI}")
+   if(${GLIBCXX_USE_CXX11_ABI} EQUAL 1)
+     set(CXX_STANDARD_REQUIRED ON)
+   else()
+@@ -659,8 +651,6 @@ if(MSVC)
+   string(APPEND CMAKE_CUDA_FLAGS " -Xcompiler /FS")
+ endif(MSVC)
+ 
+-string(APPEND CMAKE_CUDA_FLAGS " -Xfatbin -compress-all")
+-
+ # Set INTERN_BUILD_MOBILE for all mobile builds. Components that are not
+ # applicable to mobile are disabled by this variable. Setting
+ # `BUILD_PYTORCH_MOBILE_WITH_HOST_TOOLCHAIN` environment variable can force it
+@@ -1291,14 +1281,6 @@ if(BUILD_SHARED_LIBS)
+           ${PROJECT_SOURCE_DIR}/cmake/public/LoadHIP.cmake
+     DESTINATION share/cmake/Caffe2/public
+     COMPONENT dev)
+-  install(
+-    FILES ${PROJECT_SOURCE_DIR}/cmake/Modules/FindCUDAToolkit.cmake
+-    DESTINATION share/cmake/Caffe2/
+-    COMPONENT dev)
+-  install(
+-    FILES ${PROJECT_SOURCE_DIR}/cmake/Modules/FindCUSPARSELT.cmake
+-    DESTINATION share/cmake/Caffe2/
+-    COMPONENT dev)
+   install(
+     FILES ${PROJECT_SOURCE_DIR}/cmake/Modules/FindCUDSS.cmake
+     DESTINATION share/cmake/Caffe2/
+diff --git a/aten/src/ATen/CMakeLists.txt b/aten/src/ATen/CMakeLists.txt
+index 6d9152a4d..e7ec0e541 100644
+--- a/aten/src/ATen/CMakeLists.txt
++++ b/aten/src/ATen/CMakeLists.txt
+@@ -265,7 +265,9 @@ if(USE_CUDA AND USE_ROCM)
+ endif()
+ 
+ if(USE_CUDA)
+-  list(APPEND ATen_CUDA_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
++  list(APPEND ATen_CUDA_INCLUDE
++    ${CMAKE_CURRENT_SOURCE_DIR}/cuda
++    ${CUDAToolkit_INCLUDE_DIRS})
+   list(APPEND ATen_CUDA_CU_SRCS
+     ${cuda_cu}
+     ${native_cuda_cu}
+diff --git a/c10/cuda/CMakeLists.txt b/c10/cuda/CMakeLists.txt
+index 3327dab47..cd81d80e7 100644
+--- a/c10/cuda/CMakeLists.txt
++++ b/c10/cuda/CMakeLists.txt
+@@ -72,6 +72,8 @@ if(NOT BUILD_LIBTORCHLESS)
+   target_compile_options(c10_cuda PRIVATE "-DPYTORCH_C10_DRIVER_API_SUPPORTED")
+   endif()
+ 
++target_include_directories(
++    c10_cuda PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+   target_include_directories(
+       c10_cuda PUBLIC
+       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../..>
+diff --git a/caffe2/CMakeLists.txt b/caffe2/CMakeLists.txt
+index 9be7f3732..6363ff444 100644
+--- a/caffe2/CMakeLists.txt
++++ b/caffe2/CMakeLists.txt
+@@ -549,6 +549,7 @@ if(USE_CUDA)
+   endif()
+ 
+   target_link_libraries(caffe2_nvrtc PRIVATE caffe2::nvrtc ${DELAY_LOAD_FLAGS})
++  target_include_directories(caffe2_nvrtc PRIVATE ${CUDA_INCLUDE_DIRS})
+   install(TARGETS caffe2_nvrtc DESTINATION "${TORCH_INSTALL_LIB_DIR}")
+   if(USE_NCCL)
+     list(APPEND Caffe2_GPU_SRCS
+@@ -591,27 +592,6 @@ if(BUILD_ONEDNN_GRAPH)
+   )
+ endif()
+ 
+-if(USE_ROCM)
+-  list(APPEND Caffe2_HIP_SRCS ${Caffe2_GPU_HIP_JIT_FUSERS_SRCS})
+-  if(USE_NCCL)
+-    list(APPEND Caffe2_HIP_SRCS
+-      ${TORCH_SRC_DIR}/csrc/cuda/nccl.cpp)
+-  endif()
+-  if(USE_DISTRIBUTED)
+-    append_filelist("libtorch_cuda_distributed_base_sources" Caffe2_HIP_SRCS)
+-    if(NOT WIN32)
+-      append_filelist("libtorch_cuda_distributed_extra_sources" Caffe2_HIP_SRCS)
+-    endif()
+-  endif()
+-  # caffe2_nvrtc's stubs to driver APIs are useful for HIP.
+-  # See NOTE [ ATen NVRTC Stub and HIP ]
+-  add_library(caffe2_nvrtc SHARED ${ATen_NVRTC_STUB_SRCS})
+-  target_link_libraries(caffe2_nvrtc ${PYTORCH_HIP_LIBRARIES} ${ROCM_HIPRTC_LIB})
+-  target_include_directories(caffe2_nvrtc PRIVATE ${CMAKE_BINARY_DIR})
+-  target_compile_definitions(caffe2_nvrtc PRIVATE USE_ROCM __HIP_PLATFORM_AMD__)
+-  install(TARGETS caffe2_nvrtc DESTINATION "${TORCH_INSTALL_LIB_DIR}")
+-endif()
+-
+ if(NOT NO_API AND NOT BUILD_LITE_INTERPRETER)
+   list(APPEND TORCH_SRCS
+     ${TORCH_SRC_DIR}/csrc/api/src/cuda.cpp
+@@ -1518,8 +1498,6 @@ if(USE_CUDA)
+   target_link_libraries(torch_cuda PUBLIC c10_cuda)
+   if(TARGET torch::nvtx3)
+     target_link_libraries(torch_cuda PRIVATE torch::nvtx3)
+-  else()
+-    target_link_libraries(torch_cuda PUBLIC torch::nvtoolsext)
+   endif()
+ 
+   target_include_directories(
+diff --git a/cmake/Codegen.cmake b/cmake/Codegen.cmake
+index d221f5844..7974dfcd3 100644
+--- a/cmake/Codegen.cmake
++++ b/cmake/Codegen.cmake
+@@ -69,21 +69,6 @@ if(INTERN_BUILD_ATEN_OPS)
+ 
+   file(GLOB_RECURSE all_python "${CMAKE_CURRENT_LIST_DIR}/../torchgen/*.py")
+ 
+-  # RowwiseScaled.cu requires sm90a flags
+-  if(USE_CUDA)
+-    set(ROWWISE_SCALED_MM_FILE "${CMAKE_CURRENT_LIST_DIR}/../aten/src/ATen/native/cuda/RowwiseScaledMM.cu")
+-
+-    # Get existing arch flags
+-    torch_cuda_get_nvcc_gencode_flag(EXISTING_ARCH_FLAGS)
+-
+-    # Check NVCC version and existing arch flags
+-    if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 12.0 AND
+-      EXISTING_ARCH_FLAGS MATCHES ".*compute_90.*")
+-      set_source_files_properties(${ROWWISE_SCALED_MM_FILE}
+-        PROPERTIES COMPILE_FLAGS "-gencode arch=compute_90a,code=sm_90a")
+-    endif()
+-  endif()
+-
+   set(GEN_ROCM_FLAG)
+   if(USE_ROCM)
+     set(GEN_ROCM_FLAG --rocm)
+diff --git a/cmake/Dependencies.cmake b/cmake/Dependencies.cmake
+index e78305e0a..64208d97b 100644
+--- a/cmake/Dependencies.cmake
++++ b/cmake/Dependencies.cmake
+@@ -1160,7 +1160,6 @@ if(USE_DISTRIBUTED AND USE_TENSORPIPE)
+     set(TP_STATIC_OR_SHARED STATIC CACHE STRING "" FORCE)
+ 
+     # Tensorpipe uses cuda_add_library
+-    torch_update_find_cuda_flags()
+     add_subdirectory(${PROJECT_SOURCE_DIR}/third_party/tensorpipe)
+ 
+     list(APPEND Caffe2_DEPENDENCY_LIBS tensorpipe)
+@@ -1333,7 +1332,6 @@ endif()
+ 
+ if(NOT INTERN_BUILD_MOBILE)
+   set(TORCH_CUDA_ARCH_LIST $ENV{TORCH_CUDA_ARCH_LIST})
+-  string(APPEND CMAKE_CUDA_FLAGS " $ENV{TORCH_NVCC_FLAGS}")
+   set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
+ 
+   # Top-level build config
+@@ -1355,19 +1353,6 @@ if(NOT INTERN_BUILD_MOBILE)
+     string(APPEND CMAKE_CUDA_FLAGS " -Xcompiler=/wd4819,/wd4503,/wd4190,/wd4244,/wd4251,/wd4275,/wd4522")
+   endif()
+ 
+-  string(APPEND CMAKE_CUDA_FLAGS " -Wno-deprecated-gpu-targets --expt-extended-lambda")
+-
+-  # use cub in a safe manner, see:
+-  # https://github.com/pytorch/pytorch/pull/55292
+-  string(APPEND CMAKE_CUDA_FLAGS " -DCUB_WRAPPED_NAMESPACE=at_cuda_detail")
+-
+-  message(STATUS "Found CUDA with FP16 support, compiling with torch.cuda.HalfTensor")
+-  string(APPEND CMAKE_CUDA_FLAGS " -DCUDA_HAS_FP16=1"
+-                                 " -D__CUDA_NO_HALF_OPERATORS__"
+-                                 " -D__CUDA_NO_HALF_CONVERSIONS__"
+-                                 " -D__CUDA_NO_HALF2_OPERATORS__"
+-                                 " -D__CUDA_NO_BFLOAT16_CONVERSIONS__")
+-
+   string(APPEND CMAKE_C_FLAGS_RELEASE " -DNDEBUG")
+   string(APPEND CMAKE_CXX_FLAGS_RELEASE " -DNDEBUG")
+   if(NOT GENERATOR_IS_MULTI_CONFIG)
+diff --git a/cmake/Modules/FindCUDNN.cmake b/cmake/Modules/FindCUDNN.cmake
+new file mode 100644
+index 000000000..82134328c
+--- /dev/null
++++ b/cmake/Modules/FindCUDNN.cmake
+@@ -0,0 +1,78 @@
++# Find the CUDNN libraries
++#
++# The following variables are optionally searched for defaults
++#  CUDNN_ROOT: Base directory where CUDNN is found
++#  CUDNN_INCLUDE_DIR: Directory where CUDNN header is searched for
++#  CUDNN_LIBRARY: Directory where CUDNN library is searched for
++#  CUDNN_STATIC: Are we looking for a static library? (default: no)
++#
++# The following are set after configuration is done:
++#  CUDNN_FOUND
++#  CUDNN_INCLUDE_PATH
++#  CUDNN_LIBRARY_PATH
++#
++
++include(FindPackageHandleStandardArgs)
++
++set(CUDNN_ROOT $ENV{CUDNN_ROOT_DIR} CACHE PATH "Folder containing NVIDIA cuDNN")
++if (DEFINED $ENV{CUDNN_ROOT_DIR})
++  message(WARNING "CUDNN_ROOT_DIR is deprecated. Please set CUDNN_ROOT instead.")
++endif()
++list(APPEND CUDNN_ROOT $ENV{CUDNN_ROOT_DIR} ${CUDA_TOOLKIT_ROOT_DIR})
++
++# Compatible layer for CMake <3.12. CUDNN_ROOT will be accounted in for searching paths and libraries for CMake >=3.12.
++list(APPEND CMAKE_PREFIX_PATH ${CUDNN_ROOT})
++
++set(CUDNN_INCLUDE_DIR $ENV{CUDNN_INCLUDE_DIR} CACHE PATH "Folder containing NVIDIA cuDNN header files")
++
++find_path(CUDNN_INCLUDE_PATH cudnn.h
++  HINTS ${CUDNN_INCLUDE_DIR}
++  PATH_SUFFIXES cuda/include cuda include)
++
++option(CUDNN_STATIC "Look for static CUDNN" OFF)
++if (CUDNN_STATIC)
++  set(CUDNN_LIBNAME "libcudnn_static.a")
++else()
++  set(CUDNN_LIBNAME "cudnn")
++endif()
++
++set(CUDNN_LIBRARY $ENV{CUDNN_LIBRARY} CACHE PATH "Path to the cudnn library file (e.g., libcudnn.so)")
++if (CUDNN_LIBRARY MATCHES ".*cudnn_static.a" AND NOT CUDNN_STATIC)
++  message(WARNING "CUDNN_LIBRARY points to a static library (${CUDNN_LIBRARY}) but CUDNN_STATIC is OFF.")
++endif()
++
++find_library(CUDNN_LIBRARY_PATH ${CUDNN_LIBNAME}
++  PATHS ${CUDNN_LIBRARY}
++  PATH_SUFFIXES lib lib64 cuda/lib cuda/lib64 lib/x64)
++
++find_package_handle_standard_args(CUDNN DEFAULT_MSG CUDNN_LIBRARY_PATH CUDNN_INCLUDE_PATH)
++
++if(CUDNN_FOUND)
++  # Get cuDNN version
++  if(EXISTS ${CUDNN_INCLUDE_PATH}/cudnn_version.h)
++    file(READ ${CUDNN_INCLUDE_PATH}/cudnn_version.h CUDNN_HEADER_CONTENTS)
++  else()
++    file(READ ${CUDNN_INCLUDE_PATH}/cudnn.h CUDNN_HEADER_CONTENTS)
++  endif()
++  string(REGEX MATCH "define CUDNN_MAJOR * +([0-9]+)"
++               CUDNN_VERSION_MAJOR "${CUDNN_HEADER_CONTENTS}")
++  string(REGEX REPLACE "define CUDNN_MAJOR * +([0-9]+)" "\\1"
++               CUDNN_VERSION_MAJOR "${CUDNN_VERSION_MAJOR}")
++  string(REGEX MATCH "define CUDNN_MINOR * +([0-9]+)"
++               CUDNN_VERSION_MINOR "${CUDNN_HEADER_CONTENTS}")
++  string(REGEX REPLACE "define CUDNN_MINOR * +([0-9]+)" "\\1"
++               CUDNN_VERSION_MINOR "${CUDNN_VERSION_MINOR}")
++  string(REGEX MATCH "define CUDNN_PATCHLEVEL * +([0-9]+)"
++               CUDNN_VERSION_PATCH "${CUDNN_HEADER_CONTENTS}")
++  string(REGEX REPLACE "define CUDNN_PATCHLEVEL * +([0-9]+)" "\\1"
++               CUDNN_VERSION_PATCH "${CUDNN_VERSION_PATCH}")
++  # Assemble cuDNN version
++  if(NOT CUDNN_VERSION_MAJOR)
++    set(CUDNN_VERSION "?")
++  else()
++    set(CUDNN_VERSION
++        "${CUDNN_VERSION_MAJOR}.${CUDNN_VERSION_MINOR}.${CUDNN_VERSION_PATCH}")
++  endif()
++endif()
++
++mark_as_advanced(CUDNN_ROOT CUDNN_INCLUDE_DIR CUDNN_LIBRARY CUDNN_VERSION)
+diff --git a/cmake/public/cuda.cmake b/cmake/public/cuda.cmake
+index afc1bc12a..a3904febb 100644
+--- a/cmake/public/cuda.cmake
++++ b/cmake/public/cuda.cmake
+@@ -9,45 +9,11 @@ endif()
+ # release (3.11.3) yet. Hence we need our own Modules_CUDA_fix to enable sccache.
+ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/../Modules_CUDA_fix)
+ 
+-# We don't want to statically link cudart, because we rely on it's dynamic linkage in
+-# python (follow along torch/cuda/__init__.py and usage of cudaGetErrorName).
+-# Technically, we can link cudart here statically, and link libtorch_python.so
+-# to a dynamic libcudart.so, but that's just wasteful.
+-# However, on Windows, if this one gets switched off, the error "cuda: unknown error"
+-# will be raised when running the following code:
+-# >>> import torch
+-# >>> torch.cuda.is_available()
+-# >>> torch.cuda.current_device()
+-# More details can be found in the following links.
+-# https://github.com/pytorch/pytorch/issues/20635
+-# https://github.com/pytorch/pytorch/issues/17108
+-if(NOT MSVC)
+-  set(CUDA_USE_STATIC_CUDA_RUNTIME OFF CACHE INTERNAL "")
+-endif()
+-
+ # Find CUDA.
+-find_package(CUDA)
+-if(NOT CUDA_FOUND)
+-  message(WARNING
+-    "Caffe2: CUDA cannot be found. Depending on whether you are building "
+-    "Caffe2 or a Caffe2 dependent library, the next warning / error will "
+-    "give you more info.")
+-  set(CAFFE2_USE_CUDA OFF)
+-  return()
+-endif()
++find_package(CUDAToolkit 12.0 REQUIRED)
+ 
+-# Enable CUDA language support
+-set(CUDAToolkit_ROOT "${CUDA_TOOLKIT_ROOT_DIR}")
+-# Pass clang as host compiler, which according to the docs
+-# Must be done before CUDA language is enabled, see
+-# https://cmake.org/cmake/help/v3.15/variable/CMAKE_CUDA_HOST_COMPILER.html
+-if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+-  set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_C_COMPILER}")
+-endif()
+ enable_language(CUDA)
+-if("X${CMAKE_CUDA_STANDARD}" STREQUAL "X" )
+-  set(CMAKE_CUDA_STANDARD ${CMAKE_CXX_STANDARD})
+-endif()
++set(CMAKE_CUDA_STANDARD ${CMAKE_CXX_STANDARD})
+ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+ 
+ # CMP0074 - find_package will respect <PackageName>_ROOT variables
+@@ -57,148 +23,10 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.12.0)
+ endif()
+ 
+ find_package(CUDAToolkit REQUIRED)
++set(CUDA_INCLUDE_DIRS ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+ 
+ cmake_policy(POP)
+ 
+-if(NOT CMAKE_CUDA_COMPILER_VERSION VERSION_EQUAL CUDAToolkit_VERSION)
+-  message(FATAL_ERROR "Found two conflicting CUDA versions:\n"
+-                      "V${CMAKE_CUDA_COMPILER_VERSION} in '${CUDA_INCLUDE_DIRS}' and\n"
+-                      "V${CUDAToolkit_VERSION} in '${CUDAToolkit_INCLUDE_DIRS}'")
+-endif()
+-
+-message(STATUS "Caffe2: CUDA detected: " ${CUDA_VERSION})
+-message(STATUS "Caffe2: CUDA nvcc is: " ${CUDA_NVCC_EXECUTABLE})
+-message(STATUS "Caffe2: CUDA toolkit directory: " ${CUDA_TOOLKIT_ROOT_DIR})
+-if(CUDA_VERSION VERSION_LESS 11.0)
+-  message(FATAL_ERROR "PyTorch requires CUDA 11.0 or above.")
+-endif()
+-
+-if(CUDA_FOUND)
+-  # Sometimes, we may mismatch nvcc with the CUDA headers we are
+-  # compiling with, e.g., if a ccache nvcc is fed to us by CUDA_NVCC_EXECUTABLE
+-  # but the PATH is not consistent with CUDA_HOME.  It's better safe
+-  # than sorry: make sure everything is consistent.
+-  if(MSVC AND CMAKE_GENERATOR MATCHES "Visual Studio")
+-    # When using Visual Studio, it attempts to lock the whole binary dir when
+-    # `try_run` is called, which will cause the build to fail.
+-    string(RANDOM BUILD_SUFFIX)
+-    set(PROJECT_RANDOM_BINARY_DIR "${PROJECT_BINARY_DIR}/${BUILD_SUFFIX}")
+-  else()
+-    set(PROJECT_RANDOM_BINARY_DIR "${PROJECT_BINARY_DIR}")
+-  endif()
+-  set(file "${PROJECT_BINARY_DIR}/detect_cuda_version.cc")
+-  file(WRITE ${file} ""
+-    "#include <cuda.h>\n"
+-    "#include <cstdio>\n"
+-    "int main() {\n"
+-    "  printf(\"%d.%d\", CUDA_VERSION / 1000, (CUDA_VERSION / 10) % 100);\n"
+-    "  return 0;\n"
+-    "}\n"
+-    )
+-  if(NOT CMAKE_CROSSCOMPILING)
+-    try_run(run_result compile_result ${PROJECT_RANDOM_BINARY_DIR} ${file}
+-      CMAKE_FLAGS "-DINCLUDE_DIRECTORIES=${CUDA_INCLUDE_DIRS}"
+-      LINK_LIBRARIES ${CUDA_LIBRARIES}
+-      RUN_OUTPUT_VARIABLE cuda_version_from_header
+-      COMPILE_OUTPUT_VARIABLE output_var
+-      )
+-    if(NOT compile_result)
+-      message(FATAL_ERROR "Caffe2: Couldn't determine version from header: " ${output_var})
+-    endif()
+-    message(STATUS "Caffe2: Header version is: " ${cuda_version_from_header})
+-    if(NOT cuda_version_from_header STREQUAL ${CUDA_VERSION_STRING})
+-      # Force CUDA to be processed for again next time
+-      # TODO: I'm not sure if this counts as an implementation detail of
+-      # FindCUDA
+-      set(${cuda_version_from_findcuda} ${CUDA_VERSION_STRING})
+-      unset(CUDA_TOOLKIT_ROOT_DIR_INTERNAL CACHE)
+-      # Not strictly necessary, but for good luck.
+-      unset(CUDA_VERSION CACHE)
+-      # Error out
+-      message(FATAL_ERROR "FindCUDA says CUDA version is ${cuda_version_from_findcuda} (usually determined by nvcc), "
+-        "but the CUDA headers say the version is ${cuda_version_from_header}.  This often occurs "
+-        "when you set both CUDA_HOME and CUDA_NVCC_EXECUTABLE to "
+-        "non-standard locations, without also setting PATH to point to the correct nvcc.  "
+-        "Perhaps, try re-running this command again with PATH=${CUDA_TOOLKIT_ROOT_DIR}/bin:$PATH.  "
+-        "See above log messages for more diagnostics, and see https://github.com/pytorch/pytorch/issues/8092 for more details.")
+-    endif()
+-  endif()
+-endif()
+-
+-# ---[ CUDA libraries wrapper
+-
+-# find lbnvrtc.so
+-set(CUDA_NVRTC_LIB "${CUDA_nvrtc_LIBRARY}" CACHE FILEPATH "")
+-if(CUDA_NVRTC_LIB AND NOT CUDA_NVRTC_SHORTHASH)
+-  find_package(Python COMPONENTS Interpreter)
+-  execute_process(
+-    COMMAND Python::Interpreter -c
+-    "import hashlib;hash=hashlib.sha256();hash.update(open('${CUDA_NVRTC_LIB}','rb').read());print(hash.hexdigest()[:8])"
+-    RESULT_VARIABLE _retval
+-    OUTPUT_VARIABLE CUDA_NVRTC_SHORTHASH)
+-  if(NOT _retval EQUAL 0)
+-    message(WARNING "Failed to compute shorthash for libnvrtc.so")
+-    set(CUDA_NVRTC_SHORTHASH "XXXXXXXX")
+-  else()
+-    string(STRIP "${CUDA_NVRTC_SHORTHASH}" CUDA_NVRTC_SHORTHASH)
+-    message(STATUS "${CUDA_NVRTC_LIB} shorthash is ${CUDA_NVRTC_SHORTHASH}")
+-  endif()
+-endif()
+-
+-# Create new style imported libraries.
+-# Several of these libraries have a hardcoded path if CAFFE2_STATIC_LINK_CUDA
+-# is set. This path is where sane CUDA installations have their static
+-# libraries installed. This flag should only be used for binary builds, so
+-# end-users should never have this flag set.
+-
+-# cuda
+-add_library(caffe2::cuda INTERFACE IMPORTED)
+-set_property(
+-    TARGET caffe2::cuda PROPERTY INTERFACE_LINK_LIBRARIES
+-    CUDA::cuda_driver)
+-
+-# cudart
+-add_library(torch::cudart INTERFACE IMPORTED)
+-if(CAFFE2_STATIC_LINK_CUDA)
+-    set_property(
+-        TARGET torch::cudart PROPERTY INTERFACE_LINK_LIBRARIES
+-        CUDA::cudart_static)
+-else()
+-    set_property(
+-        TARGET torch::cudart PROPERTY INTERFACE_LINK_LIBRARIES
+-        CUDA::cudart)
+-endif()
+-
+-# nvToolsExt
+-find_path(nvtx3_dir NAMES nvtx3 PATHS "${PROJECT_SOURCE_DIR}/third_party/NVTX/c/include" NO_DEFAULT_PATH)
+-find_package_handle_standard_args(nvtx3 DEFAULT_MSG nvtx3_dir)
+-if(nvtx3_FOUND)
+-  add_library(torch::nvtx3 INTERFACE IMPORTED)
+-  target_include_directories(torch::nvtx3 INTERFACE "${nvtx3_dir}")
+-  target_compile_definitions(torch::nvtx3 INTERFACE TORCH_CUDA_USE_NVTX3)
+-else()
+-  message(WARNING "Cannot find NVTX3, find old NVTX instead")
+-  add_library(torch::nvtoolsext INTERFACE IMPORTED)
+-  set_property(TARGET torch::nvtoolsext PROPERTY INTERFACE_LINK_LIBRARIES CUDA::nvToolsExt)
+-endif()
+-
+-
+-# cublas
+-add_library(caffe2::cublas INTERFACE IMPORTED)
+-if(CAFFE2_STATIC_LINK_CUDA AND NOT WIN32)
+-    set_property(
+-        TARGET caffe2::cublas PROPERTY INTERFACE_LINK_LIBRARIES
+-        # NOTE: cublas is always linked dynamically
+-        CUDA::cublas CUDA::cublasLt)
+-    set_property(
+-        TARGET caffe2::cublas APPEND PROPERTY INTERFACE_LINK_LIBRARIES
+-        CUDA::cudart_static rt)
+-else()
+-    set_property(
+-        TARGET caffe2::cublas PROPERTY INTERFACE_LINK_LIBRARIES
+-        CUDA::cublas CUDA::cublasLt)
+-endif()
+-
+ # cudnn interface
+ # static linking is handled by USE_STATIC_CUDNN environment variable
+ if(CAFFE2_USE_CUDNN)
+@@ -232,22 +60,6 @@ else()
+   message(STATUS "USE_CUDNN is set to 0. Compiling without cuDNN support")
+ endif()
+ 
+-if(CAFFE2_USE_CUSPARSELT)
+-  find_package(CUSPARSELT)
+-
+-  if(NOT CUSPARSELT_FOUND)
+-    message(WARNING
+-      "Cannot find cuSPARSELt library. Turning the option off")
+-    set(CAFFE2_USE_CUSPARSELT OFF)
+-  else()
+-    add_library(torch::cusparselt INTERFACE IMPORTED)
+-    target_include_directories(torch::cusparselt INTERFACE ${CUSPARSELT_INCLUDE_PATH})
+-    target_link_libraries(torch::cusparselt INTERFACE ${CUSPARSELT_LIBRARY_PATH})
+-  endif()
+-else()
+-  message(STATUS "USE_CUSPARSELT is set to 0. Compiling without cuSPARSELt support")
+-endif()
+-
+ if(USE_CUDSS)
+   find_package(CUDSS)
+ 
+@@ -280,36 +92,6 @@ else()
+   message(STATUS "USE_CUFILE is set to 0. Compiling without cuFile support")
+ endif()
+ 
+-# curand
+-add_library(caffe2::curand INTERFACE IMPORTED)
+-if(CAFFE2_STATIC_LINK_CUDA AND NOT WIN32)
+-    set_property(
+-        TARGET caffe2::curand PROPERTY INTERFACE_LINK_LIBRARIES
+-        CUDA::curand_static)
+-else()
+-    set_property(
+-        TARGET caffe2::curand PROPERTY INTERFACE_LINK_LIBRARIES
+-        CUDA::curand)
+-endif()
+-
+-# cufft
+-add_library(caffe2::cufft INTERFACE IMPORTED)
+-if(CAFFE2_STATIC_LINK_CUDA AND NOT WIN32)
+-    set_property(
+-        TARGET caffe2::cufft PROPERTY INTERFACE_LINK_LIBRARIES
+-        CUDA::cufft_static_nocallback)
+-else()
+-    set_property(
+-        TARGET caffe2::cufft PROPERTY INTERFACE_LINK_LIBRARIES
+-        CUDA::cufft)
+-endif()
+-
+-# nvrtc
+-add_library(caffe2::nvrtc INTERFACE IMPORTED)
+-set_property(
+-    TARGET caffe2::nvrtc PROPERTY INTERFACE_LINK_LIBRARIES
+-    CUDA::nvrtc caffe2::cuda)
+-
+ # Add onnx namepsace definition to nvcc
+ if(ONNX_NAMESPACE)
+   list(APPEND CUDA_NVCC_FLAGS "-DONNX_NAMESPACE=${ONNX_NAMESPACE}")
+@@ -317,67 +99,9 @@ else()
+   list(APPEND CUDA_NVCC_FLAGS "-DONNX_NAMESPACE=onnx_c2")
+ endif()
+ 
+-# Don't activate VC env again for Ninja generators with MSVC on Windows if CUDAHOSTCXX is not defined
+-# by adding --use-local-env.
+-if(MSVC AND CMAKE_GENERATOR STREQUAL "Ninja" AND NOT DEFINED ENV{CUDAHOSTCXX})
+-  list(APPEND CUDA_NVCC_FLAGS "--use-local-env")
+-endif()
+-
+-# setting nvcc arch flags
+-torch_cuda_get_nvcc_gencode_flag(NVCC_FLAGS_EXTRA)
+-# CMake 3.18 adds integrated support for architecture selection, but we can't rely on it
+-set(CMAKE_CUDA_ARCHITECTURES OFF)
+-list(APPEND CUDA_NVCC_FLAGS ${NVCC_FLAGS_EXTRA})
+-message(STATUS "Added CUDA NVCC flags for: ${NVCC_FLAGS_EXTRA}")
+-
+-# disable some nvcc diagnostic that appears in boost, glog, glags, opencv, etc.
+-foreach(diag cc_clobber_ignored
+-             field_without_dll_interface
+-             base_class_has_different_dll_interface
+-             dll_interface_conflict_none_assumed
+-             dll_interface_conflict_dllexport_assumed
+-             bad_friend_decl)
+-  list(APPEND SUPPRESS_WARNING_FLAGS --diag_suppress=${diag})
+-endforeach()
+-string(REPLACE ";" "," SUPPRESS_WARNING_FLAGS "${SUPPRESS_WARNING_FLAGS}")
+-list(APPEND CUDA_NVCC_FLAGS -Xcudafe ${SUPPRESS_WARNING_FLAGS})
+-
+-set(CUDA_PROPAGATE_HOST_FLAGS_BLOCKLIST "-Werror")
+-if(MSVC)
+-  list(APPEND CUDA_NVCC_FLAGS "--Werror" "cross-execution-space-call")
+-  list(APPEND CUDA_NVCC_FLAGS "--no-host-device-move-forward")
+-endif()
+-
+-# Debug and Release symbol support
+-if(MSVC)
+-  if(${CAFFE2_USE_MSVC_STATIC_RUNTIME})
+-    string(APPEND CMAKE_CUDA_FLAGS_DEBUG " -Xcompiler /MTd")
+-    string(APPEND CMAKE_CUDA_FLAGS_MINSIZEREL " -Xcompiler /MT")
+-    string(APPEND CMAKE_CUDA_FLAGS_RELEASE " -Xcompiler /MT")
+-    string(APPEND CMAKE_CUDA_FLAGS_RELWITHDEBINFO " -Xcompiler /MT")
+-  else()
+-    string(APPEND CMAKE_CUDA_FLAGS_DEBUG " -Xcompiler /MDd")
+-    string(APPEND CMAKE_CUDA_FLAGS_MINSIZEREL " -Xcompiler /MD")
+-    string(APPEND CMAKE_CUDA_FLAGS_RELEASE " -Xcompiler /MD")
+-    string(APPEND CMAKE_CUDA_FLAGS_RELWITHDEBINFO " -Xcompiler /MD")
+-  endif()
+-  if(CUDA_NVCC_FLAGS MATCHES "Zi")
+-    list(APPEND CUDA_NVCC_FLAGS "-Xcompiler" "-FS")
+-  endif()
+-elseif(CUDA_DEVICE_DEBUG)
+-  list(APPEND CUDA_NVCC_FLAGS "-g" "-G")  # -G enables device code debugging symbols
+-endif()
+-
+-# Set expt-relaxed-constexpr to suppress Eigen warnings
+-list(APPEND CUDA_NVCC_FLAGS "--expt-relaxed-constexpr")
+-
+-# Set expt-extended-lambda to support lambda on device
+-list(APPEND CUDA_NVCC_FLAGS "--expt-extended-lambda")
+-
+-foreach(FLAG ${CUDA_NVCC_FLAGS})
+-  string(FIND "${FLAG}" " " flag_space_position)
+-  if(NOT flag_space_position EQUAL -1)
+-    message(FATAL_ERROR "Found spaces in CUDA_NVCC_FLAGS entry '${FLAG}'")
+-  endif()
+-  string(APPEND CMAKE_CUDA_FLAGS " ${FLAG}")
+-endforeach()
++# Create aliases for torch/caffe2 CUDA targets
++add_library(torch::cudart ALIAS CUDA::cudart)
++add_library(caffe2::cufft ALIAS CUDA::cufft)
++add_library(caffe2::nvrtc ALIAS CUDA::nvrtc)
++add_library(caffe2::curand ALIAS CUDA::curand)
++add_library(caffe2::cublas ALIAS CUDA::cublas)
+diff --git a/cmake/public/utils.cmake b/cmake/public/utils.cmake
+index c6647eb45..03fce0a2b 100644
+--- a/cmake/public/utils.cmake
++++ b/cmake/public/utils.cmake
+@@ -306,33 +306,6 @@ macro(torch_hip_get_arch_list store_var)
+   string(REPLACE " " ";" ${store_var} "${_TMP}")
+ endmacro()
+ 
+-##############################################################################
+-# Get the NVCC arch flags specified by TORCH_CUDA_ARCH_LIST and CUDA_ARCH_NAME.
+-# Usage:
+-#   torch_cuda_get_nvcc_gencode_flag(variable_to_store_flags)
+-#
+-macro(torch_cuda_get_nvcc_gencode_flag store_var)
+-  # setting nvcc arch flags
+-  if((NOT DEFINED TORCH_CUDA_ARCH_LIST) AND (DEFINED ENV{TORCH_CUDA_ARCH_LIST}))
+-    message(WARNING
+-        "In the future we will require one to explicitly pass "
+-        "TORCH_CUDA_ARCH_LIST to cmake instead of implicitly setting it as an "
+-        "env variable. This will become a FATAL_ERROR in future version of "
+-        "pytorch.")
+-    set(TORCH_CUDA_ARCH_LIST $ENV{TORCH_CUDA_ARCH_LIST})
+-  endif()
+-  if(DEFINED CUDA_ARCH_NAME)
+-    message(WARNING
+-        "CUDA_ARCH_NAME is no longer used. Use TORCH_CUDA_ARCH_LIST instead. "
+-        "Right now, CUDA_ARCH_NAME is ${CUDA_ARCH_NAME} and "
+-        "TORCH_CUDA_ARCH_LIST is ${TORCH_CUDA_ARCH_LIST}.")
+-    set(TORCH_CUDA_ARCH_LIST TORCH_CUDA_ARCH_LIST ${CUDA_ARCH_NAME})
+-  endif()
+-
+-  # Invoke cuda_select_nvcc_arch_flags from proper cmake FindCUDA.
+-  cuda_select_nvcc_arch_flags(${store_var} ${TORCH_CUDA_ARCH_LIST})
+-endmacro()
+-
+ 
+ ##############################################################################
+ # Add standard compile options.
+@@ -427,42 +400,6 @@ function(torch_compile_options libname)
+ 
+ endfunction()
+ 
+-##############################################################################
+-# Set old-style FindCuda.cmake compile flags from modern CMake cuda flags.
+-# Usage:
+-#   torch_update_find_cuda_flags()
+-function(torch_update_find_cuda_flags)
+-  # Convert -O2 -Xcompiler="-O2 -Wall" to "-O2;-Xcompiler=-O2,-Wall"
+-  if(USE_CUDA)
+-    separate_arguments(FLAGS UNIX_COMMAND "${CMAKE_CUDA_FLAGS}")
+-    string(REPLACE " " "," FLAGS "${FLAGS}")
+-    set(CUDA_NVCC_FLAGS ${FLAGS} PARENT_SCOPE)
+-
+-    separate_arguments(FLAGS_DEBUG UNIX_COMMAND "${CMAKE_CUDA_FLAGS_DEBUG}")
+-    string(REPLACE " " "," FLAGS_DEBUG "${FLAGS_DEBUG}")
+-    set(CUDA_NVCC_FLAGS_DEBUG "${FLAGS_DEBUG}" PARENT_SCOPE)
+-
+-    separate_arguments(FLAGS_RELEASE UNIX_COMMAND "${CMAKE_CUDA_FLAGS_RELEASE}")
+-    string(REPLACE " " "," FLAGS_RELEASE "${FLAGS_RELEASE}")
+-    set(CUDA_NVCC_FLAGS_RELEASE "${FLAGS_RELEASE}" PARENT_SCOPE)
+-
+-    separate_arguments(FLAGS_MINSIZEREL UNIX_COMMAND "${CMAKE_CUDA_FLAGS_MINSIZEREL}")
+-    string(REPLACE " " "," FLAGS_MINSIZEREL "${FLAGS_MINSIZEREL}")
+-    set(CUDA_NVCC_FLAGS_MINSIZEREL "${FLAGS_MINSIZEREL}" PARENT_SCOPE)
+-
+-    separate_arguments(FLAGS_RELWITHDEBINFO UNIX_COMMAND "${CMAKE_CUDA_FLAGS_RELWITHDEBINFO}")
+-    string(REPLACE " " "," FLAGS_RELWITHDEBINFO "${FLAGS_RELWITHDEBINFO}")
+-    set(CUDA_NVCC_FLAGS_RELWITHDEBINFO "${FLAGS_RELWITHDEBINFO}" PARENT_SCOPE)
+-
+-    message(STATUS "Converting CMAKE_CUDA_FLAGS to CUDA_NVCC_FLAGS:\n"
+-                    "    CUDA_NVCC_FLAGS                = ${FLAGS}\n"
+-                    "    CUDA_NVCC_FLAGS_DEBUG          = ${FLAGS_DEBUG}\n"
+-                    "    CUDA_NVCC_FLAGS_RELEASE        = ${FLAGS_RELEASE}\n"
+-                    "    CUDA_NVCC_FLAGS_RELWITHDEBINFO = ${FLAGS_RELWITHDEBINFO}\n"
+-                    "    CUDA_NVCC_FLAGS_MINSIZEREL     = ${FLAGS_MINSIZEREL}")
+-  endif()
+-endfunction()
+-
+ include(CheckCXXCompilerFlag)
+ 
+ ##############################################################################
+diff --git a/third_party/gloo/cmake/Cuda.cmake b/third_party/gloo/cmake/Cuda.cmake
+index d2ca2122b..f02db8208 100644
+--- a/third_party/gloo/cmake/Cuda.cmake
++++ b/third_party/gloo/cmake/Cuda.cmake
+@@ -1,189 +1,9 @@
+-# Known NVIDIA GPU achitectures Gloo can be compiled for.
+-# This list will be used for CUDA_ARCH_NAME = All option
+-set(gloo_known_gpu_archs "")
++find_package(CUDAToolkit 7.0 REQUIRED)
+ 
+-################################################################################
+-# Function for selecting GPU arch flags for nvcc based on CUDA_ARCH_NAME
+-# Usage:
+-#   gloo_select_nvcc_arch_flags(out_variable)
+-function(gloo_select_nvcc_arch_flags out_variable)
+-  # List of arch names
+-  set(__archs_names "Kepler" "Maxwell" "Pascal" "Volta" "All")
+-  set(__archs_name_default "All")
+-
+-  # Set CUDA_ARCH_NAME strings (so it will be seen as dropbox in the CMake GUI)
+-  set(CUDA_ARCH_NAME ${__archs_name_default} CACHE STRING "Select target NVIDIA GPU architecture")
+-  set_property(CACHE CUDA_ARCH_NAME PROPERTY STRINGS "" ${__archs_names})
+-  mark_as_advanced(CUDA_ARCH_NAME)
+-
+-  # Verify CUDA_ARCH_NAME value
+-  if(NOT ";${__archs_names};" MATCHES ";${CUDA_ARCH_NAME};")
+-    string(REPLACE ";" ", " __archs_names "${__archs_names}")
+-    message(FATAL_ERROR "Invalid CUDA_ARCH_NAME, supported values: ${__archs_names}")
+-  endif()
+-
+-  if(${CUDA_ARCH_NAME} STREQUAL "Kepler")
+-    set(__cuda_arch_bin "30 35")
+-  elseif(${CUDA_ARCH_NAME} STREQUAL "Maxwell")
+-    set(__cuda_arch_bin "50")
+-  elseif(${CUDA_ARCH_NAME} STREQUAL "Pascal")
+-    set(__cuda_arch_bin "60 61")
+-  elseif(${CUDA_ARCH_NAME} STREQUAL "Volta")
+-    set(__cuda_arch_bin "70")
+-  elseif(${CUDA_ARCH_NAME} STREQUAL "All")
+-    set(__cuda_arch_bin ${gloo_known_gpu_archs})
+-  else()
+-    message(FATAL_ERROR "Invalid CUDA_ARCH_NAME")
+-  endif()
+-
+-  # Remove dots and convert to lists
+-  string(REGEX REPLACE "\\." "" __cuda_arch_bin "${__cuda_arch_bin}")
+-  string(REGEX REPLACE "\\." "" __cuda_arch_ptx "${CUDA_ARCH_PTX}")
+-  string(REGEX MATCHALL "[0-9()]+" __cuda_arch_bin "${__cuda_arch_bin}")
+-  string(REGEX MATCHALL "[0-9]+"   __cuda_arch_ptx "${__cuda_arch_ptx}")
+-  list(REMOVE_DUPLICATES __cuda_arch_bin)
+-  list(REMOVE_DUPLICATES __cuda_arch_ptx)
+-
+-  set(__nvcc_flags "")
+-  set(__nvcc_archs_readable "")
+-
+-  # Tell NVCC to add binaries for the specified GPUs
+-  foreach(__arch ${__cuda_arch_bin})
+-    if(__arch MATCHES "([0-9]+)\\(([0-9]+)\\)")
+-      # User explicitly specified PTX for the concrete BIN
+-      list(APPEND __nvcc_flags -gencode arch=compute_${CMAKE_MATCH_2},code=sm_${CMAKE_MATCH_1})
+-      list(APPEND __nvcc_archs_readable sm_${CMAKE_MATCH_1})
+-    else()
+-      # User didn't explicitly specify PTX for the concrete BIN, we assume PTX=BIN
+-      list(APPEND __nvcc_flags -gencode arch=compute_${__arch},code=sm_${__arch})
+-      list(APPEND __nvcc_archs_readable sm_${__arch})
+-    endif()
+-  endforeach()
+-
+-  # Tell NVCC to add PTX intermediate code for the specified architectures
+-  foreach(__arch ${__cuda_arch_ptx})
+-    list(APPEND __nvcc_flags -gencode arch=compute_${__arch},code=compute_${__arch})
+-    list(APPEND __nvcc_archs_readable compute_${__arch})
+-  endforeach()
+-
+-  string(REPLACE ";" " " __nvcc_archs_readable "${__nvcc_archs_readable}")
+-  set(${out_variable}          ${__nvcc_flags}          PARENT_SCOPE)
+-  set(${out_variable}_readable ${__nvcc_archs_readable} PARENT_SCOPE)
+-endfunction()
+-
+-################################################################################
+-# Function to append to list if specified sequence does not yet exist in list.
+-# Usage:
+-#   gloo_list_append_if_unique(list_variable arg1 arg2 ...)
+-function(gloo_list_append_if_unique list)
+-  list(LENGTH ARGN __match_length)
+-  set(__match_index 0)
+-  set(__match OFF)
+-  foreach(__elem ${${list}})
+-    list(GET ARGN ${__match_index} __match_elem)
+-    if("${__elem}" STREQUAL "${__match_elem}")
+-      MATH(EXPR __match_index "${__match_index}+1")
+-      if(${__match_index} EQUAL ${__match_length})
+-        set(__match ON)
+-        break()
+-      endif()
+-    else()
+-      # Mismatch; start from scratch.
+-      # This doesn't do backtracking but shouldn't be needed either.
+-      set(__match_index 0)
+-    endif()
+-  endforeach()
+-
+-  # Only append arguments if we didn't find a match.
+-  if(NOT __match)
+-    list(APPEND ${list} ${ARGN})
+-    set(${list} ${${list}} PARENT_SCOPE)
+-  endif()
+-endfunction()
+-
+-################################################################################
+-###  Non macro section
+-################################################################################
+-
+-if(GLOO_USE_CUDA_TOOLKIT)
+-  find_package(CUDAToolkit 7.0 REQUIRED)
+-  set(GLOO_CUDA_VERSION ${CUDAToolkit_VERSION})
+-
+-  # Convert -O2 -Xcompiler="-O2 -Wall" to "-O2;-Xcompiler=-O2,-Wall"
+-  separate_arguments(GLOO_NVCC_FLAGS UNIX_COMMAND "${CMAKE_CUDA_FLAGS}")
+-  string(REPLACE " " "," GLOO_NVCC_FLAGS "${GLOO_NVCC_FLAGS}")
+-
+-  if(CUDA_USE_STATIC_CUDA_RUNTIME)
+-    set(GLOO_CUDA_LIBRARIES CUDA::cudart_static)
+-  else()
+-    set(GLOO_CUDA_LIBRARIES CUDA::cudart)
+-  endif()
+-else()
+-  find_package(CUDA 7.0)
+-  if(NOT CUDA_FOUND)
+-    return()
+-  endif()
+-  set(GLOO_CUDA_VERSION ${CUDA_VERSION})
+-  set(GLOO_NVCC_FLAGS "${CUDA_NVCC_FLAGS}")
+-
+-  include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
+-  set(GLOO_CUDA_LIBRARIES ${CUDA_CUDART_LIBRARY})
+-
+-  # If the project including us doesn't set any -std=xxx directly, we set it to C++11 here.
+-  set(CUDA_PROPAGATE_HOST_FLAGS OFF)
+-  if((NOT "${GLOO_NVCC_FLAGS}" MATCHES "-std=c\\+\\+") AND (NOT "${GLOO_NVCC_FLAGS}" MATCHES "-std=gnu\\+\\+"))
+-    if(NOT MSVC)
+-      gloo_list_append_if_unique(GLOO_NVCC_FLAGS "-std=c++11")
+-    endif()
+-  endif()
+-
+-  mark_as_advanced(CUDA_BUILD_CUBIN CUDA_BUILD_EMULATION CUDA_VERBOSE_BUILD)
+-  mark_as_advanced(CUDA_SDK_ROOT_DIR CUDA_SEPARABLE_COMPILATION)
+-endif()
+-
+-set(HAVE_CUDA TRUE)
+-message(STATUS "CUDA detected: " ${GLOO_CUDA_VERSION})
+-if (${GLOO_CUDA_VERSION} LESS 9.0)
+-  list(APPEND GLOO_NVCC_FLAGS "-D_MWAITXINTRIN_H_INCLUDED")
+-  list(APPEND GLOO_NVCC_FLAGS "-D__STRICT_ANSI__")
++if(CUDA_USE_STATIC_CUDA_RUNTIME)
++  set(GLOO_CUDA_LIBRARIES CUDA::cudart_static)
+ else()
+-  # nvcc may complain that sm_xx is no longer supported. Suppress the warning for now.
+-  list(APPEND GLOO_NVCC_FLAGS "-Wno-deprecated-gpu-targets")
+-endif()
+-
+-if(GLOO_CUDA_VERSION VERSION_LESS 8.0)
+-  set(gloo_known_gpu_archs "30 35 50 52")
+-elseif(GLOO_CUDA_VERSION VERSION_LESS 9.0)
+-  set(gloo_known_gpu_archs "30 35 50 52 60 61")
+-elseif(GLOO_CUDA_VERSION VERSION_LESS 10.0)
+-  set(gloo_known_gpu_archs "30 35 50 52 60 61 70")
+-elseif(GLOO_CUDA_VERSION VERSION_LESS 11.0)
+-  set(gloo_known_gpu_archs "35 50 52 60 61 70 75")
+-elseif(GLOO_CUDA_VERSION VERSION_LESS 12.0)
+-  set(gloo_known_gpu_archs "35 50 52 60 61 70 75 80 86")
++  set(GLOO_CUDA_LIBRARIES CUDA::cudart)
+ endif()
+ 
+ list(APPEND gloo_cuda_DEPENDENCY_LIBS ${GLOO_CUDA_LIBRARIES})
+-
+-# Setting nvcc arch flags (or inherit if already set)
+-if (NOT ";${GLOO_NVCC_FLAGS};" MATCHES ";-gencode;")
+-  gloo_select_nvcc_arch_flags(NVCC_FLAGS_EXTRA)
+-  list(APPEND GLOO_NVCC_FLAGS ${NVCC_FLAGS_EXTRA})
+-  message(STATUS "Added CUDA NVCC flags for: ${NVCC_FLAGS_EXTRA_readable}")
+-endif()
+-
+-# Disable some nvcc diagnostic that apears in boost, glog, glags, opencv, etc.
+-foreach(diag cc_clobber_ignored integer_sign_change useless_using_declaration set_but_not_used)
+-  gloo_list_append_if_unique(GLOO_NVCC_FLAGS -Xcudafe --diag_suppress=${diag})
+-endforeach()
+-
+-if(NOT MSVC)
+-  gloo_list_append_if_unique(GLOO_NVCC_FLAGS "-Xcompiler" "-fPIC")
+-endif()
+-
+-if(GLOO_USE_CUDA_TOOLKIT)
+-  # Convert list to space-separated string
+-  string(REPLACE ";" " " CMAKE_CUDA_FLAGS "${GLOO_NVCC_FLAGS}")
+-else()
+-  set(CUDA_NVCC_FLAGS "${GLOO_NVCC_FLAGS}")
+-endif()
+diff --git a/third_party/gloo/cmake/Dependencies.cmake b/third_party/gloo/cmake/Dependencies.cmake
+index 14cbcb1b0..8585f2862 100644
+--- a/third_party/gloo/cmake/Dependencies.cmake
++++ b/third_party/gloo/cmake/Dependencies.cmake
+@@ -113,10 +113,6 @@ endif()
+ 
+ if(USE_CUDA)
+   include(cmake/Cuda.cmake)
+-  if(NOT HAVE_CUDA)
+-    message(WARNING "Not compiling with CUDA support. Suppress this warning with -DUSE_CUDA=OFF.")
+-    set(USE_CUDA OFF)
+-  endif()
+ endif()
+ 
+ if(USE_CUDA AND USE_NCCL)
+diff --git a/third_party/gloo/gloo/CMakeLists.txt b/third_party/gloo/gloo/CMakeLists.txt
+index d5e6a1a55..f4c7e9292 100644
+--- a/third_party/gloo/gloo/CMakeLists.txt
++++ b/third_party/gloo/gloo/CMakeLists.txt
+@@ -140,12 +140,8 @@ configure_file(config.h.in config.h)
+ 
+ add_library(gloo ${GLOO_STATIC_OR_SHARED} ${GLOO_SRCS})
+ if(USE_CUDA)
+-  if(GLOO_USE_CUDA_TOOLKIT)
+-    enable_language(CUDA)
+-    add_library(gloo_cuda ${GLOO_STATIC_OR_SHARED} ${GLOO_CUDA_SRCS})
+-  else()
+-    cuda_add_library(gloo_cuda ${GLOO_CUDA_SRCS} ${GLOO_STATIC_OR_SHARED})
+-  endif()
++  enable_language(CUDA)
++  add_library(gloo_cuda ${GLOO_STATIC_OR_SHARED} ${GLOO_CUDA_SRCS})
+   target_link_libraries(gloo_cuda gloo ${gloo_cuda_DEPENDENCY_LIBS})
+ endif()
+ if(USE_ROCM)
+-- 
+2.34.1
+
