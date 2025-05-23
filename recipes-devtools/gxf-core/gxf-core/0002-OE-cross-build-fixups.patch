@@ -1,0 +1,27 @@
+From 75a712cc412919e87f884b3e8ecf6539817a647c Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Thu, 3 Jul 2025 15:53:51 +0100
+Subject: [PATCH 2/2] OE cross build fixups
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ gxf-install/include/gxf/core/expected_macro.hpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gxf-install/include/gxf/core/expected_macro.hpp b/gxf-install/include/gxf/core/expected_macro.hpp
+index 4fc79f5..82349ec 100644
+--- a/gxf-install/include/gxf/core/expected_macro.hpp
++++ b/gxf-install/include/gxf/core/expected_macro.hpp
+@@ -21,7 +21,7 @@
+ 
+ #include "gxf/core/common_expected_macro.hpp"
+ #include "gxf/core/expected.hpp"
+-#include "magic_enum.hpp"  // NOLINT(build/include)
++#include <magic_enum/magic_enum.hpp>
+ 
+ //////////////////////////////////////////
+ // Configuration for using bool as status:
+-- 
+2.34.1
+
