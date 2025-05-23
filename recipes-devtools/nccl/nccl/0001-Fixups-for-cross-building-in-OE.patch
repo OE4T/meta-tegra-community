@@ -1,0 +1,43 @@
+From b70d34ba2185f9e18a47033e746e877018f38b32 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Tue, 6 May 2025 16:57:35 +0100
+Subject: [PATCH] Fixups for cross building in OE
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ makefiles/common.mk | 11 ++---------
+ 1 file changed, 2 insertions(+), 9 deletions(-)
+
+diff --git a/makefiles/common.mk b/makefiles/common.mk
+index 545203a..c4a97e8 100644
+--- a/makefiles/common.mk
++++ b/makefiles/common.mk
+@@ -73,7 +73,8 @@ CXXFLAGS   := -DCUDA_MAJOR=$(CUDA_MAJOR) -DCUDA_MINOR=$(CUDA_MINOR) -fPIC -fvisi
+ # Maxrregcount needs to be set accordingly to NCCL_MAX_NTHREADS (otherwise it will cause kernel launch errors)
+ # 512 : 120, 640 : 96, 768 : 80, 1024 : 60
+ # We would not have to set this if we used __launch_bounds__, but this only works on kernels, not on functions.
+-NVCUFLAGS  := -ccbin $(CXX) $(NVCC_GENCODE) -std=c++11 --expt-extended-lambda -Xptxas -maxrregcount=96 -Xfatbin -compress-all
++NVCUFLAGS  ?= -ccbin $(CXX) $(NVCC_GENCODE) -Xptxas -maxrregcount=96 -Xfatbin -compress-all
++NVCUFLAGS  += --expt-extended-lambda
+ # Use addprefix so that we can specify more than one path
+ NVLDFLAGS  := -L${CUDA_LIB} -lcudart -lrt
+ 
+@@ -87,14 +88,6 @@ NVLDFLAGS   += ${GCOV_FLAGS:%=-Xcompiler %}
+ # $(warning GCOV_FLAGS=${GCOV_FLAGS})
+ ########## GCOV ##########
+ 
+-ifeq ($(DEBUG), 0)
+-NVCUFLAGS += -O3
+-CXXFLAGS  += -O3 -g
+-else
+-NVCUFLAGS += -O0 -G -g
+-CXXFLAGS  += -O0 -g -ggdb3
+-endif
+-
+ # Make sure to run with ASAN_OPTIONS=protect_shadow_gap=0 otherwise CUDA will fail with OOM
+ ifneq ($(ASAN), 0)
+ CXXFLAGS += -fsanitize=address
+-- 
+2.34.1
+
