@@ -1,0 +1,41 @@
+From dd28c5e28646529f6fedf4fb34f99903c3e7f3a5 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Thu, 1 May 2025 14:37:06 +0100
+Subject: [PATCH] remove TypenameAsString from nvidia namespace
+
+Upstream-Status: Inappropriate [OE-specific]
+
+Signed-off-by: Ian Stewart <istewart@nvidia.com>
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ gxf-install/include/common/type_name.hpp | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/gxf-install/include/common/type_name.hpp b/gxf-install/include/common/type_name.hpp
+index 333ea17..e4bae84 100644
+--- a/gxf-install/include/common/type_name.hpp
++++ b/gxf-install/include/common/type_name.hpp
+@@ -57,7 +57,6 @@ namespace helper {
+ }  // namespace helper
+ }  // namespace nvidia
+ 
+-namespace nvidia {
+ // Gives a string representation of the name of a C++ type.
+ //
+ // The function will compute the typename during the first invocation and store it in heap memory.
+@@ -83,11 +82,9 @@ const char* TypenameAsString() {
+   static char s_name[kMaxNameLength] = {0};  // Initialize with 0 to get a null-terminated string.
+   static char* result = s_name;
+   if (s_name[0] == 0 && result != nullptr) {  // Check for first invocation of this function.
+-    result = TypenameAsStringImpl(template_name, s_name, kMaxNameLength);
++    result = nvidia::TypenameAsStringImpl(template_name, s_name, kMaxNameLength);
+   }
+   return result;
+ }
+ 
+-}  // namespace nvidia
+-
+ #endif  // NVIDIA_COMMON_TYPE_NAME_HPP_
+-- 
+2.34.1
+
