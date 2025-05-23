@@ -1,0 +1,41 @@
+From b56ddcff899e18ea54866b8af4e3dbe2c2e813b3 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 28 Apr 2025 10:37:32 +0100
+Subject: [PATCH] Fixups for cross building in OE
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ include/gsl/assert | 2 +-
+ include/gsl/byte   | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/include/gsl/assert b/include/gsl/assert
+index a601204..a5c216f 100644
+--- a/include/gsl/assert
++++ b/include/gsl/assert
+@@ -48,7 +48,7 @@
+ #if defined(__clang__)
+ #define GSL_SUPPRESS(x) [[gsl::suppress("x")]]
+ #else
+-#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
++#if defined(_MSC_VER) && !defined(__INTEL_COMPILER) && !defined(__NVCC__)
+ #define GSL_SUPPRESS(x) [[gsl::suppress(x)]]
+ #else
+ #define GSL_SUPPRESS(x)
+diff --git a/include/gsl/byte b/include/gsl/byte
+index 9231340..f92a91c 100644
+--- a/include/gsl/byte
++++ b/include/gsl/byte
+@@ -24,7 +24,7 @@
+ #if defined(__clang__)
+ #define GSL_SUPPRESS(x) [[gsl::suppress("x")]]
+ #else
+-#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
++#if defined(_MSC_VER) && !defined(__INTEL_COMPILER) && !defined(__NVCC__)
+ #define GSL_SUPPRESS(x) [[gsl::suppress(x)]]
+ #else
+ #define GSL_SUPPRESS(x)
+-- 
+2.34.1
+
