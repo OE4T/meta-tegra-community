@@ -1,0 +1,81 @@
+From c9941abc4adb38b2e9037f432b3aa46696e3c732 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 28 Apr 2025 15:39:47 +0100
+Subject: [PATCH] Updates for OE cross builds
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ CMakeLists.txt | 41 ++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 38 insertions(+), 3 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d15d97ed..a0e098ff 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -14,8 +14,32 @@ endif()
+ cmake_policy(SET CMP0063 NEW)
+ cmake_policy(SET CMP0074 NEW)
+ 
++function(onnx_extract_version)
++    file(READ "${CMAKE_SOURCE_DIR}/VERSION_NUMBER" ONNX_VERSION)
++    string(STRIP "${ONNX_VERSION}" ONNX_VERSION)
++    string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)" ONNX_VERSION_MATCH ${ONNX_VERSION})
++    message(STATUS "ONNX matched version: ${ONNX_VERSION_MATCH}")
++    if(ONNX_VERSION_MATCH)
++        # Extract the major version
++        string(REGEX REPLACE "^([0-9]+)\\..*" "\\1" ver_major ${ONNX_VERSION})
++        # Extract the minor version
++        string(REGEX REPLACE "^[0-9]+\\.([0-9]+)\\..*" "\\1" ver_minor ${ONNX_VERSION})
++        # Extract the patch version
++        string(REGEX REPLACE "^[0-9]+\\.[0-9]+\\.([0-9]+)" "\\1" ver_patch ${ONNX_VERSION})
++
++        set(ONNX_VERSION_MAJOR ${ver_major} PARENT_SCOPE)
++        set(ONNX_VERSION_MINOR ${ver_minor} PARENT_SCOPE)
++        set(ONNX_VERSION_PATCH ${ver_patch} PARENT_SCOPE)
++        set(ONNX_VERSION "${ver_major}.${ver_minor}.${ver_patch}" PARENT_SCOPE)
++    else()
++        message(FATAL_ERROR "ONNX version did not match the expected format.")
++    endif()
++endfunction()
++
++onnx_extract_version()
++
+ # Project
+-project(onnx C CXX)
++project(onnx VERSION ${ONNX_VERSION} LANGUAGES C CXX)
+ option(ONNX_USE_PROTOBUF_SHARED_LIBS "Build ONNX using protobuf shared library. Sets PROTOBUF_USE_DLLS CMAKE Flag and Protobuf_USE_STATIC_LIBS. " OFF)
+ 
+ option(BUILD_ONNX_PYTHON "Build Python binaries" OFF)
+@@ -466,7 +490,13 @@ list(REMOVE_ITEM __tmp_srcs "${ONNX_ROOT}/onnx/cpp2py_export.cc")
+ list(REMOVE_ITEM __tmp_srcs ${onnx_gtests_src})
+ list(APPEND ONNX_SRCS ${__tmp_srcs})
+ 
+-add_library(onnx_proto ${ONNX_PROTO_SRCS} ${ONNX_PROTO_HDRS})
++if (BUILD_SHARED_LIBS)
++  add_library(onnx_proto SHARED ${ONNX_PROTO_SRCS} ${ONNX_PROTO_HDRS})
++else()
++  add_library(onnx_proto STATIC ${ONNX_PROTO_SRCS} ${ONNX_PROTO_HDRS})
++endif()
++set_target_properties(onnx_proto PROPERTIES VERSION ${ONNX_VERSION} SOVERSION ${ONNX_VERSION_MAJOR}.${ONNX_VERSION_MINOR})
++
+ add_dependencies(onnx_proto gen_onnx_operators_proto gen_onnx_data_proto)
+ target_include_directories(onnx_proto PUBLIC
+   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+@@ -522,7 +552,12 @@ if(CMAKE_SYSTEM_NAME STREQUAL "AIX")
+   # So, create a object library
+   add_library(onnx OBJECT ${ONNX_SRCS})
+ else()
+-  add_library(onnx ${ONNX_SRCS})
++  if (BUILD_SHARED_LIBS)
++    add_library(onnx SHARED ${ONNX_SRCS})
++  else()
++    add_library(onnx STATIC ${ONNX_SRCS})
++  endif()
++  set_target_properties(onnx PROPERTIES VERSION ${ONNX_VERSION} SOVERSION ${ONNX_VERSION_MAJOR}.${ONNX_VERSION_MINOR})
+ endif()
+ 
+ target_include_directories(onnx PUBLIC
+-- 
+2.34.1
+
