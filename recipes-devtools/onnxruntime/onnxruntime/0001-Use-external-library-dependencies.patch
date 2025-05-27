@@ -1,0 +1,241 @@
+From 3732ab0bd9e6dc00336d647bf0eb34756709cb48 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Wed, 11 Jun 2025 13:47:56 +0100
+Subject: [PATCH] Use external library dependencies
+
+This changes the dependencies on the following libraries so
+that they are provided at build time instead of being
+fetched, built, and installed by CMake:
+
+ - Boost
+ - Microsoft.GSL
+ - ONNX
+ - date
+ - cutlass
+ - flatbuffers
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ cmake/CMakeLists.txt                            |  1 -
+ cmake/external/cutlass.cmake                    |  1 +
+ cmake/external/onnxruntime_external_deps.cmake  | 17 +++++------------
+ onnxruntime/core/flatbuffers/schema/ort.fbs.h   |  7 -------
+ .../schema/ort_training_checkpoint.fbs.h        |  7 -------
+ .../transpose_optimization/optimizer_api.h      |  1 +
+ .../DirectMLHelpers/DmlGraphDesc_generated.h    |  7 -------
+ .../OperatorFieldTypes_generated.h              |  7 -------
+ .../lora/adapter_format/adapter_schema.fbs.h    |  7 -------
+ .../flatbuffers/flatbuffers_utils_test.fbs.h    |  7 -------
+ 10 files changed, 7 insertions(+), 55 deletions(-)
+
+diff --git a/cmake/CMakeLists.txt b/cmake/CMakeLists.txt
+index 2714e6f59d..203318888d 100644
+--- a/cmake/CMakeLists.txt
++++ b/cmake/CMakeLists.txt
+@@ -758,7 +758,6 @@ else()
+   check_cxx_compiler_flag(-Wparentheses HAS_PARENTHESES)
+   check_cxx_compiler_flag(-Wshorten-64-to-32 HAS_SHORTEN_64_TO_32)
+   check_cxx_compiler_flag(-Wstrict-aliasing HAS_STRICT_ALIASING)
+-  check_nvcc_compiler_flag(-Wstrict-aliasing NVCC_HAS_STRICT_ALIASING)
+   check_cxx_compiler_flag(-Wstringop-overflow HAS_STRINGOP_OVERFLOW)
+   check_cxx_compiler_flag(-Wtautological-pointer-compare HAS_TAUTOLOGICAL_POINTER_COMPARE)
+   check_cxx_compiler_flag(-Wundefined-var-template HAS_UNDEFINED_VAR_TEMPLATE)
+diff --git a/cmake/external/cutlass.cmake b/cmake/external/cutlass.cmake
+index 65b0d61270..f202372e18 100644
+--- a/cmake/external/cutlass.cmake
++++ b/cmake/external/cutlass.cmake
+@@ -4,6 +4,7 @@ onnxruntime_fetchcontent_declare(
+   URL ${DEP_URL_cutlass}
+   URL_HASH SHA1=${DEP_SHA1_cutlass}
+   EXCLUDE_FROM_ALL
++  FIND_PACKAGE_ARGS 3.5.1 NAMES NvidiaCutlass
+ )
+ 
+ FetchContent_GetProperties(cutlass)
+diff --git a/cmake/external/onnxruntime_external_deps.cmake b/cmake/external/onnxruntime_external_deps.cmake
+index ebf20ab21b..a8283c6d8f 100644
+--- a/cmake/external/onnxruntime_external_deps.cmake
++++ b/cmake/external/onnxruntime_external_deps.cmake
+@@ -302,7 +302,7 @@ if(NOT TARGET Boost::mp11)
+      mp11
+      URL ${DEP_URL_mp11}
+      EXCLUDE_FROM_ALL
+-     FIND_PACKAGE_ARGS NAMES Boost
++     FIND_PACKAGE_ARGS 1.88.0 NAMES Boost
+     )
+     onnxruntime_fetchcontent_makeavailable(mp11)    
+     if(NOT TARGET Boost::mp11)
+@@ -409,7 +409,7 @@ if(onnxruntime_USE_CUDA)
+     URL_HASH SHA1=${DEP_SHA1_microsoft_gsl}
+     PATCH_COMMAND ${Patch_EXECUTABLE} --binary --ignore-whitespace -p1 < ${PROJECT_SOURCE_DIR}/patches/gsl/1064.patch
+     EXCLUDE_FROM_ALL
+-    FIND_PACKAGE_ARGS 4.0 NAMES Microsoft.GSL
++    FIND_PACKAGE_ARGS 4.0.0 NAMES Microsoft.GSL
+   )
+ else()
+   onnxruntime_fetchcontent_declare(
+@@ -417,7 +417,7 @@ else()
+     URL ${DEP_URL_microsoft_gsl}
+     URL_HASH SHA1=${DEP_SHA1_microsoft_gsl}
+     EXCLUDE_FROM_ALL
+-    FIND_PACKAGE_ARGS 4.0 NAMES Microsoft.GSL
++    FIND_PACKAGE_ARGS 4.0.0 NAMES Microsoft.GSL
+   )
+ endif()
+ set(GSL_TARGET "Microsoft.GSL::GSL")
+@@ -463,7 +463,7 @@ onnxruntime_fetchcontent_declare(
+     URL_HASH SHA1=${DEP_SHA1_flatbuffers}
+     PATCH_COMMAND ${ONNXRUNTIME_FLATBUFFERS_PATCH_COMMAND}
+     EXCLUDE_FROM_ALL
+-    FIND_PACKAGE_ARGS 23.5.9 NAMES Flatbuffers flatbuffers
++    FIND_PACKAGE_ARGS 24.3.25 NAMES Flatbuffers flatbuffers
+ )
+ 
+ onnxruntime_fetchcontent_makeavailable(flatbuffers)
+@@ -527,7 +527,7 @@ onnxruntime_fetchcontent_declare(
+   URL_HASH SHA1=${DEP_SHA1_onnx}
+   PATCH_COMMAND ${ONNXRUNTIME_ONNX_PATCH_COMMAND}
+   EXCLUDE_FROM_ALL
+-  FIND_PACKAGE_ARGS NAMES ONNX onnx
++  FIND_PACKAGE_ARGS 1.17.0 NAMES ONNX
+ )
+ if (NOT onnxruntime_MINIMAL_BUILD)
+   onnxruntime_fetchcontent_makeavailable(onnx)
+@@ -591,13 +591,6 @@ set(onnxruntime_EXTERNAL_LIBRARIES ${onnxruntime_EXTERNAL_LIBRARIES_XNNPACK} ${W
+ # The other libs do not have the problem. All the sources are already there. We can compile them in any order.
+ set(onnxruntime_EXTERNAL_DEPENDENCIES onnx_proto flatbuffers::flatbuffers)
+ 
+-if(NOT (onnx_FOUND OR ONNX_FOUND)) # building ONNX from source
+-  target_compile_definitions(onnx PUBLIC $<TARGET_PROPERTY:onnx_proto,INTERFACE_COMPILE_DEFINITIONS> PRIVATE "__ONNX_DISABLE_STATIC_REGISTRATION")
+-  if (NOT onnxruntime_USE_FULL_PROTOBUF)
+-    target_compile_definitions(onnx PUBLIC "__ONNX_NO_DOC_STRINGS")
+-  endif()
+-endif()
+-
+ if (onnxruntime_RUN_ONNX_TESTS)
+   add_definitions(-DORT_RUN_EXTERNAL_ONNX_TESTS)
+ endif()
+diff --git a/onnxruntime/core/flatbuffers/schema/ort.fbs.h b/onnxruntime/core/flatbuffers/schema/ort.fbs.h
+index 50fc1db862..bf5ab15886 100644
+--- a/onnxruntime/core/flatbuffers/schema/ort.fbs.h
++++ b/onnxruntime/core/flatbuffers/schema/ort.fbs.h
+@@ -6,13 +6,6 @@
+ 
+ #include "core/common/flatbuffers.h"
+ 
+-// Ensure the included flatbuffers.h is the same version as when this file was
+-// generated, otherwise it may not be compatible.
+-static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
+-              FLATBUFFERS_VERSION_MINOR == 5 &&
+-              FLATBUFFERS_VERSION_REVISION == 26,
+-             "Non-compatible flatbuffers version included");
+-
+ namespace onnxruntime {
+ namespace fbs {
+ 
+diff --git a/onnxruntime/core/flatbuffers/schema/ort_training_checkpoint.fbs.h b/onnxruntime/core/flatbuffers/schema/ort_training_checkpoint.fbs.h
+index 4b2c950d03..5543065549 100644
+--- a/onnxruntime/core/flatbuffers/schema/ort_training_checkpoint.fbs.h
++++ b/onnxruntime/core/flatbuffers/schema/ort_training_checkpoint.fbs.h
+@@ -6,13 +6,6 @@
+ 
+ #include "core/common/flatbuffers.h"
+ 
+-// Ensure the included flatbuffers.h is the same version as when this file was
+-// generated, otherwise it may not be compatible.
+-static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
+-              FLATBUFFERS_VERSION_MINOR == 5 &&
+-              FLATBUFFERS_VERSION_REVISION == 26,
+-             "Non-compatible flatbuffers version included");
+-
+ #include "ort.fbs.h"
+ 
+ namespace onnxruntime {
+diff --git a/onnxruntime/core/optimizer/transpose_optimization/optimizer_api.h b/onnxruntime/core/optimizer/transpose_optimization/optimizer_api.h
+index e4d59ea732..25e69dc3c6 100644
+--- a/onnxruntime/core/optimizer/transpose_optimization/optimizer_api.h
++++ b/onnxruntime/core/optimizer/transpose_optimization/optimizer_api.h
+@@ -11,6 +11,7 @@
+ #include <unordered_map>
+ #include <unordered_set>
+ #include <vector>
++#include <cstdint>
+ 
+ namespace onnx_transpose_optimization {
+ namespace api {
+diff --git a/onnxruntime/core/providers/dml/DmlExecutionProvider/src/External/DirectMLHelpers/DmlGraphDesc_generated.h b/onnxruntime/core/providers/dml/DmlExecutionProvider/src/External/DirectMLHelpers/DmlGraphDesc_generated.h
+index df485396f1..49c1dd42e6 100644
+--- a/onnxruntime/core/providers/dml/DmlExecutionProvider/src/External/DirectMLHelpers/DmlGraphDesc_generated.h
++++ b/onnxruntime/core/providers/dml/DmlExecutionProvider/src/External/DirectMLHelpers/DmlGraphDesc_generated.h
+@@ -6,13 +6,6 @@
+ 
+ #include "core/common/flatbuffers.h"
+ 
+-// Ensure the included flatbuffers.h is the same version as when this file was
+-// generated, otherwise it may not be compatible.
+-static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
+-              FLATBUFFERS_VERSION_MINOR == 5 &&
+-              FLATBUFFERS_VERSION_REVISION == 26,
+-             "Non-compatible flatbuffers version included");
+-
+ #include "OperatorFieldTypes_generated.h"
+ 
+ namespace dml {
+diff --git a/onnxruntime/core/providers/dml/DmlExecutionProvider/src/External/DirectMLHelpers/OperatorFieldTypes_generated.h b/onnxruntime/core/providers/dml/DmlExecutionProvider/src/External/DirectMLHelpers/OperatorFieldTypes_generated.h
+index 639c31f0dc..a4c5f6ed16 100644
+--- a/onnxruntime/core/providers/dml/DmlExecutionProvider/src/External/DirectMLHelpers/OperatorFieldTypes_generated.h
++++ b/onnxruntime/core/providers/dml/DmlExecutionProvider/src/External/DirectMLHelpers/OperatorFieldTypes_generated.h
+@@ -6,13 +6,6 @@
+ 
+ #include "core/common/flatbuffers.h"
+ 
+-// Ensure the included flatbuffers.h is the same version as when this file was
+-// generated, otherwise it may not be compatible.
+-static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
+-              FLATBUFFERS_VERSION_MINOR == 5 &&
+-              FLATBUFFERS_VERSION_REVISION == 26,
+-             "Non-compatible flatbuffers version included");
+-
+ namespace dml {
+ namespace ir {
+ namespace operatorFieldTypes {
+diff --git a/onnxruntime/lora/adapter_format/adapter_schema.fbs.h b/onnxruntime/lora/adapter_format/adapter_schema.fbs.h
+index c1d5412acb..df0665095c 100644
+--- a/onnxruntime/lora/adapter_format/adapter_schema.fbs.h
++++ b/onnxruntime/lora/adapter_format/adapter_schema.fbs.h
+@@ -5,13 +5,6 @@
+ 
+ #include "flatbuffers/flatbuffers.h"
+ 
+-// Ensure the included flatbuffers.h is the same version as when this file was
+-// generated, otherwise it may not be compatible.
+-static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
+-                  FLATBUFFERS_VERSION_MINOR == 5 &&
+-                  FLATBUFFERS_VERSION_REVISION == 26,
+-              "Non-compatible flatbuffers version included");
+-
+ namespace onnxruntime {
+ namespace adapters {
+ 
+diff --git a/onnxruntime/test/flatbuffers/flatbuffers_utils_test.fbs.h b/onnxruntime/test/flatbuffers/flatbuffers_utils_test.fbs.h
+index 0c8e89a80e..7c765c55df 100644
+--- a/onnxruntime/test/flatbuffers/flatbuffers_utils_test.fbs.h
++++ b/onnxruntime/test/flatbuffers/flatbuffers_utils_test.fbs.h
+@@ -7,13 +7,6 @@
+ // manual edit to use wrapper in core/common
+ #include "core/common/flatbuffers.h"
+ 
+-// Ensure the included flatbuffers.h is the same version as when this file was
+-// generated, otherwise it may not be compatible.
+-static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
+-              FLATBUFFERS_VERSION_MINOR == 5 &&
+-              FLATBUFFERS_VERSION_REVISION == 26,
+-             "Non-compatible flatbuffers version included");
+-
+ // manual edit to set include path for this
+ #include "core/flatbuffers/schema/ort.fbs.h"
+ 
+-- 
+2.34.1
+
