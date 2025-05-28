@@ -1,0 +1,2506 @@
+From 6d02fd1748e5494c866a037baa350f9159cfac57 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Thu, 3 Jul 2025 13:52:04 +0100
+Subject: [PATCH 2/7] Use external library dependencies
+
+This changes the dependencies on the following libraries so
+that they are provided at build time instead of being
+fetched, built, and installed by CMake:
+
+ - glfw3
+ - yaml-cpp
+ - hwloc
+ - imgui
+ - stb
+ - fmt
+ - spdlog
+ - CLI11
+ - dlpack
+ - tl-expected
+ - gtest
+ - pybind11
+ - cpm-cmake
+ - rapids-cmake
+ - rmm
+ - cccl
+ - cub
+ - libcudacxx
+ - Thrust
+ - nvtx3
+ - magic_enum
+ - onnxruntime
+ - ucx
+ - Protobuf
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ CMakeLists.txt                                |  38 -
+ cmake/deps/cli11_rapids.cmake                 |  18 +-
+ cmake/deps/dlpack_rapids.cmake                |  18 +-
+ cmake/deps/expected_rapids.cmake              |  21 +-
+ cmake/deps/fmt_rapids.cmake                   |  26 +-
+ cmake/deps/glfw_rapids.cmake                  |  20 +-
+ cmake/deps/grpc.cmake                         |  10 +-
+ cmake/deps/gtest_rapids.cmake                 |  38 +-
+ cmake/deps/hwloc.cmake                        | 112 +--
+ cmake/deps/hwloc.config.h.in                  | 259 -----
+ cmake/deps/hwloc.private.config.h.in          | 882 ------------------
+ cmake/deps/hwloc.static-components.h.in       |  32 -
+ cmake/deps/magic_enum.cmake                   |  29 +-
+ cmake/deps/nvtx3.cmake                        |  35 -
+ cmake/deps/pybind11.cmake                     |  19 +-
+ cmake/deps/rmm.cmake                          |  30 +-
+ cmake/deps/spdlog_rapids.cmake                |  29 +-
+ cmake/deps/ucx.cmake                          |  15 -
+ cmake/deps/yaml-cpp_rapids.cmake              |  51 +-
+ cmake/modules/FindONNXRuntime.cmake           |  45 +-
+ cmake/modules/SetupCUDA.cmake                 |  26 -
+ cmake/modules/SetupCache.cmake                |   3 -
+ cmake/modules/SetupRapidsCMake.cmake          |  13 +-
+ cmake/setup_dependencies.cmake                |   1 -
+ .../cpp/operator_status_tracking.cpp          |   2 +-
+ include/holoscan/logger/logger.hpp            |  11 +-
+ include/holoscan/profiler/nvtx3.hpp           |   2 +-
+ modules/holoinfer/src/CMakeLists.txt          |  13 +-
+ .../holoinfer/src/infer/onnx/CMakeLists.txt   |   8 +-
+ .../holoinfer/src/infer/torch/CMakeLists.txt  |   3 +-
+ modules/holoviz/examples/demo/CMakeLists.txt  |  14 +-
+ .../holoviz/examples/depth_map/CMakeLists.txt |  14 +-
+ .../holoviz/tests/functional/CMakeLists.txt   |  14 +-
+ .../holoviz/thirdparty/imgui/CMakeLists.txt   |  28 +-
+ .../holoscan/operators/holoviz/CMakeLists.txt |   5 +-
+ python/holoscan/operators/holoviz/holoviz.cpp |   2 +-
+ src/CMakeLists.txt                            |  29 +-
+ src/operators/holoviz/holoviz.cpp             |   2 +-
+ .../v4l2_video_capture/v4l2_video_capture.cpp |   2 +-
+ 39 files changed, 102 insertions(+), 1817 deletions(-)
+ delete mode 100644 cmake/deps/hwloc.config.h.in
+ delete mode 100644 cmake/deps/hwloc.private.config.h.in
+ delete mode 100644 cmake/deps/hwloc.static-components.h.in
+ delete mode 100644 cmake/deps/nvtx3.cmake
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 9b59284..d0f3c65 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -248,8 +248,6 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS
+     holoinfer
+     infer_utils
+     logger
+-    nvtx3-c
+-    nvtx3-cpp
+     op_async_ping_rx
+     op_async_ping_tx
+     op_bayer_demosaic
+@@ -268,7 +266,6 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS
+     op_v4l2
+     profiler
+     spdlog_logger
+-    yaml-cpp
+ )
+ if(HOLOSCAN_BUILD_LIBTORCH)
+   list(APPEND HOLOSCAN_INSTALL_TARGETS holoinfer_torch)
+@@ -293,30 +290,6 @@ install(DIRECTORY include/holoscan/
+     COMPONENT holoscan-core
+ )
+ 
+-# Copy bundled tl-expected headers
+-install(DIRECTORY ${tl-expected_SOURCE_DIR}/include/tl/
+-    DESTINATION include/3rdparty/tl
+-    COMPONENT holoscan-dependencies
+-)
+-
+-# Copy bundled dlpack headers
+-install(DIRECTORY ${dlpack_SOURCE_DIR}/include/dlpack/
+-    DESTINATION include/3rdparty/dlpack
+-    COMPONENT holoscan-core
+-)
+-
+-# Copy bundled cli11 headers
+-install(DIRECTORY ${cli11_SOURCE_DIR}/include/CLI/
+-    DESTINATION include/3rdparty/CLI
+-    COMPONENT holoscan-core
+-)
+-
+-# Copy bundled spdlog headers
+-install(DIRECTORY ${spdlog_SOURCE_DIR}/include/spdlog/
+-    DESTINATION include/3rdparty/spdlog
+-    COMPONENT holoscan-core
+-)
+-
+ # Copy version file
+ install(FILES ${${HOLOSCAN_PACKAGE_NAME}_BINARY_DIR}/include/holoscan/version_config.hpp
+     DESTINATION include/holoscan
+@@ -426,17 +399,6 @@ foreach(gxf_component IN LISTS _GXF_components)
+   endif()
+ endforeach()
+ 
+-if(TARGET GXF::ucx)
+-    # GXF UCX classes publicly depend on UCX headers.
+-    # Workaround to include those headers without explicitly providing UCX targets.
+-    # http://cdash.nvidia.com/viewBuildError.php?buildid=4461
+-    set_property(
+-        TARGET GXF::ucx
+-        APPEND PROPERTY
+-            INTERFACE_INCLUDE_DIRECTORIES "${PACKAGE_PREFIX_DIR}/include/3rdparty/ucx"
+-    )
+-endif()
+-
+ if(NOT TARGET GXF::gxe)
+   add_executable(GXF::gxe IMPORTED)
+   set_target_properties(GXF::gxe PROPERTIES
+diff --git a/cmake/deps/cli11_rapids.cmake b/cmake/deps/cli11_rapids.cmake
+index db010da..c2b602c 100644
+--- a/cmake/deps/cli11_rapids.cmake
++++ b/cmake/deps/cli11_rapids.cmake
+@@ -14,20 +14,4 @@
+ # limitations under the License.
+ #
+ 
+-# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_find_package.html#
+-include(${rapids-cmake-dir}/cpm/find.cmake)
+-
+-rapids_cpm_find(CLI11 2.3.2
+-    GLOBAL_TARGETS CLI11
+-
+-    CPM_ARGS
+-
+-    GITHUB_REPOSITORY CLIUtils/CLI11
+-    GIT_TAG v2.3.2
+-    GIT_SHALLOW TRUE
+-    EXCLUDE_FROM_ALL
+-)
+-
+-# Set 'cli11_SOURCE_DIR' with PARENT_SCOPE so that
+-# root project can use it to include headers
+-set(cli11_SOURCE_DIR ${CLI11_SOURCE_DIR} PARENT_SCOPE)
++rapids_find_package(CLI11 2.3.2 REQUIRED)
+diff --git a/cmake/deps/dlpack_rapids.cmake b/cmake/deps/dlpack_rapids.cmake
+index d207b18..dda7379 100644
+--- a/cmake/deps/dlpack_rapids.cmake
++++ b/cmake/deps/dlpack_rapids.cmake
+@@ -14,20 +14,4 @@
+ # limitations under the License.
+ #
+ 
+-# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_find_package.html#
+-include(${rapids-cmake-dir}/cpm/find.cmake)
+-
+-rapids_cpm_find(dlpack 1.0
+-    GLOBAL_TARGETS dlpack
+-
+-    CPM_ARGS
+-
+-    GITHUB_REPOSITORY dmlc/dlpack
+-    GIT_TAG v1.0
+-    GIT_SHALLOW TRUE
+-    EXCLUDE_FROM_ALL
+-)
+-
+-# Set 'dlpack_SOURCE_DIR' with PARENT_SCOPE so that
+-# root project can use it to include headers
+-set(dlpack_SOURCE_DIR ${dlpack_SOURCE_DIR} PARENT_SCOPE)
++rapids_find_package(dlpack 1.0 REQUIRED)
+diff --git a/cmake/deps/expected_rapids.cmake b/cmake/deps/expected_rapids.cmake
+index 680c6ee..3cfa92a 100644
+--- a/cmake/deps/expected_rapids.cmake
++++ b/cmake/deps/expected_rapids.cmake
+@@ -13,23 +13,4 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_find_package.html#
+-include(${rapids-cmake-dir}/cpm/find.cmake)
+-
+-rapids_cpm_find(tl-expected 1.1.0
+-    GLOBAL_TARGETS tl::expected expected
+-
+-    CPM_ARGS
+-
+-    GITHUB_REPOSITORY TartanLlama/expected
+-    GIT_TAG v1.1.0
+-    GIT_SHALLOW TRUE
+-
+-    OPTIONS
+-    "EXPECTED_BUILD_TESTS OFF"
+-    EXCLUDE_FROM_ALL
+-)
+-
+-# Set 'tl-expected_SOURCE_DIR' with PARENT_SCOPE so that
+-# root project can use it to include headers
+-set(tl-expected_SOURCE_DIR ${tl-expected_SOURCE_DIR} PARENT_SCOPE)
++rapids_find_package(tl-expected 1.1.0 REQUIRED)
+diff --git a/cmake/deps/fmt_rapids.cmake b/cmake/deps/fmt_rapids.cmake
+index e3ca363..8c015e4 100644
+--- a/cmake/deps/fmt_rapids.cmake
++++ b/cmake/deps/fmt_rapids.cmake
+@@ -13,27 +13,5 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_cpm_find.html
+-include(${rapids-cmake-dir}/cpm/find.cmake)
+-
+-rapids_cpm_find(fmt 10.1.1
+-    GLOBAL_TARGETS fmt fmt-header-only
+-    BUILD_EXPORT_SET ${HOLOSCAN_PACKAGE_NAME}-exports
+-    CPM_ARGS
+-
+-    GITHUB_REPOSITORY fmtlib/fmt
+-    GIT_TAG 10.1.1
+-    GIT_SHALLOW TRUE
+-
+-    OPTIONS
+-    "FMT_INSTALL ON"
+-    EXCLUDE_FROM_ALL
+-)
+-
+-if(fmt_ADDED)
+-    # Install the headers needed for development with the SDK
+-    install(DIRECTORY ${fmt_SOURCE_DIR}/include/fmt
+-        DESTINATION "include"
+-        COMPONENT "holoscan-dependencies"
+-        )
+-endif()
++find_package(PkgConfig)
++pkg_check_modules(FMT REQUIRED IMPORTED_TARGET GLOBAL fmt>=10.1.1)
+diff --git a/cmake/deps/glfw_rapids.cmake b/cmake/deps/glfw_rapids.cmake
+index 7ed90e6..77f3e08 100644
+--- a/cmake/deps/glfw_rapids.cmake
++++ b/cmake/deps/glfw_rapids.cmake
+@@ -68,22 +68,4 @@ if(NOT Wayland_FOUND)
+     message(FATAL_ERROR "Wayland not found. Please install Wayland development files ('sudo apt-get install libwayland-dev') and try again.")
+ endif()
+ 
+-rapids_cpm_find(GLFW 3.4
+-    GLOBAL_TARGETS glfw
+-
+-    CPM_ARGS
+-
+-    GITHUB_REPOSITORY glfw/glfw
+-    GIT_TAG 3.4
+-    OPTIONS
+-    "BUILD_SHARED_LIBS OFF"
+-    "CXXOPTS_BUILD_EXAMPLES OFF"
+-    "CXXOPTS_BUILD_TESTS OFF"
+-    "GLFW_BUILD_X11 ON"
+-    "GLFW_BUILD_WAYLAND ON"
+-    "GLFW_BUILD_TESTS OFF"
+-    "GLFW_BUILD_EXAMPLES OFF"
+-    "GLFW_BUILD_DOCS OFF"
+-    "GLFW_INSTALL OFF"
+-    EXCLUDE_FROM_ALL
+-)
++rapids_find_package(glfw3 3.4.0 REQUIRED)
+diff --git a/cmake/deps/grpc.cmake b/cmake/deps/grpc.cmake
+index 360f64c..8b877f0 100644
+--- a/cmake/deps/grpc.cmake
++++ b/cmake/deps/grpc.cmake
+@@ -75,7 +75,7 @@ endfunction()
+ # GRPC_CPP_EXECUTABLE - the path to the grpc_cpp_plugin executable
+ 
+ set(protobuf_MODULE_COMPATIBLE TRUE)
+-find_package(Protobuf CONFIG REQUIRED)
++find_package(Protobuf REQUIRED)
+ message(STATUS "Using protobuf ${Protobuf_VERSION}")
+ 
+ if(CMAKE_CROSSCOMPILING)
+@@ -84,6 +84,14 @@ else()
+     get_target_property(PROTOC_EXECUTABLE protobuf::protoc LOCATION)
+ endif()
+ 
++# Workaround of https://github.com/protocolbuffers/protobuf/issues/18307
++# The latest (BSD variants) protobuf builds are forcibly bound to libupd, so
++# find_package(gRPC...) will fail with
++#     Targets not yet defined: protobuf::libupb
++# Try to satisfy it temporally.
++#
++add_library(protobuf::libupb STATIC IMPORTED)
++
+ # Find gRPC installation
+ # Looks for gRPCConfig.cmake file installed by gRPC's cmake installation.
+ find_package(gRPC CONFIG REQUIRED)
+diff --git a/cmake/deps/gtest_rapids.cmake b/cmake/deps/gtest_rapids.cmake
+index 1ca5a39..01baab4 100644
+--- a/cmake/deps/gtest_rapids.cmake
++++ b/cmake/deps/gtest_rapids.cmake
+@@ -13,40 +13,4 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-# Derived from https://docs.rapids.ai/api/rapids-cmake/stable/packages/rapids_cpm_gtest
+-#
+-# Workaround for issue where `FetchContent_Declare(GTest)` does not respect `SOURCE_DIR` for caching.
+-# https://github.com/google/googletest/issues/4384
+-# https://gitlab.kitware.com/cmake/cmake/-/issues/25714
+-set(version 1.12.1)
+-rapids_cpm_find(googletest ${version}
+-    GLOBAL_TARGETS GTest::gtest GTest::gmock GTest::gtest_main GTest::gmock_main
+-    CPM_ARGS FIND_PACKAGE_ARGUMENTS "EXACT"
+-    GIT_REPOSITORY "https://github.com/google/googletest.git"
+-    GIT_TAG release-${version}
+-    GIT_SHALLOW ON
+-    PATCH_COMMAND ""
+-    EXCLUDE_FROM_ALL OFF
+-    OPTIONS "INSTALL_GTEST OFF"
+-)
+-
+-# Propagate up variables that CPMFindPackage provide
+-set(googletest_SOURCE_DIR "${googletest_SOURCE_DIR}" PARENT_SCOPE)
+-set(googletest_BINARY_DIR "${googletest_BINARY_DIR}" PARENT_SCOPE)
+-set(googletest_ADDED "${googletest_ADDED}" PARENT_SCOPE)
+-set(googletest_VERSION ${version} PARENT_SCOPE)
+-
+-if(TARGET GTest::gtest AND NOT TARGET GTest::gmock)
+-    message(WARNING "The googletest package found doesn't provide gmock. If you run into 'GTest::gmock target not found' issues you need to use a different version of GTest.The easiest way is to request building GTest from source by adding the following to the cmake invocation:
+-    '-DCPM_DOWNLOAD_googletest=ON'")
+-endif()
+-
+-if(NOT TARGET GTest::gtest AND TARGET gtest)
+-    add_library(GTest::gtest ALIAS gtest)
+-    add_library(GTest::gtest_main ALIAS gtest_main)
+-endif()
+-
+-if(NOT TARGET GTest::gmock AND TARGET gmock)
+-    add_library(GTest::gmock ALIAS gmock)
+-    add_library(GTest::gmock_main ALIAS gmock_main)
+-endif()
++find_package(GTest 1.16.0 REQUIRED)
+diff --git a/cmake/deps/hwloc.cmake b/cmake/deps/hwloc.cmake
+index 9c20ea4..be9c2a0 100644
+--- a/cmake/deps/hwloc.cmake
++++ b/cmake/deps/hwloc.cmake
+@@ -13,113 +13,5 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_find_package.html#
+-include(${rapids-cmake-dir}/cpm/find.cmake)
+-
+-rapids_cpm_find(hwloc 2.9.0
+-    CPM_ARGS
+-
+-    GITHUB_REPOSITORY open-mpi/hwloc
+-    GIT_TAG hwloc-2.9.0
+-    GIT_SHALLOW TRUE
+-    EXCLUDE_FROM_ALL
+-)
+-
+-
+-if(hwloc_ADDED)
+-    # The template files are generated by the following commands:
+-    # (and modified hwloc/static-components.h and include/private/autogen/config.h files for holoscan)
+-    #   git clone https://github.com/open-mpi/hwloc.git
+-    #   cd hwloc
+-    #   git checkout hwloc-2.9.0
+-    #   ./autogen.sh
+-    #   mkdir install
+-    #   ./configure --prefix=`pwd`/install
+-    #
+-    #   TOP=/workspace/holoscan-sdk
+-    #   cp hwloc/static-components.h ${TOP}/public/cmake/deps/hwloc.static-components.h.in
+-    #   cp include/private/autogen/config.h ${TOP}/public/cmake/deps/hwloc.private.config.h.in
+-    #   cp include/hwloc/autogen/config.h ${TOP}/public/cmake/deps/hwloc.config.h.in
+-
+-    set(_hwloc_platform_specific_files "")
+-
+-    if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64 OR CMAKE_SYSTEM_PROCESSOR STREQUAL amd64)
+-        set(HWLOC_X86_64_ARCH 1)
+-        set(_hwloc_platform_specific_files ${hwloc_SOURCE_DIR}/hwloc/topology-x86.c)
+-    elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL aarch64 OR CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
+-        set(HWLOC_X86_64_ARCH 0)
+-    else()
+-        message(FATAL_ERROR "CMAKE_SYSTEM_PROCESSOR=${CMAKE_SYSTEM_PROCESSOR} is not an architecture supported by Holoscan")
+-    endif()
+-
+-    configure_file(${CMAKE_CURRENT_LIST_DIR}/hwloc.config.h.in ${hwloc_BINARY_DIR}/include/hwloc/autogen/config.h)
+-    configure_file(${CMAKE_CURRENT_LIST_DIR}/hwloc.private.config.h.in ${hwloc_BINARY_DIR}/include/private/autogen/config.h)
+-    configure_file(${CMAKE_CURRENT_LIST_DIR}/hwloc.static-components.h.in ${hwloc_BINARY_DIR}/include/static-components.h)
+-
+-    add_library(hwloc STATIC)
+-    # Reference: https://github.com/open-mpi/hwloc/pull/566/files
+-    set_target_properties(hwloc PROPERTIES LINKER_LANGUAGE C)
+-    # /usr/bin/ld: lib/libhwloc.a(topology.c.o): relocation R_X86_64_PC32 against symbol `stderr@@GLIBC_2.2.5' can not be used when making a shared object; recompile with -fPIC
+-    set_target_properties(hwloc PROPERTIES POSITION_INDEPENDENT_CODE ON)
+-
+-    target_sources(hwloc
+-        PRIVATE
+-        ${hwloc_SOURCE_DIR}/hwloc/traversal.c
+-        ${hwloc_SOURCE_DIR}/hwloc/distances.c
+-        ${hwloc_SOURCE_DIR}/hwloc/memattrs.c
+-        ${hwloc_SOURCE_DIR}/hwloc/cpukinds.c
+-        ${hwloc_SOURCE_DIR}/hwloc/components.c
+-        ${hwloc_SOURCE_DIR}/hwloc/bind.c
+-        ${hwloc_SOURCE_DIR}/hwloc/bitmap.c
+-        ${hwloc_SOURCE_DIR}/hwloc/pci-common.c
+-        ${hwloc_SOURCE_DIR}/hwloc/diff.c
+-        ${hwloc_SOURCE_DIR}/hwloc/shmem.c
+-        ${hwloc_SOURCE_DIR}/hwloc/misc.c
+-        ${hwloc_SOURCE_DIR}/hwloc/base64.c
+-        ${hwloc_SOURCE_DIR}/hwloc/topology.c
+-        ${hwloc_SOURCE_DIR}/hwloc/topology-hardwired.c
+-        ${hwloc_SOURCE_DIR}/hwloc/topology-linux.c
+-        ${hwloc_SOURCE_DIR}/hwloc/topology-noos.c
+-        ${hwloc_SOURCE_DIR}/hwloc/topology-synthetic.c
+-        ${hwloc_SOURCE_DIR}/hwloc/topology-xml.c
+-        ${hwloc_SOURCE_DIR}/hwloc/topology-xml-nolibxml.c
+-        ${_hwloc_platform_specific_files}
+-    )
+-
+-    unset(_hwloc_platform_specific_files)
+-
+-    target_include_directories(hwloc
+-        PRIVATE
+-        ${hwloc_SOURCE_DIR}/include
+-        ${hwloc_BINARY_DIR}/include
+-    )
+-
+-    set(private_headers
+-        ${hwloc_BINARY_DIR}/include/private/autogen/config.h
+-        ${hwloc_BINARY_DIR}/include/static-components.h
+-    )
+-
+-    set(public_headers
+-        ${hwloc_SOURCE_DIR}/include/hwloc.h
+-        ${hwloc_SOURCE_DIR}/include/hwloc/rename.h
+-        ${hwloc_SOURCE_DIR}/include/hwloc/bitmap.h
+-        ${hwloc_SOURCE_DIR}/include/hwloc/helper.h
+-        ${hwloc_SOURCE_DIR}/include/hwloc/inlines.h
+-        ${hwloc_SOURCE_DIR}/include/hwloc/memattrs.h
+-        ${hwloc_SOURCE_DIR}/include/hwloc/cpukinds.h
+-        ${hwloc_SOURCE_DIR}/include/hwloc/export.h
+-        ${hwloc_SOURCE_DIR}/include/hwloc/distances.h
+-        ${hwloc_SOURCE_DIR}/include/hwloc/diff.h
+-        ${hwloc_SOURCE_DIR}/include/hwloc/deprecated.h
+-        ${hwloc_BINARY_DIR}/include/hwloc/autogen/config.h
+-    )
+-
+-    target_sources(hwloc PRIVATE ${private_headers} ${public_headers})
+-
+-    target_include_directories(hwloc
+-        INTERFACE
+-        ${hwloc_SOURCE_DIR}/include
+-        ${hwloc_BINARY_DIR}/include
+-    )
+-
+-endif()
++find_package(PkgConfig)
++pkg_check_modules(hwloc REQUIRED IMPORTED_TARGET GLOBAL hwloc>=2.9.0)
+diff --git a/cmake/deps/hwloc.config.h.in b/cmake/deps/hwloc.config.h.in
+deleted file mode 100644
+index 30a6708..0000000
+--- a/cmake/deps/hwloc.config.h.in
++++ /dev/null
+@@ -1,259 +0,0 @@
+-/*
+- * SPDX-FileCopyrightText: Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+- * SPDX-License-Identifier: Apache-2.0
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- * http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-/* include/hwloc/autogen/config.h.  Generated from config.h.in by configure.  */
+-/* -*- c -*-
+- * Copyright © 2009 CNRS
+- * Copyright © 2009-2022 Inria.  All rights reserved.
+- * Copyright © 2009-2012 Université Bordeaux
+- * Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
+- * See COPYING in top-level directory.
+- */
+-
+-/* The configuration file */
+-
+-#ifndef HWLOC_CONFIG_H
+-#define HWLOC_CONFIG_H
+-
+-#define HWLOC_VERSION "2.9.0rc2-git"
+-#define HWLOC_VERSION_MAJOR 2
+-#define HWLOC_VERSION_MINOR 9
+-#define HWLOC_VERSION_RELEASE 0
+-#define HWLOC_VERSION_GREEK "rc2"
+-
+-/* #undef HWLOC_PCI_COMPONENT_BUILTIN */
+-/* #undef HWLOC_OPENCL_COMPONENT_BUILTIN */
+-/* #undef HWLOC_CUDA_COMPONENT_BUILTIN */
+-/* #undef HWLOC_NVML_COMPONENT_BUILTIN */
+-/* #undef HWLOC_RSMI_COMPONENT_BUILTIN */
+-/* #undef HWLOC_LEVELZERO_COMPONENT_BUILTIN */
+-/* #undef HWLOC_GL_COMPONENT_BUILTIN */
+-/* #undef HWLOC_XML_LIBXML_COMPONENT_BUILTIN */
+-
+-#if (__GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 95))
+-# define __hwloc_restrict __restrict
+-#else
+-# if __STDC_VERSION__ >= 199901L
+-#  define __hwloc_restrict restrict
+-# else
+-#  define __hwloc_restrict
+-# endif
+-#endif
+-
+-/* Note that if we're compiling C++, then just use the "inline"
+-   keyword, since it's part of C++ */
+-#if defined(c_plusplus) || defined(__cplusplus)
+-#  define __hwloc_inline inline
+-#elif defined(_MSC_VER) || defined(__HP_cc)
+-#  define __hwloc_inline __inline
+-#else
+-#  define __hwloc_inline __inline__
+-#endif
+-
+-/*
+- * Note: this is public.  We can not assume anything from the compiler used
+- * by the application and thus the HWLOC_HAVE_* macros below are not
+- * fetched from the autoconf result here. We only automatically use a few
+- * well-known easy cases.
+- */
+-
+-/* Some handy constants to make the logic below a little more readable */
+-#if defined(__cplusplus) && \
+-    (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR >= 4))
+-#define GXX_ABOVE_3_4 1
+-#else
+-#define GXX_ABOVE_3_4 0
+-#endif
+-
+-#if !defined(__cplusplus) && \
+-    (__GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 95))
+-#define GCC_ABOVE_2_95 1
+-#else
+-#define GCC_ABOVE_2_95 0
+-#endif
+-
+-#if !defined(__cplusplus) && \
+-    (__GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96))
+-#define GCC_ABOVE_2_96 1
+-#else
+-#define GCC_ABOVE_2_96 0
+-#endif
+-
+-#if !defined(__cplusplus) && \
+-    (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 3))
+-#define GCC_ABOVE_3_3 1
+-#else
+-#define GCC_ABOVE_3_3 0
+-#endif
+-
+-#if !defined(__cplusplus) &&					\
+-    (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4))
+-#define GCC_ABOVE_3_4 1
+-#else
+-#define GCC_ABOVE_3_4 0
+-#endif
+-
+-/* Maybe before gcc 2.95 too */
+-#ifdef HWLOC_HAVE_ATTRIBUTE_UNUSED
+-#define __HWLOC_HAVE_ATTRIBUTE_UNUSED HWLOC_HAVE_ATTRIBUTE_UNUSED 
+-#elif defined(__GNUC__)
+-# define __HWLOC_HAVE_ATTRIBUTE_UNUSED (GXX_ABOVE_3_4 || GCC_ABOVE_2_95)
+-#else
+-# define __HWLOC_HAVE_ATTRIBUTE_UNUSED 0
+-#endif
+-#if __HWLOC_HAVE_ATTRIBUTE_UNUSED
+-# define __hwloc_attribute_unused __attribute__((__unused__))
+-#else
+-# define __hwloc_attribute_unused
+-#endif
+-
+-#ifdef HWLOC_HAVE_ATTRIBUTE_MALLOC
+-#define __HWLOC_HAVE_ATTRIBUTE_MALLOC HWLOC_HAVE_ATTRIBUTE_MALLOC 
+-#elif defined(__GNUC__)
+-# define __HWLOC_HAVE_ATTRIBUTE_MALLOC (GXX_ABOVE_3_4 || GCC_ABOVE_2_96)
+-#else
+-# define __HWLOC_HAVE_ATTRIBUTE_MALLOC 0
+-#endif
+-#if __HWLOC_HAVE_ATTRIBUTE_MALLOC
+-# define __hwloc_attribute_malloc __attribute__((__malloc__))
+-#else
+-# define __hwloc_attribute_malloc
+-#endif
+-
+-#ifdef HWLOC_HAVE_ATTRIBUTE_CONST
+-#define __HWLOC_HAVE_ATTRIBUTE_CONST HWLOC_HAVE_ATTRIBUTE_CONST 
+-#elif defined(__GNUC__)
+-# define __HWLOC_HAVE_ATTRIBUTE_CONST (GXX_ABOVE_3_4 || GCC_ABOVE_2_95)
+-#else
+-# define __HWLOC_HAVE_ATTRIBUTE_CONST 0
+-#endif
+-#if __HWLOC_HAVE_ATTRIBUTE_CONST
+-# define __hwloc_attribute_const __attribute__((__const__))
+-#else
+-# define __hwloc_attribute_const
+-#endif
+-
+-#ifdef HWLOC_HAVE_ATTRIBUTE_PURE
+-#define __HWLOC_HAVE_ATTRIBUTE_PURE HWLOC_HAVE_ATTRIBUTE_PURE 
+-#elif defined(__GNUC__)
+-# define __HWLOC_HAVE_ATTRIBUTE_PURE (GXX_ABOVE_3_4 || GCC_ABOVE_2_96)
+-#else
+-# define __HWLOC_HAVE_ATTRIBUTE_PURE 0
+-#endif
+-#if __HWLOC_HAVE_ATTRIBUTE_PURE
+-# define __hwloc_attribute_pure __attribute__((__pure__))
+-#else
+-# define __hwloc_attribute_pure
+-#endif
+-
+-#ifndef __hwloc_attribute_deprecated /* allow the user to disable these warnings by defining this macro to nothing */
+-#ifdef HWLOC_HAVE_ATTRIBUTE_DEPRECATED
+-#define __HWLOC_HAVE_ATTRIBUTE_DEPRECATED HWLOC_HAVE_ATTRIBUTE_DEPRECATED 
+-#elif defined(__GNUC__)
+-# define __HWLOC_HAVE_ATTRIBUTE_DEPRECATED (GXX_ABOVE_3_4 || GCC_ABOVE_3_3)
+-#else
+-# define __HWLOC_HAVE_ATTRIBUTE_DEPRECATED 0
+-#endif
+-#if __HWLOC_HAVE_ATTRIBUTE_DEPRECATED
+-# define __hwloc_attribute_deprecated __attribute__((__deprecated__))
+-#else
+-# define __hwloc_attribute_deprecated
+-#endif
+-#endif
+-
+-#ifdef HWLOC_HAVE_ATTRIBUTE_MAY_ALIAS
+-#define __HWLOC_HAVE_ATTRIBUTE_MAY_ALIAS HWLOC_HAVE_ATTRIBUTE_MAY_ALIAS
+-#elif defined(__GNUC__)
+-# define __HWLOC_HAVE_ATTRIBUTE_MAY_ALIAS (GXX_ABOVE_3_4 || GCC_ABOVE_3_3)
+-#else
+-# define __HWLOC_HAVE_ATTRIBUTE_MAY_ALIAS 0
+-#endif
+-#if __HWLOC_HAVE_ATTRIBUTE_MAY_ALIAS
+-# define __hwloc_attribute_may_alias __attribute__((__may_alias__))
+-#else
+-# define __hwloc_attribute_may_alias
+-#endif
+-
+-#ifdef HWLOC_HAVE_ATTRIBUTE_WARN_UNUSED_RESULT
+-#define __HWLOC_HAVE_ATTRIBUTE_WARN_UNUSED_RESULT HWLOC_HAVE_ATTRIBUTE_WARN_UNUSED_RESULT
+-#elif defined(__GNUC__)
+-# define __HWLOC_HAVE_ATTRIBUTE_WARN_UNUSED_RESULT (GXX_ABOVE_3_4 || GCC_ABOVE_3_4)
+-#else
+-# define __HWLOC_HAVE_ATTRIBUTE_WARN_UNUSED_RESULT 0
+-#endif
+-#if __HWLOC_HAVE_ATTRIBUTE_WARN_UNUSED_RESULT
+-# define __hwloc_attribute_warn_unused_result __attribute__((__warn_unused_result__))
+-#else
+-# define __hwloc_attribute_warn_unused_result
+-#endif
+-
+-#ifdef HWLOC_C_HAVE_VISIBILITY
+-# if HWLOC_C_HAVE_VISIBILITY
+-#  define HWLOC_DECLSPEC __attribute__((__visibility__("default")))
+-# else
+-#  define HWLOC_DECLSPEC
+-# endif
+-#else
+-# define HWLOC_DECLSPEC
+-#endif
+-
+-/* Defined to 1 on Linux */
+-#define HWLOC_LINUX_SYS 1
+-
+-/* Defined to 1 if the CPU_SET macro works */
+-#define HWLOC_HAVE_CPU_SET 1
+-
+-/* Defined to 1 if you have the `windows.h' header. */
+-/* #undef HWLOC_HAVE_WINDOWS_H */
+-#define hwloc_pid_t pid_t
+-#define hwloc_thread_t pthread_t
+-
+-#ifdef HWLOC_HAVE_WINDOWS_H
+-
+-#  include <windows.h>
+-typedef DWORDLONG hwloc_uint64_t;
+-
+-#else /* HWLOC_HAVE_WINDOWS_H */
+-
+-#  ifdef hwloc_thread_t
+-#    include <pthread.h>
+-#  endif /* hwloc_thread_t */
+-
+-/* Defined to 1 if you have the <stdint.h> header file. */
+-#  define HWLOC_HAVE_STDINT_H 1
+-
+-#  include <unistd.h>
+-#  ifdef HWLOC_HAVE_STDINT_H
+-#    include <stdint.h>
+-#  endif
+-typedef uint64_t hwloc_uint64_t;
+-
+-#endif /* HWLOC_HAVE_WINDOWS_H */
+-
+-/* Define to 1 if --enable-32bits-pci-domain is called. */
+-/* #undef HWLOC_HAVE_32BITS_PCI_DOMAIN */
+-
+-/* Whether we need to re-define all the hwloc public symbols or not */
+-#define HWLOC_SYM_TRANSFORM 0
+-
+-/* The hwloc symbol prefix */
+-#define HWLOC_SYM_PREFIX hwloc_
+-
+-/* The hwloc symbol prefix in all caps */
+-#define HWLOC_SYM_PREFIX_CAPS HWLOC_
+-
+-#endif /* HWLOC_CONFIG_H */
+diff --git a/cmake/deps/hwloc.private.config.h.in b/cmake/deps/hwloc.private.config.h.in
+deleted file mode 100644
+index bd45111..0000000
+--- a/cmake/deps/hwloc.private.config.h.in
++++ /dev/null
+@@ -1,882 +0,0 @@
+-/*
+- * SPDX-FileCopyrightText: Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+- * SPDX-License-Identifier: Apache-2.0
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- * http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-/* include/private/autogen/config.h.  Generated from config.h.in by configure.  */
+-/* include/private/autogen/config.h.in.  Generated from configure.ac by autoheader.  */
+-
+-/* -*- c -*-
+- *
+- * Copyright © 2009, 2011, 2012 CNRS, inria., Université Bordeaux  All rights reserved.
+- * Copyright © 2009-2014 Cisco Systems, Inc.  All rights reserved.
+- * Copyright © 2022 IBM Corporation.  All rights reserved.
+- * $COPYRIGHT$
+- *
+- * Additional copyrights may follow
+- *
+- * $HEADER$
+- *
+- * This file is automatically generated by configure.  Edits will be lost
+- * the next time you run configure!
+- */
+-
+-#ifndef HWLOC_CONFIGURE_H
+-#define HWLOC_CONFIGURE_H
+-
+-
+-/* Define to 1 if the system has the type `CACHE_DESCRIPTOR'. */
+-/* #undef HAVE_CACHE_DESCRIPTOR */
+-
+-/* Define to 1 if the system has the type `CACHE_RELATIONSHIP'. */
+-/* #undef HAVE_CACHE_RELATIONSHIP */
+-
+-/* Define to 1 if you have the `clock_gettime' function. */
+-#define HAVE_CLOCK_GETTIME 1
+-
+-/* Define to 1 if you have the `clz' function. */
+-/* #undef HAVE_CLZ */
+-
+-/* Define to 1 if you have the `clzl' function. */
+-/* #undef HAVE_CLZL */
+-
+-/* Define to 1 if you have the <CL/cl_ext.h> header file. */
+-/* #undef HAVE_CL_CL_EXT_H */
+-
+-/* Define to 1 if you have the `cpuset_setaffinity' function. */
+-/* #undef HAVE_CPUSET_SETAFFINITY */
+-
+-/* Define to 1 if you have the `cpuset_setid' function. */
+-/* #undef HAVE_CPUSET_SETID */
+-
+-/* Define to 1 if you have the <ctype.h> header file. */
+-#define HAVE_CTYPE_H 1
+-
+-/* Define to 1 if we have -lcuda */
+-#define HAVE_CUDA 1
+-
+-/* Define to 1 if you have the <cuda.h> header file. */
+-#define HAVE_CUDA_H 1
+-
+-/* Define to 1 if you have the <cuda_runtime_api.h> header file. */
+-#define HAVE_CUDA_RUNTIME_API_H 1
+-
+-/* Define to 1 if you have the declaration of `bind', and to 0 if you don't.
+-   */
+-#define HAVE_DECL_BIND 1
+-
+-/* Define to 1 if you have the declaration of `CTL_HW', and to 0 if you don't.
+-   */
+-/* #undef HAVE_DECL_CTL_HW */
+-
+-/* Define to 1 if you have the declaration of `fabsf', and to 0 if you don't.
+-   */
+-#define HAVE_DECL_FABSF 1
+-
+-/* Define to 1 if you have the declaration of `getexecname', and to 0 if you
+-   don't. */
+-#define HAVE_DECL_GETEXECNAME 0
+-
+-/* Define to 1 if you have the declaration of `GetModuleFileName', and to 0 if
+-   you don't. */
+-/* #undef HAVE_DECL_GETMODULEFILENAME */
+-
+-/* Define to 1 if you have the declaration of `getprogname', and to 0 if you
+-   don't. */
+-#define HAVE_DECL_GETPROGNAME 0
+-
+-/* Define to 1 if you have the declaration of `HW_MEMSIZE', and to 0 if you
+-   don't. */
+-/* #undef HAVE_DECL_HW_MEMSIZE */
+-
+-/* Define to 1 if you have the declaration of `HW_MEMSIZE64', and to 0 if you
+-   don't. */
+-/* #undef HAVE_DECL_HW_MEMSIZE64 */
+-
+-/* Define to 1 if you have the declaration of `HW_NCPU', and to 0 if you
+-   don't. */
+-/* #undef HAVE_DECL_HW_NCPU */
+-
+-/* Define to 1 if you have the declaration of `HW_PHYSMEM', and to 0 if you
+-   don't. */
+-/* #undef HAVE_DECL_HW_PHYSMEM */
+-
+-/* Define to 1 if you have the declaration of `HW_PHYSMEM64', and to 0 if you
+-   don't. */
+-/* #undef HAVE_DECL_HW_PHYSMEM64 */
+-
+-/* Define to 1 if you have the declaration of `HW_REALMEM', and to 0 if you
+-   don't. */
+-/* #undef HAVE_DECL_HW_REALMEM */
+-
+-/* Define to 1 if you have the declaration of `HW_REALMEM64', and to 0 if you
+-   don't. */
+-/* #undef HAVE_DECL_HW_REALMEM64 */
+-
+-/* Define to 1 if you have the declaration of `HW_USERMEM', and to 0 if you
+-   don't. */
+-/* #undef HAVE_DECL_HW_USERMEM */
+-
+-/* Define to 1 if you have the declaration of `HW_USERMEM64', and to 0 if you
+-   don't. */
+-/* #undef HAVE_DECL_HW_USERMEM64 */
+-
+-/* Define to 1 if you have the declaration of `lgrp_latency_cookie', and to 0
+-   if you don't. */
+-/* #undef HAVE_DECL_LGRP_LATENCY_COOKIE */
+-
+-/* Define to 1 if you have the declaration of `modff', and to 0 if you don't.
+-   */
+-#define HAVE_DECL_MODFF 1
+-
+-/* Define to 1 if you have the declaration of
+-   `nvmlDeviceGetMaxPcieLinkGeneration', and to 0 if you don't. */
+-#define HAVE_DECL_NVMLDEVICEGETMAXPCIELINKGENERATION 1
+-
+-/* Define to 1 if you have the declaration of `pthread_getaffinity_np', and to
+-   0 if you don't. */
+-#define HAVE_DECL_PTHREAD_GETAFFINITY_NP 1
+-
+-/* Define to 1 if you have the declaration of `pthread_setaffinity_np', and to
+-   0 if you don't. */
+-#define HAVE_DECL_PTHREAD_SETAFFINITY_NP 1
+-
+-/* Embedded mode; just assume we do not have Valgrind support */
+-#define HAVE_DECL_RUNNING_ON_VALGRIND 0
+-
+-/* Define to 1 if you have the declaration of `sched_getcpu', and to 0 if you
+-   don't. */
+-#define HAVE_DECL_SCHED_GETCPU 1
+-
+-/* Define to 1 if you have the declaration of `snprintf', and to 0 if you
+-   don't. */
+-#define HAVE_DECL_SNPRINTF 1
+-
+-/* Define to 1 if you have the declaration of `strtoull', and to 0 if you
+-   don't. */
+-#define HAVE_DECL_STRTOULL 1
+-
+-/* Define to 1 if you have the declaration of `_putenv', and to 0 if you
+-   don't. */
+-#define HAVE_DECL__PUTENV 0
+-
+-/* Define to 1 if you have the declaration of `_SC_LARGE_PAGESIZE', and to 0
+-   if you don't. */
+-#define HAVE_DECL__SC_LARGE_PAGESIZE 0
+-
+-/* Define to 1 if you have the declaration of `_SC_NPROCESSORS_CONF', and to 0
+-   if you don't. */
+-#define HAVE_DECL__SC_NPROCESSORS_CONF 1
+-
+-/* Define to 1 if you have the declaration of `_SC_NPROCESSORS_ONLN', and to 0
+-   if you don't. */
+-#define HAVE_DECL__SC_NPROCESSORS_ONLN 1
+-
+-/* Define to 1 if you have the declaration of `_SC_NPROC_CONF', and to 0 if
+-   you don't. */
+-#define HAVE_DECL__SC_NPROC_CONF 0
+-
+-/* Define to 1 if you have the declaration of `_SC_NPROC_ONLN', and to 0 if
+-   you don't. */
+-#define HAVE_DECL__SC_NPROC_ONLN 0
+-
+-/* Define to 1 if you have the declaration of `_SC_PAGESIZE', and to 0 if you
+-   don't. */
+-#define HAVE_DECL__SC_PAGESIZE 1
+-
+-/* Define to 1 if you have the declaration of `_SC_PAGE_SIZE', and to 0 if you
+-   don't. */
+-#define HAVE_DECL__SC_PAGE_SIZE 1
+-
+-/* Define to 1 if you have the declaration of `_strdup', and to 0 if you
+-   don't. */
+-#define HAVE_DECL__STRDUP 0
+-
+-/* Define to 1 if you have the <dirent.h> header file. */
+-#define HAVE_DIRENT_H 1
+-
+-/* Define to 1 if you have the <dlfcn.h> header file. */
+-#define HAVE_DLFCN_H 1
+-
+-/* Define to 1 if you have the `ffs' function. */
+-#define HAVE_FFS 1
+-
+-/* Define to 1 if you have the `ffsl' function. */
+-#define HAVE_FFSL 1
+-
+-/* Define to 1 if you have the `fls' function. */
+-/* #undef HAVE_FLS */
+-
+-/* Define to 1 if you have the `flsl' function. */
+-/* #undef HAVE_FLSL */
+-
+-/* Define to 1 if you have the `getpagesize' function. */
+-#define HAVE_GETPAGESIZE 1
+-
+-/* Define to 1 if the system has the type `GROUP_AFFINITY'. */
+-/* #undef HAVE_GROUP_AFFINITY */
+-
+-/* Define to 1 if the system has the type `GROUP_RELATIONSHIP'. */
+-/* #undef HAVE_GROUP_RELATIONSHIP */
+-
+-/* Define to 1 if you have the `host_info' function. */
+-/* #undef HAVE_HOST_INFO */
+-
+-/* Define to 1 if you have the <infiniband/verbs.h> header file. */
+-#define HAVE_INFINIBAND_VERBS_H 1
+-
+-/* Define to 1 if you have the <inttypes.h> header file. */
+-#define HAVE_INTTYPES_H 1
+-
+-/* Define to 1 if you have the `isatty' function. */
+-#define HAVE_ISATTY 1
+-
+-/* Define to 1 if the system has the type `KAFFINITY'. */
+-/* #undef HAVE_KAFFINITY */
+-
+-/* Define to 1 if you have the <kstat.h> header file. */
+-/* #undef HAVE_KSTAT_H */
+-
+-/* Define to 1 if you have the <langinfo.h> header file. */
+-#define HAVE_LANGINFO_H 1
+-
+-/* Define to 1 if you have the <level_zero/zes_api.h> header file. */
+-/* #undef HAVE_LEVEL_ZERO_ZES_API_H */
+-
+-/* Define to 1 if you have the <level_zero/ze_api.h> header file. */
+-/* #undef HAVE_LEVEL_ZERO_ZE_API_H */
+-
+-/* Define to 1 if we have -lgdi32 */
+-/* #undef HAVE_LIBGDI32 */
+-
+-/* Define to 1 if we have -libverbs */
+-/* #undef HAVE_LIBIBVERBS */
+-
+-/* Define to 1 if we have -lkstat */
+-/* #undef HAVE_LIBKSTAT */
+-
+-/* Define to 1 if we have -llgrp */
+-/* #undef HAVE_LIBLGRP */
+-
+-/* Define to 1 if you have the <libudev.h> header file. */
+-/* #undef HAVE_LIBUDEV_H */
+-
+-/* Define to 1 if you have the <locale.h> header file. */
+-#define HAVE_LOCALE_H 1
+-
+-/* Define to 1 if the system has the type `LOGICAL_PROCESSOR_RELATIONSHIP'. */
+-/* #undef HAVE_LOGICAL_PROCESSOR_RELATIONSHIP */
+-
+-/* Define to 1 if you have the <mach_init.h> header file. */
+-/* #undef HAVE_MACH_INIT_H */
+-
+-/* Define to 1 if you have the <mach/mach_host.h> header file. */
+-/* #undef HAVE_MACH_MACH_HOST_H */
+-
+-/* Define to 1 if you have the <mach/mach_init.h> header file. */
+-/* #undef HAVE_MACH_MACH_INIT_H */
+-
+-/* Define to 1 if you have the <malloc.h> header file. */
+-#define HAVE_MALLOC_H 1
+-
+-/* Define to 1 if you have the `memalign' function. */
+-#define HAVE_MEMALIGN 1
+-
+-/* Define to 1 if you have the <memory.h> header file. */
+-#define HAVE_MEMORY_H 1
+-
+-/* Define to 1 if you have the `mkstemp' function. */
+-#define HAVE_MKSTEMP 1
+-
+-/* Define to 1 if you have the <mpi.h> header file. */
+-/* #undef HAVE_MPI_H */
+-
+-/* Define to 1 if you have the `nl_langinfo' function. */
+-#define HAVE_NL_LANGINFO 1
+-
+-/* Define to 1 if the system has the type `NUMA_NODE_RELATIONSHIP'. */
+-/* #undef HAVE_NUMA_NODE_RELATIONSHIP */
+-
+-/* Define to 1 if you have the <NVCtrl/NVCtrl.h> header file. */
+-/* #undef HAVE_NVCTRL_NVCTRL_H */
+-
+-/* Define to 1 if you have the <nvml.h> header file. */
+-#define HAVE_NVML_H 1
+-
+-/* Define to 1 if you have the `openat' function. */
+-#define HAVE_OPENAT 1
+-
+-/* Define to 1 if you have the <OpenCL/cl_ext.h> header file. */
+-/* #undef HAVE_OPENCL_CL_EXT_H */
+-
+-/* Define to 1 if you have the <picl.h> header file. */
+-/* #undef HAVE_PICL_H */
+-
+-/* Define to 1 if you have the `posix_memalign' function. */
+-#define HAVE_POSIX_MEMALIGN 1
+-
+-/* Define to 1 if the system has the type `PROCESSOR_CACHE_TYPE'. */
+-/* #undef HAVE_PROCESSOR_CACHE_TYPE */
+-
+-/* Define to 1 if the system has the type `PROCESSOR_GROUP_INFO'. */
+-/* #undef HAVE_PROCESSOR_GROUP_INFO */
+-
+-/* Define to 1 if the system has the type `PROCESSOR_NUMBER'. */
+-/* #undef HAVE_PROCESSOR_NUMBER */
+-
+-/* Define to 1 if the system has the type `PROCESSOR_RELATIONSHIP'. */
+-/* #undef HAVE_PROCESSOR_RELATIONSHIP */
+-
+-/* Define to '1' if program_invocation_name is present and usable */
+-#define HAVE_PROGRAM_INVOCATION_NAME 1
+-
+-/* Define to 1 if the system has the type `PSAPI_WORKING_SET_EX_BLOCK'. */
+-/* #undef HAVE_PSAPI_WORKING_SET_EX_BLOCK */
+-
+-/* Define to 1 if the system has the type `PSAPI_WORKING_SET_EX_INFORMATION'.
+-   */
+-/* #undef HAVE_PSAPI_WORKING_SET_EX_INFORMATION */
+-
+-/* Define to 1 if you have the <pthread_np.h> header file. */
+-/* #undef HAVE_PTHREAD_NP_H */
+-
+-/* Define to 1 if the system has the type `pthread_t'. */
+-#define HAVE_PTHREAD_T 1
+-
+-/* Define to 1 if you have the `putwc' function. */
+-#define HAVE_PUTWC 1
+-
+-/* Define to 1 if the system has the type `RelationProcessorPackage'. */
+-/* #undef HAVE_RELATIONPROCESSORPACKAGE */
+-
+-/* Define to 1 if you have the <rocm_smi/rocm_smi.h> header file. */
+-/* #undef HAVE_ROCM_SMI_ROCM_SMI_H */
+-
+-/* Define to 1 if you have the `setlocale' function. */
+-#define HAVE_SETLOCALE 1
+-
+-/* Define to 1 if the system has the type `ssize_t'. */
+-#define HAVE_SSIZE_T 1
+-
+-/* Define to 1 if you have the <stdint.h> header file. */
+-#define HAVE_STDINT_H 1
+-
+-/* Define to 1 if you have the <stdlib.h> header file. */
+-#define HAVE_STDLIB_H 1
+-
+-/* Define to 1 if you have the `strcasecmp' function. */
+-#define HAVE_STRCASECMP 1
+-
+-/* Define to 1 if you have the `strftime' function. */
+-#define HAVE_STRFTIME 1
+-
+-/* Define to 1 if you have the <strings.h> header file. */
+-#define HAVE_STRINGS_H 1
+-
+-/* Define to 1 if you have the <string.h> header file. */
+-#define HAVE_STRING_H 1
+-
+-/* Define to 1 if you have the `strncasecmp' function. */
+-#define HAVE_STRNCASECMP 1
+-
+-/* Define to 1 if you have the `strtoull' function. */
+-/* #undef HAVE_STRTOULL */
+-
+-/* Define to '1' if sysctl is present and usable */
+-/* #undef HAVE_SYSCTL */
+-
+-/* Define to '1' if sysctlbyname is present and usable */
+-/* #undef HAVE_SYSCTLBYNAME */
+-
+-/* Define to 1 if the system has the type
+-   `SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX'. */
+-/* #undef HAVE_SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX */
+-
+-/* Define to 1 if you have the <sys/cpuset.h> header file. */
+-/* #undef HAVE_SYS_CPUSET_H */
+-
+-/* Define to 1 if you have the <sys/domainset.h> header file. */
+-/* #undef HAVE_SYS_DOMAINSET_H */
+-
+-/* Define to 1 if you have the <sys/lgrp_user.h> header file. */
+-/* #undef HAVE_SYS_LGRP_USER_H */
+-
+-/* Define to 1 if you have the <sys/mman.h> header file. */
+-#define HAVE_SYS_MMAN_H 1
+-
+-/* Define to 1 if you have the <sys/param.h> header file. */
+-/* #undef HAVE_SYS_PARAM_H */
+-
+-/* Define to 1 if you have the <sys/stat.h> header file. */
+-#define HAVE_SYS_STAT_H 1
+-
+-/* Define to 1 if you have the <sys/sysctl.h> header file. */
+-/* #undef HAVE_SYS_SYSCTL_H */
+-
+-/* Define to 1 if you have the <sys/thr.h> header file. */
+-/* #undef HAVE_SYS_THR_H */
+-
+-/* Define to 1 if you have the <sys/types.h> header file. */
+-#define HAVE_SYS_TYPES_H 1
+-
+-/* Define to 1 if you have the <sys/utsname.h> header file. */
+-#define HAVE_SYS_UTSNAME_H 1
+-
+-/* Define to 1 if you have the `tcgetpgrp' function. */
+-#define HAVE_TCGETPGRP 1
+-
+-/* Define to 1 if you have the <time.h> header file. */
+-#define HAVE_TIME_H 1
+-
+-/* Define to 1 if you have the `uname' function. */
+-#define HAVE_UNAME 1
+-
+-/* Define to 1 if you have the <unistd.h> header file. */
+-#define HAVE_UNISTD_H 1
+-
+-/* Define to 1 if you have the `uselocale' function. */
+-#define HAVE_USELOCALE 1
+-
+-/* Define to 1 if you have the <valgrind/valgrind.h> header file. */
+-/* #undef HAVE_VALGRIND_VALGRIND_H */
+-
+-/* Define to 1 if the system has the type `wchar_t'. */
+-#define HAVE_WCHAR_T 1
+-
+-/* Define to 1 if you have the <X11/keysym.h> header file. */
+-#define HAVE_X11_KEYSYM_H 1
+-
+-/* Define to 1 if you have the <X11/Xlib.h> header file. */
+-#define HAVE_X11_XLIB_H 1
+-
+-/* Define to 1 if you have the <X11/Xutil.h> header file. */
+-#define HAVE_X11_XUTIL_H 1
+-
+-/* Define to 1 if you have the <xlocale.h> header file. */
+-/* #undef HAVE_XLOCALE_H */
+-
+-/* Define to '1' if __progname is present and usable */
+-#define HAVE___PROGNAME 1
+-
+-/* Define to 1 on AIX */
+-/* #undef HWLOC_AIX_SYS */
+-
+-/* Define to the location of the archivemount program */
+-/* #undef HWLOC_ARCHIVEMOUNT_PATH */
+-
+-/* Define to 1 on BlueGene/Q */
+-/* #undef HWLOC_BGQ_SYS */
+-
+-/* Define if the CUDA component is built statically inside libhwloc */
+-#define HWLOC_CUDA_COMPONENT_BUILTIN 1
+-
+-/* Whether C compiler supports symbol visibility or not */
+-#define HWLOC_C_HAVE_VISIBILITY 1
+-
+-/* Define to 1 on Darwin */
+-/* #undef HWLOC_DARWIN_SYS */
+-
+-/* Whether we are in debugging mode or not */
+-/* #undef HWLOC_DEBUG */
+-
+-/* Define to 1 on *FREEBSD */
+-/* #undef HWLOC_FREEBSD_SYS */
+-
+-/* Define if the GL component is built statically inside libhwloc */
+-/* #undef HWLOC_GL_COMPONENT_BUILTIN */
+-
+-/* Define to 1 if --enable-32bits-pci-domain is called. */
+-/* #undef HWLOC_HAVE_32BITS_PCI_DOMAIN */
+-
+-/* Whether your compiler has __attribute__ or not */
+-#define HWLOC_HAVE_ATTRIBUTE 
+-
+-/* Whether your compiler has __attribute__ aligned or not */
+-#define HWLOC_HAVE_ATTRIBUTE_ALIGNED 1
+-
+-/* Whether your compiler has __attribute__ always_inline or not */
+-#define HWLOC_HAVE_ATTRIBUTE_ALWAYS_INLINE 1
+-
+-/* Whether your compiler has __attribute__ cold or not */
+-#define HWLOC_HAVE_ATTRIBUTE_COLD 1
+-
+-/* Whether your compiler has __attribute__ const or not */
+-#define HWLOC_HAVE_ATTRIBUTE_CONST 1
+-
+-/* Whether your compiler has __attribute__ constructor or not */
+-#define HWLOC_HAVE_ATTRIBUTE_CONSTRUCTOR 1
+-
+-/* Whether your compiler has __attribute__ deprecated or not */
+-#define HWLOC_HAVE_ATTRIBUTE_DEPRECATED 1
+-
+-/* Whether your compiler has __attribute__ format or not */
+-#define HWLOC_HAVE_ATTRIBUTE_FORMAT 1
+-
+-/* Whether your compiler has __attribute__ hot or not */
+-#define HWLOC_HAVE_ATTRIBUTE_HOT 1
+-
+-/* Whether your compiler has __attribute__ malloc or not */
+-#define HWLOC_HAVE_ATTRIBUTE_MALLOC 1
+-
+-/* Whether your compiler has __attribute__ may_alias or not */
+-#define HWLOC_HAVE_ATTRIBUTE_MAY_ALIAS 1
+-
+-/* Whether your compiler has __attribute__ nonnull or not */
+-#define HWLOC_HAVE_ATTRIBUTE_NONNULL 1
+-
+-/* Whether your compiler has __attribute__ noreturn or not */
+-#define HWLOC_HAVE_ATTRIBUTE_NORETURN 1
+-
+-/* Whether your compiler has __attribute__ no_instrument_function or not */
+-#define HWLOC_HAVE_ATTRIBUTE_NO_INSTRUMENT_FUNCTION 1
+-
+-/* Whether your compiler has __attribute__ packed or not */
+-#define HWLOC_HAVE_ATTRIBUTE_PACKED 1
+-
+-/* Whether your compiler has __attribute__ pure or not */
+-#define HWLOC_HAVE_ATTRIBUTE_PURE 1
+-
+-/* Whether your compiler has __attribute__ sentinel or not */
+-#define HWLOC_HAVE_ATTRIBUTE_SENTINEL 1
+-
+-/* Whether your compiler has __attribute__ unused or not */
+-#define HWLOC_HAVE_ATTRIBUTE_UNUSED 1
+-
+-/* Whether your compiler has __attribute__ warn unused result or not */
+-#define HWLOC_HAVE_ATTRIBUTE_WARN_UNUSED_RESULT 1
+-
+-/* Whether your compiler has __attribute__ weak alias or not */
+-#define HWLOC_HAVE_ATTRIBUTE_WEAK_ALIAS 1
+-
+-/* Define to 1 if your `ffs' function is known to be broken. */
+-/* #undef HWLOC_HAVE_BROKEN_FFS */
+-
+-/* Define to 1 if you have the `cairo' library. */
+-/* #undef HWLOC_HAVE_CAIRO */
+-
+-/* Define to 1 if you have the `clz' function. */
+-/* #undef HWLOC_HAVE_CLZ */
+-
+-/* Define to 1 if you have the `clzl' function. */
+-/* #undef HWLOC_HAVE_CLZL */
+-
+-/* Define to 1 if snprintf supports NULL output buffer and returns the correct
+-   length on truncation */
+-#define HWLOC_HAVE_CORRECT_SNPRINTF 1
+-
+-/* Define to 1 if the CPU_SET macro works */
+-#define HWLOC_HAVE_CPU_SET 1
+-
+-/* Define to 1 if the CPU_SET_S macro works */
+-#define HWLOC_HAVE_CPU_SET_S 1
+-
+-/* Define to 1 if you have the `cudart' SDK. */
+-#define HWLOC_HAVE_CUDART 1
+-
+-/* `Define to 1 if you have the Foundation Darwin framework' */
+-/* #undef HWLOC_HAVE_DARWIN_FOUNDATION */
+-
+-/* `Define to 1 if you have the IOKit Darwin framework' */
+-/* #undef HWLOC_HAVE_DARWIN_IOKIT */
+-
+-/* Define to 1 if function `clz' is declared by system headers */
+-/* #undef HWLOC_HAVE_DECL_CLZ */
+-
+-/* Define to 1 if function `clzl' is declared by system headers */
+-/* #undef HWLOC_HAVE_DECL_CLZL */
+-
+-/* Define to 1 if function `ffs' is declared by system headers */
+-#define HWLOC_HAVE_DECL_FFS 1
+-
+-/* Define to 1 if function `ffsl' is declared by system headers */
+-#define HWLOC_HAVE_DECL_FFSL 1
+-
+-/* Define to 1 if function `fls' is declared by system headers */
+-/* #undef HWLOC_HAVE_DECL_FLS */
+-
+-/* Define to 1 if function `flsl' is declared by system headers */
+-/* #undef HWLOC_HAVE_DECL_FLSL */
+-
+-/* Define to 1 if function `strcasecmp' is declared by system headers */
+-#define HWLOC_HAVE_DECL_STRCASECMP 1
+-
+-/* Define to 1 if function `strncasecmp' is declared by system headers */
+-#define HWLOC_HAVE_DECL_STRNCASECMP 1
+-
+-/* Define to 1 if you have the `ffs' function. */
+-#define HWLOC_HAVE_FFS 1
+-
+-/* Define to 1 if you have the `ffsl' function. */
+-#define HWLOC_HAVE_FFSL 1
+-
+-/* Define to 1 if you have the `fls' function. */
+-/* #undef HWLOC_HAVE_FLS */
+-
+-/* Define to 1 if you have the `flsl' function. */
+-/* #undef HWLOC_HAVE_FLSL */
+-
+-/* Define to 1 if gcc -Wcast-function-type is supported and enabled */
+-#define HWLOC_HAVE_GCC_W_CAST_FUNCTION_TYPE 1
+-
+-/* Define to 1 if gcc -Wmissing-field-initializers is supported and enabled */
+-#define HWLOC_HAVE_GCC_W_MISSING_FIELD_INITIALIZERS 1
+-
+-/* Define to 1 if you have the GL module components. */
+-/* #undef HWLOC_HAVE_GL */
+-
+-/* Define to 1 if you have the `LevelZero' library. */
+-/* #undef HWLOC_HAVE_LEVELZERO */
+-
+-/* Define to 1 if you have a library providing the termcap interface */
+-/* #undef HWLOC_HAVE_LIBTERMCAP */
+-
+-/* Define to 1 if you have libudev. */
+-/* #undef HWLOC_HAVE_LIBUDEV */
+-
+-/* Define to 1 if you have the `libxml2' library. */
+-/* #undef HWLOC_HAVE_LIBXML2 */
+-
+-/* Define to 1 for I/O discovery in the Linux component */
+-#define HWLOC_HAVE_LINUXIO 1
+-
+-/* Define to 1 if enabling Linux-specific PCI discovery in the Linux I/O
+-   component */
+-#define HWLOC_HAVE_LINUXPCI 1
+-
+-/* Define to 1 if the hwloc library should use ltdl for loading plugins */
+-/* #undef HWLOC_HAVE_LTDL */
+-
+-/* Define to 1 if you have the `NVML' library. */
+-#define HWLOC_HAVE_NVML 1
+-
+-/* Define to 1 if glibc provides the old prototype (without length) of
+-   sched_setaffinity() */
+-/* #undef HWLOC_HAVE_OLD_SCHED_SETAFFINITY */
+-
+-/* Define to 1 if you have the `OpenCL' library. */
+-/* #undef HWLOC_HAVE_OPENCL */
+-
+-/* Define to 1 if the hwloc library should support dynamically-loaded plugins
+-   */
+-/* #undef HWLOC_HAVE_PLUGINS */
+-
+-/* `Define to 1 if you have pthread_getthrds_np' */
+-/* #undef HWLOC_HAVE_PTHREAD_GETTHRDS_NP */
+-
+-/* Define to 1 if pthread mutexes are available */
+-#define HWLOC_HAVE_PTHREAD_MUTEX 1
+-
+-/* Define to 1 if you have the `RSMI' library. */
+-/* #undef HWLOC_HAVE_RSMI */
+-
+-/* Define to 1 if glibc provides a prototype of sched_setaffinity() */
+-#define HWLOC_HAVE_SCHED_SETAFFINITY 1
+-
+-/* Define to 1 if you have the <stdint.h> header file. */
+-#define HWLOC_HAVE_STDINT_H 1
+-
+-/* Define to 1 if function `syscall' is available with 6 parameters */
+-#define HWLOC_HAVE_SYSCALL 1
+-
+-/* Define to 1 if you have the `windows.h' header. */
+-/* #undef HWLOC_HAVE_WINDOWS_H */
+-
+-/* Define to 1 if X11 headers including Xutil.h and keysym.h are available. */
+-#define HWLOC_HAVE_X11_KEYSYM 1
+-
+-/* Define to 1 if you have x86 cpuid */
+-/* #undef HWLOC_HAVE_X86_CPUID */
+-
+-/* Define to 1 if zeDevicePciGetPropertiesExt is available */
+-/* #undef HWLOC_HAVE_ZEDEVICEPCIGETPROPERTIESEXT */
+-
+-/* Define to 1 on HP-UX */
+-/* #undef HWLOC_HPUX_SYS */
+-
+-/* Define to 1 on Irix */
+-/* #undef HWLOC_IRIX_SYS */
+-
+-/* Define if the LevelZero component is built statically inside libhwloc */
+-/* #undef HWLOC_LEVELZERO_COMPONENT_BUILTIN */
+-
+-/* Define to 1 on Linux */
+-#define HWLOC_LINUX_SYS 1
+-
+-/* Define to 1 on *NETBSD */
+-/* #undef HWLOC_NETBSD_SYS */
+-
+-/* Define if the NVML component is built statically inside libhwloc */
+-#define HWLOC_NVML_COMPONENT_BUILTIN 1
+-
+-/* Define if the OpenCL component is built statically inside libhwloc */
+-/* #undef HWLOC_OPENCL_COMPONENT_BUILTIN */
+-
+-/* Define if the PCI component is built statically inside libhwloc */
+-/* #undef HWLOC_PCI_COMPONENT_BUILTIN */
+-
+-/* Define if the RSMI component is built statically inside libhwloc */
+-/* #undef HWLOC_RSMI_COMPONENT_BUILTIN */
+-
+-/* The size of `unsigned int', as computed by sizeof */
+-#define HWLOC_SIZEOF_UNSIGNED_INT 4
+-
+-/* The size of `unsigned long', as computed by sizeof */
+-#define HWLOC_SIZEOF_UNSIGNED_LONG 8
+-
+-/* Define to 1 on Solaris */
+-/* #undef HWLOC_SOLARIS_SYS */
+-
+-/* The hwloc symbol prefix */
+-#define HWLOC_SYM_PREFIX hwloc_
+-
+-/* The hwloc symbol prefix in all caps */
+-#define HWLOC_SYM_PREFIX_CAPS HWLOC_
+-
+-/* Whether we need to re-define all the hwloc public symbols or not */
+-#define HWLOC_SYM_TRANSFORM 0
+-
+-/* Define to 1 on unsupported systems */
+-/* #undef HWLOC_UNSUPPORTED_SYS */
+-
+-/* Define to 1 if ncurses works, preferred over curses */
+-/* #undef HWLOC_USE_NCURSES */
+-
+-/* The library version, always available, even in embedded mode, contrary to
+-   VERSION */
+-#define HWLOC_VERSION "2.9.0rc2-git"
+-
+-/* The library version optional greek suffix string */
+-#define HWLOC_VERSION_GREEK "rc2"
+-
+-/* The library version major number */
+-#define HWLOC_VERSION_MAJOR 2
+-
+-/* The library version minor number */
+-#define HWLOC_VERSION_MINOR 9
+-
+-/* The library version release number */
+-#define HWLOC_VERSION_RELEASE 0
+-
+-/* Define to 1 on WINDOWS */
+-/* #undef HWLOC_WIN_SYS */
+-
+-/* Define to 1 on x86_32 */
+-/* #undef HWLOC_X86_32_ARCH */
+-
+-/* Define to 1 on x86_64 */
+-#cmakedefine HWLOC_X86_64_ARCH  // modified for Holoscan
+-
+-/* Define if the libxml XML component is built statically inside libhwloc */
+-/* #undef HWLOC_XML_LIBXML_COMPONENT_BUILTIN */
+-
+-/* Define if lstopo Cairo/X11 interactive graphical output is supported */
+-/* #undef LSTOPO_HAVE_X11 */
+-
+-/* Define to the sub-directory where libtool stores uninstalled libraries. */
+-#define LT_OBJDIR ".libs/"
+-
+-/* Define to 1 if scotch is netlocscotch is enabled */
+-/* #undef NETLOC_SCOTCH */
+-
+-/* Name of package */
+-#define PACKAGE "hwloc"
+-
+-/* Define to the address where bug reports for this package should be sent. */
+-#define PACKAGE_BUGREPORT "https://github.com/open-mpi/hwloc/issues"
+-
+-/* Define to the full name of this package. */
+-#define PACKAGE_NAME "hwloc"
+-
+-/* Define to the full name and version of this package. */
+-#define PACKAGE_STRING "hwloc 2.9.0rc2-git"
+-
+-/* Define to the one symbol short name of this package. */
+-#define PACKAGE_TARNAME "hwloc"
+-
+-/* Define to the home page for this package. */
+-#define PACKAGE_URL ""
+-
+-/* Define to the version of this package. */
+-#define PACKAGE_VERSION "2.9.0rc2-git"
+-
+-/* The size of `unsigned int', as computed by sizeof. */
+-#define SIZEOF_UNSIGNED_INT 4
+-
+-/* The size of `unsigned long', as computed by sizeof. */
+-#define SIZEOF_UNSIGNED_LONG 8
+-
+-/* The size of `void *', as computed by sizeof. */
+-#define SIZEOF_VOID_P 8
+-
+-/* Define to 1 if you have the ANSI C header files. */
+-#define STDC_HEADERS 1
+-
+-/* Enable extensions on HP-UX. */
+-#ifndef _HPUX_SOURCE
+-# define _HPUX_SOURCE 1
+-#endif
+-
+-
+-/* Enable extensions on AIX 3, Interix.  */
+-#ifndef _ALL_SOURCE
+-# define _ALL_SOURCE 1
+-#endif
+-/* Enable GNU extensions on systems that have them.  */
+-#ifndef _GNU_SOURCE
+-# define _GNU_SOURCE 1
+-#endif
+-/* Enable threading extensions on Solaris.  */
+-#ifndef _POSIX_PTHREAD_SEMANTICS
+-# define _POSIX_PTHREAD_SEMANTICS 1
+-#endif
+-/* Enable extensions on HP NonStop.  */
+-#ifndef _TANDEM_SOURCE
+-# define _TANDEM_SOURCE 1
+-#endif
+-/* Enable general extensions on Solaris.  */
+-#ifndef __EXTENSIONS__
+-# define __EXTENSIONS__ 1
+-#endif
+-
+-
+-/* Version number of package */
+-#define VERSION "2.9.0rc2-git"
+-
+-/* Define to 1 if the X Window System is missing or not being used. */
+-/* #undef X_DISPLAY_MISSING */
+-
+-/* Are we building for HP-UX? */
+-#define _HPUX_SOURCE 1
+-
+-/* Define to 1 if on MINIX. */
+-/* #undef _MINIX */
+-
+-/* Define to 2 if the system does not provide POSIX.1 features except with
+-   this defined. */
+-/* #undef _POSIX_1_SOURCE */
+-
+-/* Define to 1 if you need to in order for `stat' and other things to work. */
+-/* #undef _POSIX_SOURCE */
+-
+-/* Define this to the process ID type */
+-#define hwloc_pid_t pid_t
+-
+-/* Define this to the thread ID type */
+-#define hwloc_thread_t pthread_t
+-
+-/* Added manually for Holoscan for hwloc/topology-linux.c */
+-#define RUNSTATEDIR ""
+-
+-#endif /* HWLOC_CONFIGURE_H */
+diff --git a/cmake/deps/hwloc.static-components.h.in b/cmake/deps/hwloc.static-components.h.in
+deleted file mode 100644
+index a788a24..0000000
+--- a/cmake/deps/hwloc.static-components.h.in
++++ /dev/null
+@@ -1,32 +0,0 @@
+-/*
+- * SPDX-FileCopyrightText: Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+- * SPDX-License-Identifier: Apache-2.0
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- * http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-#include <private/internal-components.h>
+-static const struct hwloc_component* hwloc_static_components[] = {
+-    &hwloc_noos_component,
+-    &hwloc_xml_component,
+-    &hwloc_synthetic_component,
+-    &hwloc_xml_nolibxml_component,
+-    &hwloc_linux_component,
+-    // Note: the following components commented out are disabled from the default build to
+-    // not depends on external libraries.
+-    //
+-    // &hwloc_cuda_component,
+-    // &hwloc_nvml_component,
+-    // &hwloc_opencl_component,
+-    // &hwloc_x86_component,
+-    NULL};
+diff --git a/cmake/deps/magic_enum.cmake b/cmake/deps/magic_enum.cmake
+index 3f8203b..bff89fc 100644
+--- a/cmake/deps/magic_enum.cmake
++++ b/cmake/deps/magic_enum.cmake
+@@ -13,31 +13,4 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_cpm_find.html
+-include(${rapids-cmake-dir}/cpm/find.cmake)
+-
+-# GXF 4.0 added a dependency on magic_enum
+-
+-rapids_cpm_find(magic_enum 0.9.3
+-    GLOBAL_TARGETS magic_enum
+-    BUILD_EXPORT_SET ${HOLOSCAN_PACKAGE_NAME}-exports
+-    CPM_ARGS
+-
+-    GITHUB_REPOSITORY Neargye/magic_enum
+-    GIT_TAG v0.9.3
+-    GIT_SHALLOW TRUE
+-
+-    EXCLUDE_FROM_ALL
+-)
+-
+-# Set 'magic_enum_SOURCE_DIR' with PARENT_SCOPE so that
+-# root project can use it to include headers
+-set(magic_enum_SOURCE_DIR ${magic_enum_SOURCE_DIR} PARENT_SCOPE)
+-
+-if(magic_enum_ADDED)
+-    # Install the headers needed for development with the SDK
+-    install(FILES ${magic_enum_SOURCE_DIR}/include/magic_enum.hpp
+-        DESTINATION "include"
+-        COMPONENT "holoscan-dependencies"
+-        )
+-endif()
++rapids_find_package(magic_enum 0.9.7 REQUIRED)
+diff --git a/cmake/deps/nvtx3.cmake b/cmake/deps/nvtx3.cmake
+deleted file mode 100644
+index 6b9ccf8..0000000
+--- a/cmake/deps/nvtx3.cmake
++++ /dev/null
+@@ -1,35 +0,0 @@
+-# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+-# SPDX-License-Identifier: Apache-2.0
+-#
+-# Licensed under the Apache License, Version 2.0 (the "License");
+-# you may not use this file except in compliance with the License.
+-# You may obtain a copy of the License at
+-#
+-# http://www.apache.org/licenses/LICENSE-2.0
+-#
+-# Unless required by applicable law or agreed to in writing, software
+-# distributed under the License is distributed on an "AS IS" BASIS,
+-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-# See the License for the specific language governing permissions and
+-# limitations under the License.
+-
+-# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_find_package.html#
+-include(${rapids-cmake-dir}/cpm/find.cmake)
+-
+-rapids_cpm_find(nvtx3 3.1
+-    GLOBAL_TARGETS nvtx3-c nvtx3-cpp
+-
+-    CPM_ARGS
+-    GITHUB_REPOSITORY NVIDIA/NVTX
+-    GIT_TAG v3.1.0-c-cpp
+-    GIT_SHALLOW TRUE
+-    EXCLUDE_FROM_ALL
+-)
+-
+-if(nvtx3_ADDED)
+-    # Install the headers needed for development with the SDK
+-    install(DIRECTORY ${nvtx3_SOURCE_DIR}/include/nvtx3/
+-        DESTINATION include/3rdparty/nvtx3
+-        COMPONENT "holoscan-dependencies"
+-        )
+-endif()
+diff --git a/cmake/deps/pybind11.cmake b/cmake/deps/pybind11.cmake
+index 3aa140e..2dce9bf 100644
+--- a/cmake/deps/pybind11.cmake
++++ b/cmake/deps/pybind11.cmake
+@@ -14,22 +14,5 @@
+ # limitations under the License.
+ #
+ 
+-# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_find_package.html#
+-include(${rapids-cmake-dir}/cpm/find.cmake)
++rapids_find_package(pybind11 2.11.1 REQUIRED)
+ 
+-rapids_cpm_find(pybind11 2.13.6
+-    GLOBAL_TARGETS pybind11
+-
+-    CPM_ARGS
+-
+-    GITHUB_REPOSITORY pybind/pybind11
+-    GIT_TAG v2.13.6
+-    GIT_SHALLOW TRUE
+-    EXCLUDE_FROM_ALL
+-)
+-
+-# https://pybind11.readthedocs.io/en/stable/compiling.html#configuration-variables
+-#    set(PYBIND11_PYTHON_VERSION 3.6) # It doesn't find python in manylinux2014 image
+-if(NOT PYTHON_EXECUTABLE)
+-    set(PYTHON_EXECUTABLE /usr/bin/python3 PARENT_SCOPE)
+-endif()
+diff --git a/cmake/deps/rmm.cmake b/cmake/deps/rmm.cmake
+index 4fbde88..856b2bb 100644
+--- a/cmake/deps/rmm.cmake
++++ b/cmake/deps/rmm.cmake
+@@ -13,28 +13,8 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_cpm_find.html
+-include(${rapids-cmake-dir}/cpm/find.cmake)
+-
+-set(rmm_PATCH_FILEPATH "${CMAKE_SOURCE_DIR}/cmake/deps/patches/rmm.patch")
+-
+-rapids_cpm_find(rmm 24.04.00
+-    GLOBAL_TARGETS rmm
+-    BUILD_EXPORT_SET ${HOLOSCAN_PACKAGE_NAME}-exports
+-    CPM_ARGS
+-
+-    GITHUB_REPOSITORY rapidsai/rmm
+-    GIT_TAG v24.04.00
+-    GIT_SHALLOW TRUE
+-    PATCH_COMMAND git apply -p0 "${rmm_PATCH_FILEPATH}"
+-
+-    EXCLUDE_FROM_ALL
+-)
+-
+-if(rmm_ADDED)
+-    # Install the headers needed for development with the SDK
+-    install(DIRECTORY ${rmm_SOURCE_DIR}/include/rmm
+-        DESTINATION "include"
+-        COMPONENT "holoscan-dependencies"
+-        )
+-endif()
++rapids_find_package(CCCL REQUIRED)
++rapids_find_package(CUB REQUIRED)
++rapids_find_package(libcudacxx REQUIRED)
++rapids_find_package(Thrust REQUIRED)
++rapids_find_package(rmm 24.04.0 REQUIRED)
+diff --git a/cmake/deps/spdlog_rapids.cmake b/cmake/deps/spdlog_rapids.cmake
+index 74baaa7..cf07302 100644
+--- a/cmake/deps/spdlog_rapids.cmake
++++ b/cmake/deps/spdlog_rapids.cmake
+@@ -13,31 +13,4 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_cpm_find.html
+-include(${rapids-cmake-dir}/cpm/find.cmake)
+-
+-# Here we are using rapids_cpm_find() function instead of rapids_cpm_spdlog() function
+-# (https://docs.rapids.ai/api/rapids-cmake/stable/packages/rapids_cpm_spdlog.html), to
+-# override the default options.
+-set(version 1.14.1)
+-
+-rapids_cpm_find(spdlog ${version}
+-    GLOBAL_TARGETS spdlog::spdlog spdlog::spdlog_header_only
+-
+-    CPM_ARGS
+-
+-    GITHUB_REPOSITORY gabime/spdlog
+-    GIT_TAG v${version}
+-    GIT_SHALLOW TRUE
+-
+-    OPTIONS
+-    "SPDLOG_FMT_EXTERNAL_HO ON"
+-    EXCLUDE_FROM_ALL
+-)
+-
+-if(spdlog_ADDED)
+-    set(spdlog_SOURCE_DIR "${spdlog_SOURCE_DIR}" PARENT_SCOPE)
+-    set(spdlog_BINARY_DIR "${spdlog_BINARY_DIR}" PARENT_SCOPE)
+-    set(spdlog_ADDED "${spdlog_ADDED}" PARENT_SCOPE)
+-    set(spdlog_VERSION ${version} PARENT_SCOPE)
+-endif()
++rapids_find_package(spdlog 1.13.0 REQUIRED)
+diff --git a/cmake/deps/ucx.cmake b/cmake/deps/ucx.cmake
+index af23ffc..b30bbd3 100644
+--- a/cmake/deps/ucx.cmake
++++ b/cmake/deps/ucx.cmake
+@@ -14,18 +14,3 @@
+ # limitations under the License.
+ 
+ find_package(ucx 1.17.0 REQUIRED)
+-
+-install(
+-  DIRECTORY ${UCX_LIBRARIES}
+-  DESTINATION "${HOLOSCAN_INSTALL_LIB_DIR}/.."
+-  COMPONENT "holoscan-dependencies"
+-  FILES_MATCHING PATTERN "*.so*"
+-)
+-
+-foreach(ucx_target ucm ucp ucs uct)
+-  install(
+-    DIRECTORY ${UCX_INCLUDE_DIRS}/${ucx_target}
+-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/3rdparty/ucx"
+-    COMPONENT "holoscan-dependencies"
+-  )
+-endforeach()
+diff --git a/cmake/deps/yaml-cpp_rapids.cmake b/cmake/deps/yaml-cpp_rapids.cmake
+index f13166f..3e49726 100644
+--- a/cmake/deps/yaml-cpp_rapids.cmake
++++ b/cmake/deps/yaml-cpp_rapids.cmake
+@@ -13,53 +13,4 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_find_package.html#
+-include(${rapids-cmake-dir}/cpm/find.cmake)
+-
+-# Unfortunately, yaml-cpp project's CMakeLists.txt registers the user package
+-# (see below) which creates an item in '~/.cmake/packages/yaml-cpp/' and makes
+-# `find_package()` command in CPM try to look at the registered packages for
+-# 'yaml-cpp'.
+-# If the user configures CMake build twice consecutively without building
+-# source, the second configure will use a package in the user package registry
+-# (specified by '~/.cmake/packages/yaml-cpp/xxxxx' which refers to
+-# '${CMAKE_BINARY_DIR}/_deps/yaml-cpp-build')
+-# causing a failure when building the source tree because
+-# '_deps/yaml-cpp-build/libyaml-cpp.a', needed by'libholoscan.so' is
+-# missing.
+-#
+-# export(PACKAGE yaml-cpp)
+-#
+-# To prevent the situation, we set CMAKE_FIND_USE_PACKAGE_REGISTRY to FALSE
+-# (https://cmake.org/cmake/help/latest/variable/CMAKE_FIND_USE_PACKAGE_REGISTRY.html#variable:CMAKE_FIND_USE_PACKAGE_REGISTRY)
+-set(CMAKE_FIND_USE_PACKAGE_REGISTRY FALSE)
+-
+-set(patch_command ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/patches/yaml-cpp.patch <SOURCE_DIR> && git apply <SOURCE_DIR>/yaml-cpp.patch)
+-
+-set(YAML_CPP_VERSION 0.8.0)
+-
+-# https://github.com/cpm-cmake/CPM.cmake/wiki/More-Snippets#yaml-cpp
+-rapids_cpm_find(yaml-cpp ${YAML_CPP_VERSION}
+-    GLOBAL_TARGETS yaml-cpp
+-
+-    CPM_ARGS
+-    GITHUB_REPOSITORY jbeder/yaml-cpp
+-    GIT_TAG ${YAML_CPP_VERSION}
+-    PATCH_COMMAND ${patch_command}
+-    OPTIONS
+-    "YAML_CPP_BUILD_TESTS Off"
+-    "YAML_CPP_BUILD_CONTRIB Off"
+-    "YAML_CPP_BUILD_TOOLS Off"
+-    "YAML_BUILD_SHARED_LIBS Off"
+-)
+-
+-if(yaml-cpp_ADDED)
+-    set_target_properties(yaml-cpp PROPERTIES POSITION_INDEPENDENT_CODE ON)
+-
+-    # Install the headers needed for development with the SDK
+-    install(DIRECTORY ${yaml-cpp_SOURCE_DIR}/include/yaml-cpp
+-        DESTINATION "include"
+-        COMPONENT "holoscan-dependencies"
+-        )
+-
+-endif()
++rapids_find_package(yaml-cpp 0.7.0 REQUIRED)
+diff --git a/cmake/modules/FindONNXRuntime.cmake b/cmake/modules/FindONNXRuntime.cmake
+index 9f8c10a..8b4df5b 100644
+--- a/cmake/modules/FindONNXRuntime.cmake
++++ b/cmake/modules/FindONNXRuntime.cmake
+@@ -13,47 +13,6 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-# Create ONNXRuntime imported cmake targets
+-#
+-# This module defines ONNXRuntime_FOUND if all ONNXRuntime libraries are found or
+-# if the required libraries (COMPONENTS property in find_package)
+-# are found.
+-#
+-# A new imported target is created for each component (library)
+-# under the ONNXRuntime namespace (ONNXRuntime::${component_name})
+-#
+-# Note: this leverages the find-module paradigm [1]. The config-file paradigm [2]
+-# is recommended instead in CMake.
+-# [1] https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html#config-file-packages
+-# [2] https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html#find-module-packages
+-
+-# Find headers
+-find_path(ONNXRuntime_INCLUDE_DIR
+-  NAMES onnxruntime/onnxruntime_c_api.h
+-)
+-list(APPEND ONNXRuntime_INCLUDE_DIRS "${ONNXRuntime_INCLUDE_DIR}")
+-list(APPEND ONNXRuntime_INCLUDE_DIRS "${ONNXRuntime_INCLUDE_DIR}/onnxruntime")
+-mark_as_advanced(ONNXRuntime_INCLUDE_DIR)
+-mark_as_advanced(ONNXRuntime_INCLUDE_DIRS)
+-
+-# Find version
+-if(ONNXRuntime_INCLUDE_DIR)
+-  file(STRINGS "${ONNXRuntime_INCLUDE_DIR}/../VERSION_NUMBER" ONNXRuntime_VERSION)
+-endif()
+-
+-# Find libraries
+-find_library(ONNXRuntime_LIBRARY NAMES onnxruntime)
+-mark_as_advanced(ONNXRuntime_LIBRARY)
+-add_library(ONNXRuntime::ONNXRuntime SHARED IMPORTED)
+-set_target_properties(ONNXRuntime::ONNXRuntime PROPERTIES
+-   IMPORTED_LOCATION "${ONNXRuntime_LIBRARY}"
+-   INTERFACE_INCLUDE_DIRECTORIES "${ONNXRuntime_INCLUDE_DIRS}"
+-)
++find_package(PkgConfig)
++pkg_check_modules(libonnxruntime REQUIRED IMPORTED_TARGET GLOBAL libonnxruntime>=1.21.0)
+ 
+-# Generate ONNXRuntime_FOUND
+-include(FindPackageHandleStandardArgs)
+-find_package_handle_standard_args(ONNXRuntime
+-    FOUND_VAR ONNXRuntime_FOUND
+-    VERSION_VAR ONNXRuntime_VERSION
+-    REQUIRED_VARS ONNXRuntime_LIBRARY ONNXRuntime_INCLUDE_DIR
+-)
+diff --git a/cmake/modules/SetupCUDA.cmake b/cmake/modules/SetupCUDA.cmake
+index ebdb9c7..e4b6897 100644
+--- a/cmake/modules/SetupCUDA.cmake
++++ b/cmake/modules/SetupCUDA.cmake
+@@ -25,29 +25,3 @@ endif()
+ enable_language(CUDA)
+ 
+ message(STATUS "Requested CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
+-
+-# If using "native", nothing else to do. Otherwise, use script to process the request.
+-if(CMAKE_CUDA_ARCHITECTURES STREQUAL "native")
+-    message(STATUS "Using native CUDA architecture detection.")
+-else()
+-    # Get the CUDA architectures from the script
+-    set(_script_command
+-        "${CMAKE_SOURCE_DIR}/scripts/get_cmake_cuda_archs.py"
+-        "${CMAKE_CUDA_ARCHITECTURES}"
+-        "--nvcc-path" "${CMAKE_CUDA_COMPILER}"
+-        "--min-arch" "70" # Holoscan requirement
+-        "--verbose"       # Enable debug logging from script
+-    )
+-    execute_process(COMMAND ${_script_command}
+-                    OUTPUT_VARIABLE _script_output
+-                    ERROR_VARIABLE _script_error
+-                    RESULT_VARIABLE _script_result
+-                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+-    if(NOT _script_result EQUAL 0)
+-        message(FATAL_ERROR "get_cuda_archs.py script failed (${_script_result}):\n${_script_error}")
+-    else()
+-        message(DEBUG "\n${_script_error}") # debug verbose logs
+-        set(CMAKE_CUDA_ARCHITECTURES "${_script_output}")
+-        message(STATUS "Using CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
+-    endif()
+-endif()
+diff --git a/cmake/modules/SetupCache.cmake b/cmake/modules/SetupCache.cmake
+index 640443e..6ef500f 100644
+--- a/cmake/modules/SetupCache.cmake
++++ b/cmake/modules/SetupCache.cmake
+@@ -160,9 +160,6 @@ if(${HOLOSCAN_CACHE_DIR} STREQUAL " ")
+     set(HOLOSCAN_CACHE_DIR "${CMAKE_SOURCE_DIR}/.cache" CACHE)
+ endif()
+ 
+-check_cache_dir(HOLOSCAN_CACHE_DIR)
+-configure_cpm(HOLOSCAN_CACHE_DIR)
+-
+ if(HOLOSCAN_USE_CCACHE)
+     configure_ccache(HOLOSCAN_CACHE_DIR)
+ endif()
+diff --git a/cmake/modules/SetupRapidsCMake.cmake b/cmake/modules/SetupRapidsCMake.cmake
+index 6104099..5d777b7 100644
+--- a/cmake/modules/SetupRapidsCMake.cmake
++++ b/cmake/modules/SetupRapidsCMake.cmake
+@@ -13,13 +13,16 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-# https://github.com/rapidsai/rapids-cmake#installation
+-file(DOWNLOAD https://gitlab.com/nvidia/rapidsai/rapids-cmake/-/raw/branch-24.04/RAPIDS.cmake
+-    ${CMAKE_BINARY_DIR}/RAPIDS.cmake
+-)
+-include(${CMAKE_BINARY_DIR}/RAPIDS.cmake)
++set(CPM_DOWNLOAD_VERSION 0.38.5)
++set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
++message(STATUS "CPM download location: ${CPM_DOWNLOAD_LOCATION}")
++
++list(APPEND CMAKE_MODULE_PATH "${RAPIDS_CMAKE_DIR}/rapids-cmake")
++set(rapids-cmake-dir "${RAPIDS_CMAKE_DIR}/rapids-cmake")
++include("${RAPIDS_CMAKE_DIR}/RAPIDS.cmake")
+ include(rapids-cmake)
+ include(rapids-cpm)
+ include(rapids-cuda)
+ include(rapids-export)
+ include(rapids-find)
++
+diff --git a/cmake/setup_dependencies.cmake b/cmake/setup_dependencies.cmake
+index 2fec057..7fb4321 100644
+--- a/cmake/setup_dependencies.cmake
++++ b/cmake/setup_dependencies.cmake
+@@ -48,7 +48,6 @@ superbuild_depend(ucx)
+ superbuild_depend(v4l2)
+ superbuild_depend(yaml-cpp_rapids)
+ superbuild_depend(gxf)
+-superbuild_depend(nvtx3)
+ 
+ # Testing dependencies
+ if(HOLOSCAN_BUILD_TESTS)
+diff --git a/examples/execution_control/operator_status_tracking/cpp/operator_status_tracking.cpp b/examples/execution_control/operator_status_tracking/cpp/operator_status_tracking.cpp
+index 7700a81..7a2607b 100644
+--- a/examples/execution_control/operator_status_tracking/cpp/operator_status_tracking.cpp
++++ b/examples/execution_control/operator_status_tracking/cpp/operator_status_tracking.cpp
+@@ -22,7 +22,7 @@
+ #include <vector>
+ 
+ #include <holoscan/holoscan.hpp>
+-#include <magic_enum.hpp>
++#include <magic_enum/magic_enum.hpp>
+ 
+ // A simple operator that processes a fixed number of times and then completes
+ class FiniteSourceOp : public holoscan::Operator {
+diff --git a/include/holoscan/logger/logger.hpp b/include/holoscan/logger/logger.hpp
+index 4713b74..9cea17f 100644
+--- a/include/holoscan/logger/logger.hpp
++++ b/include/holoscan/logger/logger.hpp
+@@ -161,18 +161,27 @@ class Logger {
+   template <typename FormatT, typename... ArgsT>
+   static void log(const char* file, int line, const char* function_name, LogLevel level,
+                   const FormatT& format, ArgsT&&... args) {
++// Version number of the fmt library represented as (major * 10000 + minor * 100 + patch)
++#if FMT_VERSION >= 110000
++    log_message(
++        file, line, function_name, level, format, fmt::make_format_args(args...));
++#else
+     log_message(file,
+                 line,
+                 function_name,
+                 level,
+                 format,
+                 fmt::make_format_args<fmt::buffer_context<fmt::char_t<FormatT>>>(args...));
++#endif
+   }
+-
+   template <typename FormatT, typename... ArgsT>
+   static void log(LogLevel level, const FormatT& format, ArgsT&&... args) {
++#if FMT_VERSION >= 110000
++    log_message(level, format, fmt::make_format_args(args...));
++#else
+     log_message(
+         level, format, fmt::make_format_args<fmt::buffer_context<fmt::char_t<FormatT>>>(args...));
++#endif
+   }
+ 
+   /**
+diff --git a/include/holoscan/profiler/nvtx3.hpp b/include/holoscan/profiler/nvtx3.hpp
+index 52e6c09..c975dfa 100644
+--- a/include/holoscan/profiler/nvtx3.hpp
++++ b/include/holoscan/profiler/nvtx3.hpp
+@@ -18,7 +18,7 @@
+ #ifndef HOLOSCAN_PROFILER_NVTX3_HPP
+ #define HOLOSCAN_PROFILER_NVTX3_HPP
+ 
+-#include <nvtx3/nvtx3.hpp>
++#include <nvtx3.hpp>
+ 
+ // Copy of nvtx3::v1::scoped_range_in which checks whether tracing is enabled or not
+ namespace nvtx3::v1 {
+diff --git a/modules/holoinfer/src/CMakeLists.txt b/modules/holoinfer/src/CMakeLists.txt
+index 3d1b55a..789058a 100644
+--- a/modules/holoinfer/src/CMakeLists.txt
++++ b/modules/holoinfer/src/CMakeLists.txt
+@@ -20,7 +20,14 @@ project(holoinfer VERSION ${HOLOSCAN_BUILD_VERSION} LANGUAGES CXX CUDA)
+ add_subdirectory(infer)
+ 
+ find_package(CUDAToolkit REQUIRED)
++find_package(dlpack 1.0 REQUIRED)
++find_package(tl-expected 1.1.0 REQUIRED)
++find_package(CLI11 2.3.2 REQUIRED)
++find_package(magic_enum 0.9.7 REQUIRED)
+ 
++get_target_property(DLPACK_INCLUDE_DIRS dlpack::dlpack INTERFACE_INCLUDE_DIRECTORIES)
++get_target_property(TL_EXPECTED_INCLUDE_DIRS tl::expected INTERFACE_INCLUDE_DIRECTORIES)
++get_target_property(MAGIC_ENUM_INCLUDE_DIRS magic_enum::magic_enum INTERFACE_INCLUDE_DIRECTORIES)
+ set(holoinfer_src
+     infer/trt/core.cpp
+     infer/trt/utils.cpp
+@@ -42,10 +49,10 @@ target_include_directories(${PROJECT_NAME}
+     PRIVATE
+         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+     PUBLIC
+-        $<BUILD_INTERFACE:${tl-expected_SOURCE_DIR}/include>
+         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+-        $<BUILD_INTERFACE:${dlpack_SOURCE_DIR}/include>
+-        $<BUILD_INTERFACE:${magic_enum_SOURCE_DIR}/include>
++        ${TL_EXPECTED_INCLUDE_DIRS}
++        ${DLPACK_INCLUDE_DIRS}
++        ${MAGIC_ENUM_INCLUDE_DIRS}
+         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}>
+ )
+ 
+diff --git a/modules/holoinfer/src/infer/onnx/CMakeLists.txt b/modules/holoinfer/src/infer/onnx/CMakeLists.txt
+index 115721e..aeb93ba 100644
+--- a/modules/holoinfer/src/infer/onnx/CMakeLists.txt
++++ b/modules/holoinfer/src/infer/onnx/CMakeLists.txt
+@@ -15,7 +15,9 @@
+ # limitations under the License.
+ #
+ 
+-find_package(ONNXRuntime REQUIRED)
++find_package(PkgConfig)
++pkg_check_modules(libonnxruntime REQUIRED IMPORTED_TARGET GLOBAL libonnxruntime>=1.21.0)
++find_package(dlpack 1.0 REQUIRED)
+ add_library(holoinfer_ort SHARED core.cpp)
+ add_library(holoscan::infer::onnx_runtime ALIAS holoinfer_ort)
+ set_target_properties(holoinfer_ort PROPERTIES
+@@ -27,7 +29,7 @@ set_target_properties(holoinfer_ort PROPERTIES
+ )
+ target_link_libraries(holoinfer_ort
+     PRIVATE
+-        ONNXRuntime::ONNXRuntime
++        PkgConfig::libonnxruntime
+         CUDA::cudart
+         holoscan::logger
+         holoscan::infer
+@@ -39,6 +41,6 @@ target_include_directories(holoinfer_ort
+         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../..>
+     PUBLIC
+         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include>
+-        $<BUILD_INTERFACE:${dlpack_SOURCE_DIR}/include>
++        ${dlpack_INCLUDE_DIRS}
+         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}>
+     )
+diff --git a/modules/holoinfer/src/infer/torch/CMakeLists.txt b/modules/holoinfer/src/infer/torch/CMakeLists.txt
+index 231647b..c617088 100644
+--- a/modules/holoinfer/src/infer/torch/CMakeLists.txt
++++ b/modules/holoinfer/src/infer/torch/CMakeLists.txt
+@@ -52,6 +52,7 @@ message(STATUS "TORCH_CUDA_ARCH_LIST: ${TORCH_CUDA_ARCH_LIST}")
+ # Find dependencies
+ find_package(Torch REQUIRED)
+ find_package(TorchVision REQUIRED)
++find_package(dlpack 1.0 REQUIRED)
+ 
+ # Create the holoinfer torch backend library
+ add_library(holoinfer_torch SHARED core.cpp)
+@@ -77,6 +78,6 @@ target_include_directories(holoinfer_torch
+         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../..>
+     PUBLIC
+         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include>
+-        $<BUILD_INTERFACE:${dlpack_SOURCE_DIR}/include>
++        ${dlpack_INCLUDE_DIRS}
+         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}>
+     )
+diff --git a/modules/holoviz/examples/demo/CMakeLists.txt b/modules/holoviz/examples/demo/CMakeLists.txt
+index 8b96a52..3f26fae 100644
+--- a/modules/holoviz/examples/demo/CMakeLists.txt
++++ b/modules/holoviz/examples/demo/CMakeLists.txt
+@@ -15,18 +15,6 @@
+ 
+ set(PROJECT_NAME holoviz_demo)
+ 
+-# fetch the dependencies
+-include(FetchContent)
+-
+-# stb
+-FetchContent_Declare(
+-    stb
+-    GIT_REPOSITORY https://github.com/nothings/stb.git
+-    GIT_TAG af1a5bc352164740c1cc1354942b1c6b72eacb8a
+-    GIT_PROGRESS TRUE
+-    )
+-FetchContent_MakeAvailable(stb)
+-
+ add_executable(${PROJECT_NAME})
+ 
+ target_sources(${PROJECT_NAME}
+@@ -36,7 +24,7 @@ target_sources(${PROJECT_NAME}
+ 
+ target_include_directories(${PROJECT_NAME}
+     PRIVATE
+-        ${stb_SOURCE_DIR}
++        ${stb_INCLUDE_DIRS}
+     )
+ 
+ target_link_libraries(${PROJECT_NAME}
+diff --git a/modules/holoviz/examples/depth_map/CMakeLists.txt b/modules/holoviz/examples/depth_map/CMakeLists.txt
+index af2b7a3..0f87a07 100644
+--- a/modules/holoviz/examples/depth_map/CMakeLists.txt
++++ b/modules/holoviz/examples/depth_map/CMakeLists.txt
+@@ -15,18 +15,6 @@
+ 
+ set(PROJECT_NAME holoviz_depth_map)
+ 
+-# fetch the dependencies
+-include(FetchContent)
+-
+-# stb
+-FetchContent_Declare(
+-    stb
+-    GIT_REPOSITORY https://github.com/nothings/stb.git
+-    GIT_TAG af1a5bc352164740c1cc1354942b1c6b72eacb8a
+-    GIT_PROGRESS TRUE
+-    )
+-FetchContent_MakeAvailable(stb)
+-
+ add_executable(${PROJECT_NAME})
+ 
+ target_sources(${PROJECT_NAME}
+@@ -36,7 +24,7 @@ target_sources(${PROJECT_NAME}
+ 
+ target_include_directories(${PROJECT_NAME}
+     PRIVATE
+-        ${stb_SOURCE_DIR}
++        ${stb_INCLUDE_DIRS}
+     )
+ 
+ target_link_libraries(${PROJECT_NAME}
+diff --git a/modules/holoviz/tests/functional/CMakeLists.txt b/modules/holoviz/tests/functional/CMakeLists.txt
+index c52e451..769fa81 100644
+--- a/modules/holoviz/tests/functional/CMakeLists.txt
++++ b/modules/holoviz/tests/functional/CMakeLists.txt
+@@ -15,18 +15,6 @@
+ 
+ set(PROJECT_NAME holoviz_functionaltests)
+ 
+-# fetch the dependencies
+-include(FetchContent)
+-
+-# stb
+-FetchContent_Declare(
+-    stb
+-    GIT_REPOSITORY https://github.com/nothings/stb.git
+-    GIT_TAG af1a5bc352164740c1cc1354942b1c6b72eacb8a
+-    GIT_PROGRESS TRUE
+-)
+-FetchContent_MakeAvailable(stb)
+-
+ find_package(CUDAToolkit REQUIRED)
+ find_package(X11 REQUIRED)
+ find_package(Vulkan REQUIRED)
+@@ -62,7 +50,7 @@ target_compile_definitions(${PROJECT_NAME}
+ 
+ target_include_directories(${PROJECT_NAME}
+     PRIVATE
+-        ${stb_SOURCE_DIR}
++        ${stb_INCLUDE_DIRS}
+     )
+ 
+ target_link_libraries(${PROJECT_NAME}
+diff --git a/modules/holoviz/thirdparty/imgui/CMakeLists.txt b/modules/holoviz/thirdparty/imgui/CMakeLists.txt
+index cfab674..2344633 100644
+--- a/modules/holoviz/thirdparty/imgui/CMakeLists.txt
++++ b/modules/holoviz/thirdparty/imgui/CMakeLists.txt
+@@ -18,27 +18,17 @@ include(GNUInstallDirs)
+ 
+ find_package(Vulkan REQUIRED)
+ 
+-FetchContent_Declare(
+-  imgui
+-  GIT_REPOSITORY https://github.com/ocornut/imgui.git
+-  GIT_TAG f3373780668fba1f9bd64c208d05c20b781c9a39
+-  GIT_PROGRESS TRUE
+-  PATCH_COMMAND git apply "${CMAKE_CURRENT_SOURCE_DIR}/imgui.patch" || true
+-  )
+-
+-FetchContent_MakeAvailable(imgui)
+-
+ add_library(imgui_backend STATIC)
+ 
+ target_sources(imgui_backend
+   PRIVATE
+-    ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+-    ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
++    ${IMGUI_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
++    ${IMGUI_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
+   )
+ 
+ target_include_directories(imgui_backend
+   PUBLIC
+-    ${imgui_SOURCE_DIR}
++    ${IMGUI_SOURCE_DIR}
+   )
+ 
+ target_compile_definitions(imgui_backend
+@@ -60,16 +50,16 @@ add_library(holoscan::viz::imgui ALIAS holoviz_imgui)
+ 
+ target_sources(holoviz_imgui
+   PRIVATE
+-    ${imgui_SOURCE_DIR}/imgui.cpp
+-    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+-    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+-    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+-    ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp
++    ${IMGUI_SOURCE_DIR}/imgui.cpp
++    ${IMGUI_SOURCE_DIR}/imgui_draw.cpp
++    ${IMGUI_SOURCE_DIR}/imgui_tables.cpp
++    ${IMGUI_SOURCE_DIR}/imgui_widgets.cpp
++    ${IMGUI_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp
+   )
+ 
+ target_include_directories(holoviz_imgui
+   PUBLIC
+-    $<BUILD_INTERFACE:${imgui_SOURCE_DIR}>
++    $<BUILD_INTERFACE:${IMGUI_SOURCE_DIR}>
+     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>/holoviz/imgui
+   )
+ 
+diff --git a/python/holoscan/operators/holoviz/CMakeLists.txt b/python/holoscan/operators/holoviz/CMakeLists.txt
+index e9c5987..f0414b4 100644
+--- a/python/holoscan/operators/holoviz/CMakeLists.txt
++++ b/python/holoscan/operators/holoviz/CMakeLists.txt
+@@ -13,6 +13,9 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
++find_package(magic_enum 0.9.7 REQUIRED)
++get_target_property(MAGIC_ENUM_INCLUDE_DIRS magic_enum::magic_enum INTERFACE_INCLUDE_DIRECTORIES)
++
+ holoscan_pybind11_module(holoviz
+     holoviz.cpp
+     ../../core/emitter_receiver_registry.cpp
+@@ -23,5 +26,5 @@ target_link_libraries(holoviz_python
+ 
+ target_include_directories(holoviz_python
+     PUBLIC
+-        $<BUILD_INTERFACE:${magic_enum_SOURCE_DIR}/include>
++        ${MAGIC_ENUM_INCLUDE_DIRS}
+ )
+diff --git a/python/holoscan/operators/holoviz/holoviz.cpp b/python/holoscan/operators/holoviz/holoviz.cpp
+index eaa0cc1..f213ed2 100644
+--- a/python/holoscan/operators/holoviz/holoviz.cpp
++++ b/python/holoscan/operators/holoviz/holoviz.cpp
+@@ -30,7 +30,7 @@
+ 
+ // the default range for enums is 128 which is not enough for the Key enum, increase to 512
+ #define MAGIC_ENUM_RANGE_MAX 512  // NOLINT(cppcoreguidelines-macro-usage)
+-#include <magic_enum.hpp>
++#include <magic_enum/magic_enum.hpp>
+ 
+ #include "../operator_util.hpp"
+ #include "./pydoc.hpp"
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index eb343db..af8e52d 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -97,20 +97,26 @@ endif()
+ # ##############################################################################
+ add_holoscan_library(profiler
+     profiler/profiler.cpp)
+-target_link_libraries(profiler
+-    PUBLIC
+-        nvtx3-cpp
+-)
++
+ target_include_directories(profiler
+     PUBLIC
+-      $<BUILD_INTERFACE:${nvtx3_SOURCE_DIR}/include>
+-      $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/3rdparty>
++      ${NVTX3_INCLUDEDIR}
+ )
+ 
+ # ##############################################################################
+ # # Add library: holoscan::core
+ # ##############################################################################
+ 
++find_package(dlpack 1.0 REQUIRED)
++find_package(tl-expected 1.1.0 REQUIRED)
++find_package(CLI11 2.3.2 REQUIRED)
++find_package(magic_enum 0.9.7 REQUIRED)
++
++get_target_property(DLPACK_INCLUDE_DIRS dlpack::dlpack INTERFACE_INCLUDE_DIRECTORIES)
++get_target_property(TL_EXPECTED_INCLUDE_DIRS tl::expected INTERFACE_INCLUDE_DIRECTORIES)
++get_target_property(CLI11_INCLUDE_DIRS CLI11::CLI11 INTERFACE_INCLUDE_DIRECTORIES)
++get_target_property(MAGIC_ENUM_INCLUDE_DIRS magic_enum::magic_enum INTERFACE_INCLUDE_DIRECTORIES)
++
+ set(CORE_PROTO_FILES
+     core/services/proto/app_driver.proto
+     core/services/proto/app_worker.proto
+@@ -258,7 +264,7 @@ target_link_libraries(core
+         GXF::ucx
+         yaml-cpp
+     PRIVATE
+-        hwloc
++        PkgConfig::hwloc
+         gRPC::grpc++
+         gRPC::grpc++_reflection
+         protobuf::libprotobuf
+@@ -266,11 +272,10 @@ target_link_libraries(core
+ 
+ target_include_directories(core
+     PUBLIC
+-      $<BUILD_INTERFACE:${tl-expected_SOURCE_DIR}/include>
+-      $<BUILD_INTERFACE:${dlpack_SOURCE_DIR}/include>
+-      $<BUILD_INTERFACE:${cli11_SOURCE_DIR}/include>
+-      $<BUILD_INTERFACE:${magic_enum_SOURCE_DIR}/include>
+-      $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/3rdparty>
++      ${TL_EXPECTED_INCLUDE_DIRS}
++      ${DLPACK_INCLUDE_DIRS}
++      ${CLI11_INCLUDE_DIRS}
++      ${MAGIC_ENUM_INCLUDE_DIRS}
+ )
+ 
+ # ##############################################################################
+diff --git a/src/operators/holoviz/holoviz.cpp b/src/operators/holoviz/holoviz.cpp
+index 826d65f..d62cfeb 100644
+--- a/src/operators/holoviz/holoviz.cpp
++++ b/src/operators/holoviz/holoviz.cpp
+@@ -26,7 +26,7 @@
+ #include <utility>
+ #include <vector>
+ 
+-#include <magic_enum.hpp>
++#include <magic_enum/magic_enum.hpp>
+ 
+ #include "holoscan/core/application.hpp"
+ #include "holoscan/core/codecs.hpp"
+diff --git a/src/operators/v4l2_video_capture/v4l2_video_capture.cpp b/src/operators/v4l2_video_capture/v4l2_video_capture.cpp
+index 235fcb9..60e49af 100644
+--- a/src/operators/v4l2_video_capture/v4l2_video_capture.cpp
++++ b/src/operators/v4l2_video_capture/v4l2_video_capture.cpp
+@@ -35,7 +35,7 @@
+ #include <utility>
+ #include <vector>
+ 
+-#include <magic_enum.hpp>
++#include <magic_enum/magic_enum.hpp>
+ 
+ #include "holoscan/core/execution_context.hpp"
+ #include "holoscan/core/resources/gxf/allocator.hpp"
+-- 
+2.34.1
+
