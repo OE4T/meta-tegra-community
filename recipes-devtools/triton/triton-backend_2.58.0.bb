@@ -4,11 +4,11 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=124771e398c4a908eba9a40eaa7903e5"
 SECTION = "libs"
 
 SRC_URI = "\
-    git://github.com/triton-inference-server/backend.git;protocol=https;branch=r22.05 \
+    git://github.com/triton-inference-server/backend.git;protocol=https;branch=r25.05 \
     file://0001-Build-fixups.patch \
 "
 
-SRCREV = "aad5e4e02e53a9e1a6b9629739f44f8c5db4d75f"
+SRCREV = "eb6a13fff6b4ec1d1c6c0d988a8443a1aedca63b"
 
 DEPENDS = " \
     triton-common \

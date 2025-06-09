@@ -1,38 +1,61 @@
-From 775efe0c0760bab44992f9b74a8a3687646d0f95 Mon Sep 17 00:00:00 2001
-From: Ilies CHERGUI <ilies.chergui@gmail.com>
-Date: Thu, 10 Nov 2022 16:17:11 +0000
+From f7768cd35240108fb2e99634a75281f2bf586467 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Fri, 13 Jun 2025 06:14:29 +0100
 Subject: [PATCH] Build fixups
 
 Upstream-Status: Inappropriate [OE-Specific]
-Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 Signed-off-by: Roger Knecht <roger@norberthealth.com>
 Signed-off-by: Matt Madison <matt@madison.systems>
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt     |  42 +-----------------
- src/CMakeLists.txt | 107 ++++++++++++++++-----------------------------
- 2 files changed, 38 insertions(+), 111 deletions(-)
+ CMakeLists.txt                                |  57 +---------
+ src/CMakeLists.txt                            | 107 ++++++------------
+ src/grpc/CMakeLists.txt                       |   3 +-
+ src/python/CMakeLists.txt                     |   2 +-
+ src/python/tritonfrontend/CMakeLists.txt      |  23 ++--
+ src/test/CMakeLists.txt                       |  17 ++-
+ src/test/distributed_addsub/CMakeLists.txt    |  11 +-
+ src/test/dyna_sequence/CMakeLists.txt         |   9 +-
+ src/test/implicit_state/CMakeLists.txt        |  19 +++-
+ src/test/iterative_sequence/CMakeLists.txt    |  11 +-
+ src/test/query_backend/CMakeLists.txt         |  16 +--
+ .../relocation_repoagent/CMakeLists.txt       |   6 +-
+ src/test/sequence/CMakeLists.txt              |  14 +--
+ 13 files changed, 96 insertions(+), 199 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 6d4ec543..cb1b1b66 100644
+index 7d03d856..c55f565f 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -100,23 +100,8 @@ endif()
- #
- # Dependencies
- #
+@@ -107,35 +107,8 @@ if(TRITON_ENABLE_ASAN AND TRITON_ENABLE_GPU)
+   message(FATAL_ERROR "TRITON_ENABLE_ASAN=ON requires TRITON_ENABLE_GPU=OFF")
+ endif()
+ 
+-#
+-# Dependencies
+-#
 -include(FetchContent)
 -
 -FetchContent_Declare(
 -  repo-core
--  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
+-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/core.git
 -  GIT_TAG ${TRITON_CORE_REPO_TAG}
 -)
 -FetchContent_Declare(
 -  repo-third-party
--  GIT_REPOSITORY https://github.com/triton-inference-server/third_party.git
+-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/third_party.git
 -  GIT_TAG ${TRITON_THIRD_PARTY_REPO_TAG}
 -)
 -
+-# Some libs are installed to ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/{LIB}/lib64 instead
+-# of ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/{LIB}/lib on Centos
+-set(LIB_DIR "lib")
+-if(LINUX)
+-  file(STRINGS "/etc/os-release" DISTRO_ID_LIKE REGEX "ID_LIKE")
+-  if(${DISTRO_ID_LIKE} MATCHES "rhel|centos")
+-    set (LIB_DIR "lib64")
+-  endif(${DISTRO_ID_LIKE} MATCHES "rhel|centos")
+-endif(LINUX)
  set(TRITON_CORE_HEADERS_ONLY OFF)
  
 -FetchContent_MakeAvailable(repo-third-party repo-core)
@@ -40,7 +63,7 @@ index 6d4ec543..cb1b1b66 100644
  #
  # Triton server executable and examples
  #
-@@ -183,31 +168,6 @@ ExternalProject_Add(triton-server
+@@ -211,35 +184,7 @@ ExternalProject_Add(triton-server
    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src"
    BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/triton-server"
    CMAKE_CACHE_ARGS
@@ -50,21 +73,25 @@ index 6d4ec543..cb1b1b66 100644
 -    ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
 -    -DGTEST_ROOT:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/googletest
 -    -DgRPC_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/grpc/lib/cmake/grpc
--    -Dc-ares_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/c-ares/lib/cmake/c-ares
--    -Dabsl_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/absl/lib/cmake/absl
--    -Dnlohmann_json_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/nlohmann_json/lib/cmake/nlohmann_json
+-    -Dc-ares_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/c-ares/${LIB_DIR}/cmake/c-ares
+-    -Dre2_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/re2/${LIB_DIR}/cmake/re2
+-    -Dabsl_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/absl/${LIB_DIR}/cmake/absl
+-    -DCURL_DIR:STRING=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/curl/${LIB_DIR}/cmake/CURL
+-    -Dnlohmann_json_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/nlohmann_json/share/cmake/nlohmann_json
 -    -DLibevent_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevent/lib/cmake/libevent
 -    -Dlibevhtp_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevhtp/lib/cmake/libevhtp
--    -Dstorage_client_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/lib/cmake/storage_client
--    -Dazure-storage-cpplite_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/azure-storage-cpplite
--    -Dgoogle_cloud_cpp_common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/lib/cmake/google_cloud_cpp_common
--    -DCrc32c_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/crc32c/lib/cmake/Crc32c
--    -DAWSSDK_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/cmake/AWSSDK
--    -Daws-cpp-sdk-core_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/cmake/aws-cpp-sdk-core
--    -Daws-cpp-sdk-s3_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/cmake/aws-cpp-sdk-s3
--    -Daws-c-event-stream_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-c-event-stream/cmake
--    -Daws-c-common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-c-common/cmake
--    -Daws-checksums_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-checksums/cmake
+-    -Dstorage_client_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/${LIB_DIR}/cmake/storage_client
+-    -Dgoogle_cloud_cpp_common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/${LIB_DIR}/cmake/google_cloud_cpp_common
+-    -DCrc32c_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/crc32c/${LIB_DIR}/cmake/Crc32c
+-    -DAWSSDK_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/cmake/AWSSDK
+-    -Daws-cpp-sdk-core_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/cmake/aws-cpp-sdk-core
+-    -Daws-cpp-sdk-s3_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/cmake/aws-cpp-sdk-s3
+-    -Daws-c-event-stream_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-event-stream/cmake
+-    -Daws-c-common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-common/cmake
+-    -Daws-checksums_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-checksums/cmake
+-    -Dopentelemetry-cpp_DIR:PATH=${_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR}
+-    -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION}
+     -DTRITON_IGPU_BUILD:BOOL=${TRITON_IGPU_BUILD}
 -    -DTRITON_THIRD_PARTY_REPO_TAG:STRING=${TRITON_THIRD_PARTY_REPO_TAG}
 -    -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
 -    -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
@@ -72,7 +99,7 @@ index 6d4ec543..cb1b1b66 100644
      -DTRITON_EXTRA_LIB_PATHS:PATH=${TRITON_EXTRA_LIB_PATHS}
      -DTRITON_ENABLE_ASAN:BOOL=${TRITON_ENABLE_ASAN}
      -DTRITON_ENABLE_NVTX:BOOL=${TRITON_ENABLE_NVTX}
-@@ -231,5 +191,5 @@ ExternalProject_Add(triton-server
+@@ -265,5 +210,5 @@ ExternalProject_Add(triton-server
      -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
      -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}
      -DTRITON_VERSION:STRING=${TRITON_VERSION}
@@ -80,28 +107,34 @@ index 6d4ec543..cb1b1b66 100644
 +    -DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH}
  )
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index d17392b8..643b9270 100644
+index 8824e2ed..7a7ae77c 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -36,35 +36,16 @@ include(GNUInstallDirs)
- # We must include the transitive closure of all repos so that we can
- # override the tag. The backend repo is needed for the tests.
- #
+@@ -30,41 +30,15 @@ project(tritonserverexe LANGUAGES C CXX)
+ 
+ include(GNUInstallDirs)
+ 
+-#
+-# Dependencies
+-#
+-# We must include the transitive closure of all repos so that we can
+-# override the tag. The backend repo is needed for the tests.
+-#
 -include(FetchContent)
 -
 -FetchContent_Declare(
 -  repo-common
--  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
+-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/common.git
 -  GIT_TAG ${TRITON_COMMON_REPO_TAG}
 -)
 -FetchContent_Declare(
 -  repo-core
--  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
+-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/core.git
 -  GIT_TAG ${TRITON_CORE_REPO_TAG}
 -)
 -FetchContent_Declare(
 -  repo-backend
--  GIT_REPOSITORY https://github.com/triton-inference-server/backend.git
+-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/backend.git
 -  GIT_TAG ${TRITON_BACKEND_REPO_TAG}
 -)
 -
@@ -114,51 +147,67 @@ index d17392b8..643b9270 100644
 -
  # CUDA
  #
-+find_package(PkgConfig REQUIRED)
  if(${TRITON_ENABLE_GPU})
 -  find_package(CUDAToolkit REQUIRED)
 +  enable_language(CUDA)
    message(STATUS "Using CUDA ${CUDA_VERSION}")
  endif() # TRITON_ENABLE_GPU
  
-@@ -79,13 +60,13 @@ endif()
+@@ -72,7 +46,8 @@ endif() # TRITON_ENABLE_GPU
  #
  if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
      ${TRITON_ENABLE_SAGEMAKER} OR ${TRITON_ENABLE_VERTEX_AI})
 -  find_package(Libevent CONFIG REQUIRED)
++  find_package(PkgConfig)
 +  pkg_check_modules(LIBEVENT REQUIRED libevent)
    message(STATUS "Using libevent ${Libevent_VERSION}")
  endif()
  
+@@ -88,7 +63,8 @@ endif()
+ 
  # re2
  #
--find_library(RE2_LIBRARY NAMES re2)
+-find_package(re2 REQUIRED)
++find_package(PkgConfig)
 +pkg_check_modules(re2 REQUIRED IMPORTED_TARGET re2)
  
  #
  # tritonserver executable
-@@ -127,7 +108,7 @@ else()
+@@ -144,7 +120,7 @@ else()
    target_compile_options(
      main
      PRIVATE
 -      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
 +      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations
    )
- endif()
  
-@@ -147,8 +128,9 @@ target_link_libraries(
+   # Dependency from common.h
+@@ -155,13 +131,6 @@ else()
+   )
+   endif()
+ 
+-set(LIB_DIR "lib")
+-if(LINUX)
+-  file(STRINGS "/etc/os-release" DISTRO_ID_LIKE REGEX "ID_LIKE")
+-  if(${DISTRO_ID_LIKE} MATCHES "rhel|centos")
+-    set (LIB_DIR "lib64")
+-  endif(${DISTRO_ID_LIKE} MATCHES "rhel|centos")
+-endif(LINUX)
+ set(TRITON_CORE_HEADERS_ONLY OFF)
+ 
+ set_target_properties(
+@@ -180,8 +149,8 @@ target_link_libraries(
      triton-common-async-work-queue  # from repo-common
      triton-common-error             # from repo-common
      triton-common-logging           # from repo-common
 -    triton-core-serverapi           # from repo-core
 -    triton-core-serverstub          # from repo-core
-+    #triton-core-serverapi           # from repo-core
 +    triton-core                      # from repo-core
 +    ${LIBEVENT_LIBRARIES}
  )
  
  if(${TRITON_ENABLE_ASAN})
-@@ -172,7 +154,7 @@ if(${TRITON_ENABLE_GPU})
+@@ -205,7 +174,7 @@ if(${TRITON_ENABLE_GPU})
    target_link_libraries(
      main
      PRIVATE
@@ -167,7 +216,7 @@ index d17392b8..643b9270 100644
    )
  endif() # TRITON_ENABLE_GPU
  
-@@ -266,7 +248,7 @@ endif() # NOT WIN32
+@@ -287,7 +256,7 @@ endif() # NOT WIN32
  if (NOT WIN32)
    install(
      TARGETS main
@@ -176,59 +225,28 @@ index d17392b8..643b9270 100644
    )
  else()
    # See explanation above as to why we need to rename main.exe to
-@@ -298,7 +280,7 @@ if(${TRITON_ENABLE_GRPC})
-     target_compile_options(
-       grpc-endpoint-library
-       PRIVATE
--        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
-+        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations
-     )
-   endif()
- 
-@@ -313,10 +295,10 @@ if(${TRITON_ENABLE_GRPC})
-     PUBLIC
-       proto-library           # from repo-common
-       triton-common-logging   # from repo-common
--      triton-common-json      # from repo-common
-+      #triton-common-json      # from repo-common
-       grpc-service-library    # from repo-common
--      triton-core-serverapi   # from repo-core
--      triton-core-serverstub  # from repo-core
-+      #triton-core-serverapi   # from repo-core
-+      triton-core             # from repo-core
-       gRPC::grpc++
-       gRPC::grpc
-       protobuf::libprotobuf
-@@ -343,7 +325,7 @@ if(${TRITON_ENABLE_GRPC})
-     target_link_libraries(
-       grpc-endpoint-library
-       PUBLIC
--        CUDA::cudart
-+        cudart
-     )
-   endif() # TRITON_ENABLE_GPU
- 
-@@ -395,8 +377,8 @@ if(${TRITON_ENABLE_HTTP}
+@@ -331,8 +300,9 @@ if(${TRITON_ENABLE_HTTP}
        OR ${TRITON_ENABLE_METRICS}
        OR ${TRITON_ENABLE_SAGEMAKER}
        OR ${TRITON_ENABLE_VERTEX_AI})
 -  find_package(libevhtp CONFIG REQUIRED)
 -  message(STATUS "Using libevhtp ${libevhtp_VERSION}")
++  find_package(PkgConfig)
 +  pkg_check_modules(evhtp REQUIRED IMPORTED_TARGET evhtp)
 +  message(STATUS "Using libevhtp ${evhtp_VERSION}")
  
    list(APPEND
      HTTP_ENDPOINT_SRCS
-@@ -446,7 +428,7 @@ if(${TRITON_ENABLE_HTTP}
+@@ -384,7 +354,7 @@ if(${TRITON_ENABLE_HTTP}
      target_compile_options(
        http-endpoint-library
        PRIVATE
--        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
-+        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations
+-        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Wno-error=maybe-uninitialized -Werror
++        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Wno-error=maybe-uninitialized
      )
    endif()
  
-@@ -459,18 +441,11 @@ if(${TRITON_ENABLE_HTTP}
+@@ -397,18 +367,11 @@ if(${TRITON_ENABLE_HTTP}
    target_link_libraries(
      http-endpoint-library
      PUBLIC
@@ -239,7 +257,7 @@ index d17392b8..643b9270 100644
 +      triton-core             # from repo-core
        ${LIBEVENT_LIBRARIES}
 -      libevhtp::evhtp
--      ${RE2_LIBRARY}
+-      re2::re2
 -  )
 -
 -  target_include_directories(
@@ -249,8 +267,8 @@ index d17392b8..643b9270 100644
 +      PkgConfig::re2
    )
  
-   if(${TRITON_ENABLE_GPU})
-@@ -483,7 +458,7 @@ if(${TRITON_ENABLE_HTTP}
+   # FIXME when Triton support of Opentelemetry is available on Windows
+@@ -431,7 +394,7 @@ if(${TRITON_ENABLE_HTTP}
      target_link_libraries(
        http-endpoint-library
        PUBLIC
@@ -259,17 +277,18 @@ index d17392b8..643b9270 100644
      )
    endif() # TRITON_ENABLE_GPU
  
-@@ -583,8 +558,7 @@ if(${TRITON_ENABLE_TRACING})
+@@ -551,9 +514,7 @@ if(${TRITON_ENABLE_TRACING})
      tracing-library
      PUBLIC
        triton-common-logging    # from repo-common
+-      triton-common-json      # from repo-common
 -      triton-core-serverapi    # from repo-core
 -      triton-core-serverstub   # from repo-core
 +      triton-core              # from repo-core
    )
  
    target_compile_definitions(
-@@ -602,7 +576,7 @@ if(${TRITON_ENABLE_TRACING})
+@@ -571,7 +532,7 @@ if(${TRITON_ENABLE_TRACING})
      target_link_libraries(
        tracing-library
        PUBLIC
@@ -278,7 +297,7 @@ index d17392b8..643b9270 100644
      )
    endif() # TRITON_ENABLE_GPU
  
-@@ -664,7 +638,7 @@ if (NOT WIN32)
+@@ -633,7 +594,7 @@ if (NOT WIN32)
      target_compile_options(
        simple
        PRIVATE
@@ -287,7 +306,7 @@ index d17392b8..643b9270 100644
      )
    endif()
  
-@@ -683,8 +657,7 @@ if (NOT WIN32)
+@@ -652,8 +613,7 @@ if (NOT WIN32)
      PRIVATE
        triton-common-async-work-queue  # from repo-common
        triton-common-error             # from repo-common
@@ -297,7 +316,7 @@ index d17392b8..643b9270 100644
      )
  
    if(${TRITON_ENABLE_GPU})
-@@ -697,13 +670,13 @@ if (NOT WIN32)
+@@ -666,13 +626,13 @@ if (NOT WIN32)
      target_link_libraries(
        simple
        PRIVATE
@@ -313,7 +332,7 @@ index d17392b8..643b9270 100644
    )
  
    #
-@@ -728,7 +701,7 @@ if (NOT WIN32)
+@@ -697,7 +657,7 @@ if (NOT WIN32)
      target_compile_options(
        multi_server
        PRIVATE
@@ -322,7 +341,7 @@ index d17392b8..643b9270 100644
      )
    endif()
  
-@@ -747,8 +720,8 @@ if (NOT WIN32)
+@@ -716,8 +676,8 @@ if (NOT WIN32)
      PRIVATE
        triton-common-async-work-queue  # from repo-common
        triton-common-error             # from repo-common
@@ -333,7 +352,7 @@ index d17392b8..643b9270 100644
      )
  
    if(${TRITON_ENABLE_GPU})
-@@ -761,13 +734,13 @@ if (NOT WIN32)
+@@ -730,13 +690,13 @@ if (NOT WIN32)
      target_link_libraries(
        multi_server
        PRIVATE
@@ -349,7 +368,7 @@ index d17392b8..643b9270 100644
    )
  
    if(${TRITON_ENABLE_GPU})
-@@ -793,7 +766,7 @@ if (NOT WIN32)
+@@ -762,7 +722,7 @@ if (NOT WIN32)
        target_compile_options(
          memory_alloc
          PRIVATE
@@ -358,7 +377,7 @@ index d17392b8..643b9270 100644
        )
      endif()
  
-@@ -818,19 +791,13 @@ if (NOT WIN32)
+@@ -787,14 +747,13 @@ if (NOT WIN32)
        PRIVATE
          triton-common-async-work-queue  # from repo-common
          triton-common-error             # from repo-common
@@ -376,8 +395,372 @@ index d17392b8..643b9270 100644
      )
    endif() # TRITON_ENABLE_GPU
  endif() # NOT WIN32
+diff --git a/src/grpc/CMakeLists.txt b/src/grpc/CMakeLists.txt
+index 0cd027a3..e66f63a8 100644
+--- a/src/grpc/CMakeLists.txt
++++ b/src/grpc/CMakeLists.txt
+@@ -67,8 +67,7 @@ target_link_libraries(
+     triton-common-json            # from repo-common
+     grpc-health-library           # from repo-common
+     grpc-service-library          # from repo-common
+-    triton-core-serverapi         # from repo-core
+-    triton-core-serverstub        # from repo-core
++    triton-core                   # from repo-core
+     gRPC::grpc++
+     gRPC::grpc
+     protobuf::libprotobuf
+diff --git a/src/python/CMakeLists.txt b/src/python/CMakeLists.txt
+index 58208b5c..6016b2a3 100644
+--- a/src/python/CMakeLists.txt
++++ b/src/python/CMakeLists.txt
+@@ -44,7 +44,7 @@ set(wheel_stamp_file "stamp.whl")
+ 
+ add_custom_command(
+   OUTPUT "${wheel_stamp_file}"
+-  COMMAND python3
++  COMMAND ${PYTHON_EXECUTABLE}
+   ARGS
+     "${CMAKE_CURRENT_SOURCE_DIR}/build_wheel.py"
+     --dest-dir "${CMAKE_CURRENT_BINARY_DIR}/generic"
+diff --git a/src/python/tritonfrontend/CMakeLists.txt b/src/python/tritonfrontend/CMakeLists.txt
+index eb871667..702908c2 100644
+--- a/src/python/tritonfrontend/CMakeLists.txt
++++ b/src/python/tritonfrontend/CMakeLists.txt
+@@ -39,19 +39,8 @@ file(GLOB PYTHON_MODULE_FILES ./_api/*.py)
+ file(COPY ${PYTHON_MODULE_FILES} DESTINATION ./_api/.)
+ # ================================= END =====================================
+ 
 -
--# Currently unit tests do not build for windows...
--if (NOT WIN32)
--  add_subdirectory(test test)
--endif() # NOT WIN32
+-# =================== Downloading and Installing pybind11 ===================
+-include(FetchContent)
+-
+-FetchContent_Declare(
+-    pybind11
+-    GIT_REPOSITORY https://github.com/pybind/pybind11.git
+-    GIT_TAG v2.13.1
+-    GIT_SHALLOW ON
+-)
+-
+-FetchContent_MakeAvailable(pybind11)
+-# ================================= END =====================================
++set(PYBIND11_FINDPYTHON ON)
++find_package(pybind11 CONFIG REQUIRED)
+ 
+ # ================== Collect the Dependencies ===============================
+ set(
+@@ -82,9 +71,13 @@ if(${TRITON_ENABLE_GRPC})
+ endif()
+ 
+ if(${TRITON_ENABLE_GPU})
+-  find_package(CUDAToolkit REQUIRED)
++  enable_language(CUDA)
++  find_package(CUDA REQUIRED)
++  include_directories(${CUDA_INCLUDE_DIRS})
++  link_directories(${CUDA_LIBRARIES})
++  message(STATUS "Using CUDA ${CUDA_VERSION}")
+   list(APPEND PY_BINDING_DEPENDENCY_LIBS
+-      CUDA::cudart
++      cudart
+   )
+ endif()
+ 
+diff --git a/src/test/CMakeLists.txt b/src/test/CMakeLists.txt
+index 23243bf9..b69780ee 100644
+--- a/src/test/CMakeLists.txt
++++ b/src/test/CMakeLists.txt
+@@ -26,6 +26,12 @@
+ 
+ cmake_minimum_required (VERSION 3.18)
+ 
++enable_language(CUDA)
++find_package(CUDA REQUIRED)
++include_directories(${CUDA_INCLUDE_DIRS})
++link_directories(${CUDA_LIBRARIES})
++message(STATUS "Using CUDA ${CUDA_VERSION}")
++
+ #
+ # Unit tests
+ #
+@@ -63,12 +69,12 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
+   target_link_libraries(
+     data_compressor_test
+     PRIVATE
+-      triton-core-serverapi   # from repo-core
+-      triton-core-serverstub  # from repo-core
++      triton-core               # from repo-core
+       GTest::gtest
+       GTest::gtest_main
+       ${LIBEVENT_LIBRARIES}
+       -lz
++      cudart
+   )
+ 
+   install(
+@@ -104,11 +110,12 @@ target_include_directories(
+ target_link_libraries(
+   backend_tensor_size_test
+   PRIVATE
+-    triton-backend-utils    # from repo-backend
+-    triton-core-serverapi   # from repo-core
+-    triton-core-serverstub  # from repo-core
++    triton-backend-utils             # from repo-backend
++    triton-backend-cuda-utils        # from repo-backend
++    triton-core                      # from repo-core
+     GTest::gtest
+     GTest::gtest_main
++    cudart
+ )
+ 
+ install(
+diff --git a/src/test/distributed_addsub/CMakeLists.txt b/src/test/distributed_addsub/CMakeLists.txt
+index 10a7148f..bfd7ab77 100644
+--- a/src/test/distributed_addsub/CMakeLists.txt
++++ b/src/test/distributed_addsub/CMakeLists.txt
+@@ -47,16 +47,15 @@ target_compile_features(triton-distributed-addsub-backend PRIVATE cxx_std_11)
+ target_compile_options(
+   triton-distributed-addsub-backend PRIVATE
+   $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
+-    -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -Werror>
++    -Wall -Wextra -Wno-unused-parameter -Wno-type-limits>
+ )
+ 
+ target_link_libraries(
+   triton-distributed-addsub-backend
+   PRIVATE
+-    triton-backend-utils    # from repo-backend
+-    triton-core-serverapi   # from repo-core
+-    triton-core-backendapi  # from repo-core
+-    triton-core-serverstub  # from repo-core
++    triton-backend-utils         # from repo-backend
++    triton-backend-cuda-utils    # from repo-backend
++    triton-core                  # from repo-core
+ )
+ 
+ set_target_properties(
+@@ -64,7 +63,7 @@ set_target_properties(
+   POSITION_INDEPENDENT_CODE ON
+   OUTPUT_NAME triton_distributed_addsub
+   LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_distributed_addsub.ldscript
+-  LINK_FLAGS "-Wl,--version-script libtriton_distributed_addsub.ldscript"
++  LINK_FLAGS "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libtriton_distributed_addsub.ldscript"
+ )
+ 
+ #
+diff --git a/src/test/dyna_sequence/CMakeLists.txt b/src/test/dyna_sequence/CMakeLists.txt
+index 1d0c095b..27e08e69 100644
+--- a/src/test/dyna_sequence/CMakeLists.txt
++++ b/src/test/dyna_sequence/CMakeLists.txt
+@@ -53,10 +53,9 @@ target_compile_options(
+ target_link_libraries(
+   triton-dyna-sequence-backend
+   PRIVATE
+-    triton-backend-utils    # from repo-backend
+-    triton-core-serverapi   # from repo-core
+-    triton-core-backendapi  # from repo-core
+-    triton-core-serverstub  # from repo-core
++    triton-backend-utils         # from repo-backend
++    triton-backend-cuda-utils    # from repo-backend
++    triton-core                  # from repo-core
+ )
+ 
+ set_target_properties(
+@@ -64,7 +63,7 @@ set_target_properties(
+   POSITION_INDEPENDENT_CODE ON
+   OUTPUT_NAME triton_dyna_sequence
+   LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_dyna_sequence.ldscript
+-  LINK_FLAGS "-Wl,--version-script libtriton_dyna_sequence.ldscript"
++  LINK_FLAGS "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libtriton_dyna_sequence.ldscript"
+ )
+ 
+ #
+diff --git a/src/test/implicit_state/CMakeLists.txt b/src/test/implicit_state/CMakeLists.txt
+index c868c5f1..44096911 100644
+--- a/src/test/implicit_state/CMakeLists.txt
++++ b/src/test/implicit_state/CMakeLists.txt
+@@ -28,6 +28,12 @@ cmake_minimum_required(VERSION 3.17)
+ 
+ project(tritonimplicitsequencebackend LANGUAGES C CXX)
+ 
++enable_language(CUDA)
++find_package(CUDA REQUIRED)
++include_directories(${CUDA_INCLUDE_DIRS})
++link_directories(${CUDA_LIBRARIES})
++message(STATUS "Using CUDA ${CUDA_VERSION}")
++
+ #
+ # libtriton_implicit_state.so
+ # Shared library implementing the Triton Implicit Sequence Backend API
+@@ -43,20 +49,21 @@ add_library(
+   TritonImplicitStateBackend::triton-implicit-state-backend ALIAS triton-implicit-state-backend
+ )
+ 
++target_compile_definitions(triton-implicit-state-backend PRIVATE TRITON_ENABLE_GPU)
+ target_compile_features(triton-implicit-state-backend PRIVATE cxx_std_11)
+ target_compile_options(
+   triton-implicit-state-backend PRIVATE
+   $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
+-    -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -Werror>
++    -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -fpermissive>
+ )
+ 
+ target_link_libraries(
+   triton-implicit-state-backend
+   PRIVATE
+-    triton-backend-utils    # from repo-backend
+-    triton-core-serverapi   # from repo-core
+-    triton-core-backendapi  # from repo-core
+-    triton-core-serverstub  # from repo-core
++    triton-backend-utils         # from repo-backend
++    triton-backend-cuda-utils    # from repo-backend
++    triton-core                  # from repo-core
++    cudart
+ )
+ 
+ set_target_properties(
+@@ -64,7 +71,7 @@ set_target_properties(
+   POSITION_INDEPENDENT_CODE ON
+   OUTPUT_NAME triton_implicit_state
+   LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_implicit_state.ldscript
+-  LINK_FLAGS "-Wl,--version-script libtriton_implicit_state.ldscript"
++  LINK_FLAGS "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libtriton_implicit_state.ldscript"
+ )
+ 
+ #
+diff --git a/src/test/iterative_sequence/CMakeLists.txt b/src/test/iterative_sequence/CMakeLists.txt
+index 9321e320..4cf8842d 100644
+--- a/src/test/iterative_sequence/CMakeLists.txt
++++ b/src/test/iterative_sequence/CMakeLists.txt
+@@ -47,16 +47,15 @@ target_compile_features(triton-iterative-sequence-backend PRIVATE cxx_std_11)
+ target_compile_options(
+   triton-iterative-sequence-backend PRIVATE
+   $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
+-    -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -Werror>
++    -Wall -Wextra -Wno-unused-parameter -Wno-type-limits>
+ )
+ 
+ target_link_libraries(
+   triton-iterative-sequence-backend
+   PRIVATE
+-    triton-backend-utils    # from repo-backend
+-    triton-core-serverapi   # from repo-core
+-    triton-core-backendapi  # from repo-core
+-    triton-core-serverstub  # from repo-core
++    triton-backend-utils         # from repo-backend
++    triton-backend-cuda-utils    # from repo-backend
++    triton-core                  # from repo-core
+ )
+ 
+ set_target_properties(
+@@ -64,7 +63,7 @@ set_target_properties(
+   POSITION_INDEPENDENT_CODE ON
+   OUTPUT_NAME triton_iterative_sequence
+   LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_iterative_sequence.ldscript
+-  LINK_FLAGS "-Wl,--version-script libtriton_iterative_sequence.ldscript"
++  LINK_FLAGS "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libtriton_iterative_sequence.ldscript"
+ )
+ 
+ #
+diff --git a/src/test/query_backend/CMakeLists.txt b/src/test/query_backend/CMakeLists.txt
+index 809499cd..3379cf8c 100644
+--- a/src/test/query_backend/CMakeLists.txt
++++ b/src/test/query_backend/CMakeLists.txt
+@@ -43,20 +43,12 @@ add_library(
+   TritonQueryBackend::triton-query-backend ALIAS triton-query-backend
+ )
+ 
+-target_compile_features(triton-query-backend PRIVATE cxx_std_11)
+-target_compile_options(
+-  triton-query-backend PRIVATE
+-  $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
+-    -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -Werror>
+-)
+-
+ target_link_libraries(
+   triton-query-backend
+   PRIVATE
+-    triton-backend-utils    # from repo-backend
+-    triton-core-serverapi   # from repo-core
+-    triton-core-backendapi  # from repo-core
+-    triton-core-serverstub  # from repo-core
++    triton-backend-utils         # from repo-backend
++    triton-backend-cuda-utils    # from repo-backend
++    triton-core                  # from repo-core
+ )
+ 
+ set_target_properties(
+@@ -64,7 +56,7 @@ set_target_properties(
+   POSITION_INDEPENDENT_CODE ON
+   OUTPUT_NAME triton_query
+   LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_query.ldscript
+-  LINK_FLAGS "-Wl,--version-script libtriton_query.ldscript"
++  LINK_FLAGS "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libtriton_query.ldscript"
+ )
+ 
+ #
+diff --git a/src/test/repoagent/relocation_repoagent/CMakeLists.txt b/src/test/repoagent/relocation_repoagent/CMakeLists.txt
+index 8c2e27be..a5ac5f99 100644
+--- a/src/test/repoagent/relocation_repoagent/CMakeLists.txt
++++ b/src/test/repoagent/relocation_repoagent/CMakeLists.txt
+@@ -51,9 +51,7 @@ target_compile_options(
+ target_link_libraries(
+   triton-relocation-repoagent
+   PRIVATE
+-    triton-core-serverapi     # from repo-core
+-    triton-core-repoagentapi  # from repo-core
+-    triton-core-serverstub    # from repo-core
++    triton-core               # from repo-core
+ )
+ 
+ set_target_properties(
+@@ -61,7 +59,7 @@ set_target_properties(
+   POSITION_INDEPENDENT_CODE ON
+   OUTPUT_NAME tritonrepoagent_relocation
+   LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtritonrepoagent_relocation.ldscript
+-  LINK_FLAGS "-Wl,--version-script libtritonrepoagent_relocation.ldscript"
++  LINK_FLAGS "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libtritonrepoagent_relocation.ldscript"
+ )
+ 
+ #
+diff --git a/src/test/sequence/CMakeLists.txt b/src/test/sequence/CMakeLists.txt
+index 5cb8b653..8aaab630 100644
+--- a/src/test/sequence/CMakeLists.txt
++++ b/src/test/sequence/CMakeLists.txt
+@@ -43,20 +43,20 @@ add_library(
+   TritonSequenceBackend::triton-sequence-backend ALIAS triton-sequence-backend
+ )
+ 
+-target_compile_features(triton-sequence-backend PRIVATE cxx_std_17)
++target_compile_definitions(triton-sequence-backend PRIVATE TRITON_ENABLE_GPU)
++target_compile_features(triton-sequence-backend PRIVATE cxx_std_11)
+ target_compile_options(
+   triton-sequence-backend PRIVATE
+   $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
+-    -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -Werror>
++    -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -fpermissive>
+ )
+ 
+ target_link_libraries(
+   triton-sequence-backend
+   PRIVATE
+-    triton-backend-utils    # from repo-backend
+-    triton-core-serverapi   # from repo-core
+-    triton-core-backendapi  # from repo-core
+-    triton-core-serverstub  # from repo-core
++    triton-backend-utils         # from repo-backend
++    triton-backend-cuda-utils    # from repo-backend
++    triton-core                  # from repo-core
+ )
+ 
+ set_target_properties(
+@@ -64,7 +64,7 @@ set_target_properties(
+   POSITION_INDEPENDENT_CODE ON
+   OUTPUT_NAME triton_sequence
+   LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_sequence.ldscript
+-  LINK_FLAGS "-Wl,--version-script libtriton_sequence.ldscript"
++  LINK_FLAGS "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libtriton_sequence.ldscript"
+ )
+ 
+ #
+-- 
+2.34.1
+

@@ -4,11 +4,13 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=7889848dc86811b06ded7bfa9ba39e02"
 SECTION = "libs"
 
 SRC_URI = "\
-    git://github.com/triton-inference-server/common.git;protocol=https;branch=r22.05 \
+    git://github.com/triton-inference-server/common.git;protocol=https;branch=r25.05 \
     file://0001-Build-fixups.patch \
 "
 
-SRCREV = "feca9eadf25eb0230eaac0e9f2ce8f6447a0e9f1"
+SRCREV = "e4e00edd25af07d2f0e81e2025dbd40daa1dffc2"
+
+DEPENDS += "googletest"
 
 COMPATIBLE_MACHINE = "(cuda)"
 

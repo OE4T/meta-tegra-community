@@ -4,11 +4,11 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=1c4cd58940438cc34ebeb4fec0a79ec8"
 SECTION = "libs"
 
 SRC_URI = "\
-    git://github.com/triton-inference-server/client.git;protocol=https;branch=r22.05 \
+    git://github.com/triton-inference-server/client.git;protocol=https;branch=r25.05 \
     file://0001-Build-fixups.patch \
 "
 
-SRCREV = "1a167ab9eb1c6ffc23d12c04bc9ffbd3dede0856"
+SRCREV = "9cf06a1beec8b8cf4854247ba77704f03127f2fb"
 
 DEPENDS = "\
     triton-common \
@@ -17,16 +17,18 @@ DEPENDS = "\
 
 COMPATIBLE_MACHINE = "(cuda)"
 
-inherit pkgconfig cmake python3-dir cuda
+inherit pkgconfig cmake setuptools3 cuda
 
+SETUPTOOLS_SETUP_PATH = "${S}/src/python/library"
 
 EXTRA_OECMAKE += '\
     -DCMAKE_INSTALL_PREFIX="${D}${prefix}" \
+    -DTRITON_VERSION="${PV}" \
 '
 
 PACKAGECONFIG ??= "cc_http gpu python_http"
-PACKAGECONFIG[cc_http] = "-DTRITON_ENABLE_CC_HTTP=ON,-DTRITON_ENABLE_CC_HTTP=OFF,curl"
-PACKAGECONFIG[cc_grpc] = "-DTRITON_ENABLE_CC_GRPC=ON,-DTRITON_ENABLE_CC_GRPC=OFF,grpc protobuf protobuf-native"
+PACKAGECONFIG[cc_http] = "-DTRITON_ENABLE_CC_HTTP=ON,-DTRITON_ENABLE_CC_HTTP=OFF,re2 curl"
+PACKAGECONFIG[cc_grpc] = "-DTRITON_ENABLE_CC_GRPC=ON,-DTRITON_ENABLE_CC_GRPC=OFF,re2 rapidjson grpc protobuf protobuf-native"
 PACKAGECONFIG[python_http] = "-DTRITON_ENABLE_PYTHON_HTTP=ON,-DTRITON_ENABLE_PYTHON_HTTP=OFF,,triton-python-backend"
 PACKAGECONFIG[python_grpc] = "-DTRITON_ENABLE_PYTHON_GRPC=ON,-DTRITON_ENABLE_PYTHON_GRPC=OFF,,triton-python-backend"
 PACKAGECONFIG[java] = "-DTRITON_ENABLE_JAVA_HTTP=ON,-DTRITON_ENABLE_JAVA_HTTP=OFF"
@@ -35,30 +37,24 @@ PACKAGECONFIG[perf_c] = "-DTRITON_ENABLE_PERF_ANALYZER_C_API=ON,-DTRITON_ENABLE_
 PACKAGECONFIG[perf_tfs] = "-DTRITON_ENABLE_PERF_ANALYZER_TFS=ON,-DTRITON_ENABLE_PERF_ANALYZER_TFS=OFF"
 PACKAGECONFIG[perf_ts] = "-DTRITON_ENABLE_PERF_ANALYZER_TS=ON,-DTRITON_ENABLE_PERF_ANALYZER_TS=OFF"
 PACKAGECONFIG[gpu] = "-DTRITON_ENABLE_GPU=ON,-DTRITON_ENABLE_GPU=OFF,cuda-cudart"
-PACKAGECONFIG[tests] = "-DTRITON_ENABLE_TESTS=ON,-DTRITON_ENABLE_TESTS=OFF"
+PACKAGECONFIG[tests] = "-DTRITON_ENABLE_TESTS=ON,-DTRITON_ENABLE_TESTS=OFF,googletest"
 PACKAGECONFIG[examples] = "-DTRITON_ENABLE_EXAMPLES=ON,-DTRITON_ENABLE_EXAMPLES=OFF"
 
-def get_epoch_time(d):
-    import time
-    return int(time.time())
-
-SOURCE_DATE_EPOCH = "${@get_epoch_time(d)}"
-
-cmake_runcmake_install() {
-	bbnote ${DESTDIR:+DESTDIR=${DESTDIR} }${CMAKE_VERBOSE} cmake --build '${B}/cc-clients' "$@" -- ${EXTRA_OECMAKE_BUILD}
-	eval ${DESTDIR:+DESTDIR=${DESTDIR} }${CMAKE_VERBOSE} cmake --build '${B}/cc-clients' "$@" -- ${EXTRA_OECMAKE_BUILD}
+do_configure() {
+    cmake_do_configure
 }
 
-do_install() {
-    cmake_runcmake_install --target ${OECMAKE_TARGET_INSTALL}
-    install -d ${D}${PYTHON_SITEPACKAGES_DIR}
-    cp --preserve=mode,timestamps -R ${B}/python-clients/library/linux/wheel/build/lib/* ${D}${PYTHON_SITEPACKAGES_DIR}
+do_compile() {
+    cmake_do_compile
+    export VERSION="${PV}"
+    setuptools3_do_compile
 }
 
-FILES:${PN} += " \
-    ${includedir}/triton \
-    ${PYTHON_SITEPACKAGES_DIR} \
+do_install:append() {
+    rm -f ${D}${prefix}/LICENSE.txt
+}
+
+RDEPENDS:${PN} = " \
+    python3-six \
+    python3-certifi \
 "
-
-SOLIBS = ".so"
-FILES_SOLIBSDEV = ""

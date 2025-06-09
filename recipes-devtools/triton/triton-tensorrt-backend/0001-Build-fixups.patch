@@ -1,81 +1,116 @@
-From c98b0f5c0b01439fe05d40e02a7a368c079a68bc Mon Sep 17 00:00:00 2001
-From: Ilies CHERGUI <ilies.chergui@gmail.com>
-Date: Sat, 22 Jul 2023 15:05:32 +0100
-Subject: [PATCH 1/2] Build fixups
+From bec5cc158bd6b105a8d7bbf63bd1f8edff20b160 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Tue, 10 Jun 2025 17:56:02 +0100
+Subject: [PATCH] Build fixups
 
 Upstream-Status: Inappropriate [OE-Specific]
-Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 Signed-off-by: Roger Knecht <roger@norberthealth.com>
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt  | 35 ++++++++++++-----------------------
- src/tensorrt.cc |  2 +-
- 2 files changed, 13 insertions(+), 24 deletions(-)
+ CMakeLists.txt | 58 +++++++++++++++-----------------------------------
+ 1 file changed, 17 insertions(+), 41 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 5da6ecd..11ee8b0 100644
+index 682b3fd..a76bcac 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -46,7 +46,7 @@ if(NOT CMAKE_BUILD_TYPE)
+@@ -40,17 +40,12 @@ option(TRITON_ENABLE_NVTX "Include nvtx markers collection in backend." OFF)
+ set(TRITON_TENSORRT_LIB_PATHS "" CACHE PATH "Paths to TensorRT libraries. Multiple paths may be specified by separating them with a semicolon.")
+ set(TRITON_TENSORRT_INCLUDE_PATHS "" CACHE PATH "Paths to TensorRT includes. Multiple paths may be specified by separating them with a semicolon.")
+ 
+-set(TRITON_REPO_ORGANIZATION "https://github.com/triton-inference-server" CACHE STRING "Git repository to pull from")
+-set(TRITON_BACKEND_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/backend repo.")
+-set(TRITON_CORE_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/core repo.")
+-set(TRITON_COMMON_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/common repo.")
+-
+ if(NOT CMAKE_BUILD_TYPE)
+   set(CMAKE_BUILD_TYPE Release)
  endif()
  
  set(TRITON_TENSORRT_BACKEND_LIBNAME triton_tensorrt)
 -set(TRITON_TENSORRT_BACKEND_INSTALLDIR ${CMAKE_INSTALL_PREFIX}/backends/tensorrt)
 +set(TRITON_TENSORRT_BACKEND_INSTALLDIR ${CMAKE_INSTALL_LIBDIR}/tensorrt)
  
- #
- # Dependencies
-@@ -54,30 +54,14 @@ set(TRITON_TENSORRT_BACKEND_INSTALLDIR ${CMAKE_INSTALL_PREFIX}/backends/tensorrt
- # FetchContent's composibility isn't very good. We must include the
- # transitive closure of all repos so that we can override the tag.
- #
+ 
+ if(LINUX)
+@@ -64,51 +59,28 @@ if(LINUX)
+   endif(${DISTRO_ID_LIKE} MATCHES "rhel|centos")
+ endif(LINUX)
+ 
+-#
+-# Dependencies
+-#
+-# FetchContent's composability isn't very good. We must include the
+-# transitive closure of all repos so that we can override the tag.
+-#
 -include(FetchContent)
 -
 -FetchContent_Declare(
 -  repo-common
--  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
+-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/common.git
 -  GIT_TAG ${TRITON_COMMON_REPO_TAG}
 -)
 -FetchContent_Declare(
 -  repo-core
--  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
+-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/core.git
 -  GIT_TAG ${TRITON_CORE_REPO_TAG}
 -)
 -FetchContent_Declare(
 -  repo-backend
--  GIT_REPOSITORY https://github.com/triton-inference-server/backend.git
+-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/backend.git
 -  GIT_TAG ${TRITON_BACKEND_REPO_TAG}
 -)
 -FetchContent_MakeAvailable(repo-common repo-core repo-backend)
- 
+-
  #
  # CUDA
  #
  if(${TRITON_ENABLE_GPU})
 -  find_package(CUDAToolkit REQUIRED)
+-  message(STATUS "Using CUDA ${CUDAToolkit_VERSION}")
 +  enable_language(CUDA)
 +  find_package(CUDA REQUIRED)
 +  include_directories(${CUDA_INCLUDE_DIRS})
-   message(STATUS "Using CUDA ${CUDA_VERSION}")
-   set(CUDA_NVCC_FLAGS -std=c++11)
++  message(STATUS "Using CUDA ${CUDA_VERSION}")
+   if (WIN32)
+     set(CUDA_NVCC_FLAGS -std=c++17)
+   else ()
+     set(CUDA_NVCC_FLAGS -std=c++11)
+   endif ()
  
-@@ -178,9 +162,14 @@ find_library(NVINFER_PLUGIN_LIBRARY NAMES nvinfer_plugin)
+-  if(NOT DEFINED CUDAToolkit_VERSION)
+-    message( FATAL_ERROR "Unable to determine CUDAToolkit_VERSION, CMake will exit." )
++  if(NOT DEFINED CUDA_VERSION)
++    message( FATAL_ERROR "Unable to determine CUDA_VERSION, CMake will exit." )
+   endif()
+ 
+-  if(CUDAToolkit_VERSION VERSION_GREATER "10.1" OR CUDAToolkit_VERSION VERSION_EQUAL "10.1")
++  if(CUDA_VERSION VERSION_GREATER "10.1" OR CUDA_VERSION VERSION_EQUAL "10.1")
+     add_definitions(-DTRITON_ENABLE_CUDA_GRAPH=1)
+   else()
+-    message(WARNING "CUDA ${CUDAToolkit_VERSION} does not support CUDA graphs.")
++    message(WARNING "CUDA ${CUDA_VERSION} does not support CUDA graphs.")
+   endif()
+ else()
+   message( FATAL_ERROR "TensorRT backend requires TRITON_ENABLE_GPU=1, CMake will exit." )
+@@ -213,9 +185,13 @@ find_library(NVINFER_PLUGIN_LIBRARY NAMES nvinfer_plugin nvinfer_plugin_10)
  target_link_libraries(
    triton-tensorrt-backend
    PRIVATE
 -    triton-core-serverapi   # from repo-core
 -    triton-core-serverstub  # from repo-core
+-    triton-backend-utils    # from repo-backend
 +    triton-common-async-work-queue
-+    triton-common-error
 +    triton-common-logging
 +    triton-common-model-config
 +    triton-common-table-printer
-     triton-backend-utils    # from repo-backend
-+    kernel-library-new
-+    triton-core             # from repo-core
++    triton-backend-utils         # from repo-backend
++    triton-backend-cuda-utils    # from repo-backend
++    triton-core                  # from repo-core
      -lpthread
      ${NVINFER_LIBRARY}
      ${NVINFER_PLUGIN_LIBRARY}
-@@ -194,7 +183,7 @@ target_link_libraries(
+@@ -229,7 +205,7 @@ target_link_libraries(
  target_link_libraries(
      triton-tensorrt-backend
      PRIVATE
@@ -84,19 +119,6 @@ index 5da6ecd..11ee8b0 100644
  )
  
  
-diff --git a/src/tensorrt.cc b/src/tensorrt.cc
-index 65f62d3..736ef15 100644
---- a/src/tensorrt.cc
-+++ b/src/tensorrt.cc
-@@ -2553,7 +2553,7 @@ ModelInstanceState::ProcessResponse()
- {
-   while (true) {
-     NVTX_RANGE(nvtx_, "ProcessResponse " + Name());
--    auto payload = std::move(completion_queue_.Get());
-+    auto payload = completion_queue_.Get();
-     if (payload.get() == nullptr) {
-       break;
-     }
 -- 
-2.25.1
+2.34.1
 
