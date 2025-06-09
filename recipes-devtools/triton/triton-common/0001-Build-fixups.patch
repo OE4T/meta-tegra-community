@@ -1,54 +1,23 @@
-From fcfe293be6220321365b226c84342655a5fe0e8e Mon Sep 17 00:00:00 2001
-From: Ilies CHERGUI <ilies.chergui@gmail.com>
-Date: Thu, 10 Nov 2022 19:23:23 +0000
+From 8a023dd5ed11dfdb7b4aeacc322b45ff2266030d Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Thu, 12 Jun 2025 12:40:43 +0100
 Subject: [PATCH] Build fixups
 
 Upstream-Status: Inappropriate [OE-Specific]
-Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 Signed-off-by: Roger Knecht <roger@norberthealth.com>
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt                       | 8 +++++++-
- include/triton/common/model_config.h | 2 +-
- protobuf/CMakeLists.txt              | 2 +-
- 3 files changed, 9 insertions(+), 3 deletions(-)
+ CMakeLists.txt          |  8 +++++++-
+ protobuf/CMakeLists.txt |  2 +-
+ src/CMakeLists.txt      |  6 ++++++
+ src/test/CMakeLists.txt | 11 +----------
+ 4 files changed, 15 insertions(+), 12 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d060a9c..9e070c1 100644
+index 61870a8..95ed3f6 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -70,6 +70,7 @@ add_library(
-   triton-common-error
-   src/error.cc
-   )
-+set_target_properties(triton-common-error PROPERTIES ARCHIVE_OUTPUT_NAME triton-common-error)
- 
- add_library(
-   TritonCommon::triton-common-error ALIAS triton-common-error
-@@ -93,6 +94,7 @@ add_library(
-   triton-common-logging
-   src/logging.cc
- )
-+set_target_properties(triton-common-logging PROPERTIES ARCHIVE_OUTPUT_NAME triton-common-logging)
- 
- add_library(
-   TritonCommon::triton-common-logging ALIAS triton-common-logging
-@@ -142,6 +144,7 @@ add_library(
-   src/async_work_queue.cc
-   src/error.cc
- )
-+set_target_properties(triton-common-async-work-queue PROPERTIES ARCHIVE_OUTPUT_NAME triton-common-async-work-queue)
- 
- add_library(
-   TritonCommon::triton-common-async-work-queue ALIAS  triton-common-async-work-queue
-@@ -196,6 +199,7 @@ add_library(
- add_library(
-   TritonBackend::triton-common-table-printer ALIAS triton-common-table-printer
- )
-+set_target_properties(triton-common-table-printer PROPERTIES ARCHIVE_OUTPUT_NAME triton-common-table-printer)
- 
- target_include_directories(
-   triton-common-table-printer
-@@ -249,7 +253,7 @@ if(${TRITON_COMMON_ENABLE_PROTOBUF} OR ${TRITON_COMMON_ENABLE_GRPC})
+@@ -118,7 +118,7 @@ if(${TRITON_COMMON_ENABLE_PROTOBUF} OR ${TRITON_COMMON_ENABLE_GRPC})
    add_subdirectory(protobuf)
  
    set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
@@ -57,7 +26,7 @@ index d060a9c..9e070c1 100644
    message(STATUS "Using protobuf ${Protobuf_VERSION}")
  
    #
-@@ -260,6 +264,8 @@ if(${TRITON_COMMON_ENABLE_PROTOBUF} OR ${TRITON_COMMON_ENABLE_GRPC})
+@@ -129,6 +129,8 @@ if(${TRITON_COMMON_ENABLE_PROTOBUF} OR ${TRITON_COMMON_ENABLE_GRPC})
      src/model_config.cc
      )
  
@@ -66,21 +35,24 @@ index d060a9c..9e070c1 100644
    add_library(
      TritonCommon::triton-common-model-config ALIAS triton-common-model-config
    )
-diff --git a/include/triton/common/model_config.h b/include/triton/common/model_config.h
-index d4b20c3..41156c1 100644
---- a/include/triton/common/model_config.h
-+++ b/include/triton/common/model_config.h
-@@ -36,7 +36,7 @@ using DimsList = ::google::protobuf::RepeatedField<::google::protobuf::int64>;
+@@ -235,6 +237,8 @@ install(
+     ${INSTALL_CONFIGDIR}
+ )
  
- /// The type for the metric_tags map.
- using MetricTagsMap = ::google::protobuf::Map<
--    ::google::protobuf::string, ::google::protobuf::string>;
-+    std::string, std::string>;
++set_target_properties(triton-common-async-work-queue PROPERTIES ARCHIVE_OUTPUT_NAME triton-common-async-work-queue)
++
+ include(CMakePackageConfigHelpers)
+ configure_package_config_file(
+   ${CMAKE_CURRENT_LIST_DIR}/cmake/TritonCommonConfig.cmake.in
+@@ -261,4 +265,6 @@ export(
+     TritonCommon::
+ )
  
- // Map from a host policy name to <setting, value> map of cmdline
- // settings for the host policy.
++set_target_properties(triton-common-table-printer PROPERTIES ARCHIVE_OUTPUT_NAME triton-common-table-printer)
++
+ export(PACKAGE TritonCommon)
 diff --git a/protobuf/CMakeLists.txt b/protobuf/CMakeLists.txt
-index 39fdabf..15065c6 100644
+index 34f8374..781a758 100644
 --- a/protobuf/CMakeLists.txt
 +++ b/protobuf/CMakeLists.txt
 @@ -27,7 +27,7 @@
@@ -92,6 +64,59 @@ index 39fdabf..15065c6 100644
  message(STATUS "Using protobuf ${Protobuf_VERSION}")
  include_directories(${Protobuf_INCLUDE_DIRS})
  
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 4c98094..85d947d 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -48,6 +48,8 @@ target_include_directories(
+ 
+ target_link_libraries(triton-common-error PRIVATE common-compile-settings)
+ 
++set_target_properties(triton-common-error PROPERTIES ARCHIVE_OUTPUT_NAME triton-common-error)
++
+ #
+ # Logging
+ #
+@@ -79,6 +81,8 @@ endif() # TRITON_ENABLE_LOGGING
+ 
+ target_link_libraries(triton-common-logging PRIVATE common-compile-settings)
+ 
++set_target_properties(triton-common-logging PROPERTIES ARCHIVE_OUTPUT_NAME triton-common-logging)
++
+ #
+ # Async Work Queue
+ #
+@@ -137,6 +141,8 @@ target_link_libraries(triton-common-thread-pool
+     common-compile-settings
+ )
+ 
++set_target_properties(triton-common-thread-pool PROPERTIES ARCHIVE_OUTPUT_NAME triton-common-thread-pool)
++
+ #
+ # Table Printer
+ #
+diff --git a/src/test/CMakeLists.txt b/src/test/CMakeLists.txt
+index dad48a5..f5fd907 100644
+--- a/src/test/CMakeLists.txt
++++ b/src/test/CMakeLists.txt
+@@ -26,16 +26,7 @@
+ 
+ cmake_minimum_required (VERSION 3.18)
+ 
+-#
+-# Unit tests
+-#
+-include(FetchContent)
+-
+-FetchContent_Declare(
+-  googletest
+-  URL https://github.com/google/googletest/archive/9406a60c7839052e4944ea4dbc8344762a89f9bd.zip
+-)
+-FetchContent_MakeAvailable(googletest)
++find_package(GTest REQUIRED)
+ 
+ if (TRITON_COMMON_ENABLE_JSON)
+     add_subdirectory(triton_json triton_json)
 -- 
-2.25.1
+2.34.1
 

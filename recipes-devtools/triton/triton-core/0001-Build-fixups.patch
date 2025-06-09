@@ -1,22 +1,26 @@
-From 6fff9f2288bac40b998159b6461a4a6a3316e96b Mon Sep 17 00:00:00 2001
-From: Ilies CHERGUI <ilies.chergui@gmail.com>
-Date: Thu, 10 Nov 2022 14:22:38 +0000
+From e09a0b75ffb251087898e23977607b5d39795683 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 30 Jun 2025 21:24:57 +0100
 Subject: [PATCH] Build fixups
 
 Upstream-Status: Inappropriate [OE-Specific]
-Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 Signed-off-by: Roger Knecht <roger@norberthealth.com>
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt     | 33 +++++----------------------------
- src/CMakeLists.txt | 30 ++++++++----------------------
- src/filesystem.cc  |  2 +-
- 3 files changed, 14 insertions(+), 51 deletions(-)
+ CMakeLists.txt                     | 49 ++--------------------
+ python/CMakeLists.txt              |  2 +-
+ python/build_wheel.py              |  2 +-
+ python/setup.py                    | 67 ++++++++++++++++++++++++++++--
+ python/tritonserver/CMakeLists.txt | 12 ++----
+ src/CMakeLists.txt                 | 36 ++++------------
+ src/model_config_utils.cc          |  4 +-
+ 7 files changed, 82 insertions(+), 90 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d1d6f4a..41a2c08 100644
+index 5453a41..d8cc4d1 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -96,6 +96,7 @@ add_library(
+@@ -120,6 +120,7 @@ add_library(
    triton-core-serverstub SHARED
    ${CMAKE_CURRENT_SOURCE_DIR}/src/tritonserver_stub.cc
  )
@@ -24,7 +28,7 @@ index d1d6f4a..41a2c08 100644
  
  add_library(
    TritonCore::triton-core-serverstub ALIAS triton-core-serverstub
-@@ -115,7 +116,7 @@ else()
+@@ -139,7 +140,7 @@ else()
    target_compile_options(
      triton-core-serverstub
      PRIVATE
@@ -33,22 +37,35 @@ index d1d6f4a..41a2c08 100644
    )
  endif()
  
-@@ -180,14 +181,6 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
+@@ -183,12 +184,6 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
+ 
+   # Repo tags
+   set(TRITON_REPO_ORGANIZATION "https://github.com/triton-inference-server" CACHE STRING "Git repository to pull from")
+-  set(TRITON_COMMON_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/common repo")
+-  set(TRITON_THIRD_PARTY_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/third_party repo")
+-
+-  # Third-party location
+-  set(TRITON_THIRD_PARTY_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/third-party" CACHE STRING "Location of third-party build")
+-  set(TRITON_THIRD_PARTY_SRC_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/third-party-src" CACHE STRING "Location of third-party source")
+ 
+   if(TRITON_ENABLE_METRICS AND NOT TRITON_ENABLE_STATS)
+     message(FATAL_ERROR "TRITON_ENABLE_METRICS=ON requires TRITON_ENABLE_STATS=ON")
+@@ -210,14 +205,6 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
      message(FATAL_ERROR "TRITON_ENABLE_METRICS_GPU=ON requires TRITON_ENABLE_GPU=ON")
    endif()
  
 -  include(FetchContent)
 -  FetchContent_Declare(
 -    repo-third-party
--    GIT_REPOSITORY https://github.com/triton-inference-server/third_party.git
+-    GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/third_party.git
 -    GIT_TAG ${TRITON_THIRD_PARTY_REPO_TAG}
 -  )
 -  FetchContent_MakeAvailable(repo-third-party)
 -
-   # Need to use ExternalProject for our builds so that we can get the
-   # correct dependencies between Triton shared library components and
-   # the ExternalProject dependencies (found in the third_party repo)
-@@ -250,27 +243,10 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
+   # Some libs are installed to ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/{LIB}/lib64 instead
+   # of ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/{LIB}/lib on Centos
+   set (LIB_DIR "lib")
+@@ -300,38 +287,9 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
      SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src"
      BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/triton-core"
      CMAKE_CACHE_ARGS
@@ -58,26 +75,36 @@ index d1d6f4a..41a2c08 100644
        ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
 -      -DGTEST_ROOT:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/googletest
 -      -DgRPC_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/grpc/lib/cmake/grpc
--      -Dc-ares_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/c-ares/lib/cmake/c-ares
--      -Dabsl_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/absl/lib/cmake/absl
--      -Dnlohmann_json_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/nlohmann_json/lib/cmake/nlohmann_json
--      -Dprometheus-cpp_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/prometheus-cpp/lib/cmake/prometheus-cpp
--      -Dstorage_client_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/lib/cmake/storage_client
--      -Dazure-storage-cpplite_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/azure-storage-cpplite
--      -Dgoogle_cloud_cpp_common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/lib/cmake/google_cloud_cpp_common
--      -DCrc32c_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/crc32c/lib/cmake/Crc32c
--      -DAWSSDK_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/cmake/AWSSDK
--      -Daws-cpp-sdk-core_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/cmake/aws-cpp-sdk-core
--      -Daws-cpp-sdk-s3_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/cmake/aws-cpp-sdk-s3
--      -Daws-c-event-stream_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-c-event-stream/cmake
--      -Daws-c-common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-c-common/cmake
--      -Daws-checksums_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-checksums/cmake
--      -DCNMEM_PATH:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/cnmem
-+      -DCUDA_TOOLKIT_ROOT_DIR:PATH=${CUDA_TOOLKIT_ROOT_DIR}
-       -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
-       -DTRITON_EXTRA_LIB_PATHS:PATH=${TRITON_EXTRA_LIB_PATHS}
-       -DTRITON_ENABLE_NVTX:BOOL=${TRITON_ENABLE_NVTX}
-@@ -289,7 +265,8 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
+-      -Dc-ares_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/c-ares/${LIB_DIR}/cmake/c-ares
+-      -Dabsl_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/absl/${LIB_DIR}/cmake/absl
+-      -Dre2_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/re2/${LIB_DIR}/cmake/re2
+-      -Dnlohmann_json_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/nlohmann_json/share/cmake/nlohmann_json
+-      -Dprometheus-cpp_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/prometheus-cpp/${LIB_DIR}/cmake/prometheus-cpp
+-      -Dgoogle_cloud_cpp_storage_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/${LIB_DIR}/cmake/google_cloud_cpp_storage
+-      -Dgoogle_cloud_cpp_rest_internal_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/${LIB_DIR}/cmake/google_cloud_cpp_rest_internal
+-      -Dgoogle_cloud_cpp_common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/${LIB_DIR}/cmake/google_cloud_cpp_common
+-      ${TRITON_AZURE_STORAGE_PACKAGE_DIRS}
+-      -DCrc32c_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/crc32c/${LIB_DIR}/cmake/Crc32c
+-      -DAWSSDK_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/cmake/AWSSDK
+-      -Daws-cpp-sdk-core_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/cmake/aws-cpp-sdk-core
+-      -Daws-cpp-sdk-s3_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/cmake/aws-cpp-sdk-s3
+-      -Daws-c-event-stream_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-event-stream/cmake
+-      -Daws-c-common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-common/cmake
+-      -Daws-checksums_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-checksums/cmake
+-      -Daws-crt-cpp_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-crt-cpp/cmake
+-      -Daws-c-http_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-http/cmake
+-      -Daws-c-io_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-io/cmake
+-      -Ds2n_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/s2n/cmake
+-      -Daws-c-cal_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-cal/cmake
+-      -Daws-c-s3_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-s3/cmake
+-      -Daws-c-auth_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-auth/cmake
+-      -Daws-c-compression_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-compression/cmake
+-      -Daws-c-mqtt_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-mqtt/cmake
+-      -Daws-c-sdkutils_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-sdkutils/cmake
+       -DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH}
+       -DCNMEM_PATH:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/cnmem
+       -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION}
+@@ -355,7 +313,8 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
        -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
        -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}
        -DTRITON_VERSION:STRING=${TRITON_VERSION}
@@ -87,19 +114,164 @@ index d1d6f4a..41a2c08 100644
    )
  endif() # NOT TRITON_CORE_HEADERS_ONLY
  
+diff --git a/python/CMakeLists.txt b/python/CMakeLists.txt
+index df7f1bd..30df59e 100644
+--- a/python/CMakeLists.txt
++++ b/python/CMakeLists.txt
+@@ -45,7 +45,7 @@ set(wheel_stamp_file "stamp.whl")
+ 
+ add_custom_command(
+   OUTPUT "${wheel_stamp_file}"
+-  COMMAND python3
++  COMMAND ${PYTHON_EXECUTABLE}
+   ARGS
+     "${CMAKE_CURRENT_SOURCE_DIR}/build_wheel.py"
+     --dest-dir "${CMAKE_CURRENT_BINARY_DIR}/generic"
+diff --git a/python/build_wheel.py b/python/build_wheel.py
+index 2888cfe..f44a1da 100755
+--- a/python/build_wheel.py
++++ b/python/build_wheel.py
+@@ -112,7 +112,7 @@ if __name__ == "__main__":
+ 
+     os.chdir(FLAGS.whl_dir)
+     print("=== Building wheel")
+-    args = ["python3", "-m", "build"]
++    args = ["python3", "setup.py", "bdist_wheel"]
+ 
+     wenv = os.environ.copy()
+     wenv["VERSION"] = FLAGS.triton_version
+diff --git a/python/setup.py b/python/setup.py
+index 9b9b291..c7dbb8a 100755
+--- a/python/setup.py
++++ b/python/setup.py
+@@ -25,10 +25,10 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-
++import os
+ import subprocess
+ 
+-from setuptools import setup
++from setuptools import find_packages, setup
+ from setuptools.command.build_py import build_py
+ 
+ 
+@@ -37,11 +37,70 @@ class BuildPyCommand(build_py):
+         build_py.run(self)
+         # Generate stub files:
+         package_name = self.distribution.metadata.name
++        stubgen_cmd = os.environ.get('STUBGEN_CLI')
+         subprocess.run(
+-            ["stubgen", "-p", f"{package_name}._c", "-o", f"{self.build_lib}"],
++            [stubgen_cmd, "-p", f"{package_name}._c", "-o", f"{self.build_lib}"],
+             check=True,
+         )
+ 
+ 
+ if __name__ == "__main__":
+-    setup(cmdclass={"build_py": BuildPyCommand})
++    if "VERSION" not in os.environ:
++        raise Exception("envvar VERSION must be specified")
++
++    VERSION = os.environ["VERSION"]
++
++    data_files = [
++        ("", ["LICENSE.txt"]),
++    ]
++
++    # Type checking marker file indicating support for type checkers.
++    # https://peps.python.org/pep-0561/
++    # Type hints for c extension generated by mypy
++    platform_package_data = [
++        os.environ["TRITON_PYBIND"],
++        "py.typed",
++        "_c/__init__.pyi",
++        "_c/triton_bindings.pyi",
++    ]
++
++    gpu_extras = ["cupy-cuda12x"]
++    test_extras = ["pytest"]
++    all_extras = gpu_extras + test_extras
++
++    setup(
++        name="tritonserver",
++        version=VERSION,
++        author="NVIDIA Inc.",
++        author_email="sw-dl-triton@nvidia.com",
++        description="Triton Inference Server In-Process Python API",
++        license="BSD",
++        url="https://developer.nvidia.com/nvidia-triton-inference-server",
++        classifiers=[
++            "Development Status :: 5 - Production/Stable",
++            "Intended Audience :: Developers",
++            "Intended Audience :: Science/Research",
++            "Intended Audience :: Information Technology",
++            "Topic :: Scientific/Engineering",
++            "Topic :: Scientific/Engineering :: Image Recognition",
++            "Topic :: Scientific/Engineering :: Artificial Intelligence",
++            "Topic :: Software Development :: Libraries",
++            "Topic :: Utilities",
++            "License :: OSI Approved :: BSD License",
++            "Programming Language :: Python :: 3",
++            "Programming Language :: Python :: 3.10",
++            "Programming Language :: Python :: 3.12",
++            "Environment :: Console",
++            "Natural Language :: English",
++            "Operating System :: OS Independent",
++        ],
++        packages=find_packages(),
++        package_data={
++            "": platform_package_data,
++        },
++        zip_safe=False,
++        ccmdclass={"build_py": BuildPyCommand},
++        data_files=data_files,
++        install_requires=["numpy<2"],
++        extras_require={"GPU": gpu_extras, "test": test_extras, "all": all_extras},
++    )
+diff --git a/python/tritonserver/CMakeLists.txt b/python/tritonserver/CMakeLists.txt
+index d2480bc..4efd85a 100644
+--- a/python/tritonserver/CMakeLists.txt
++++ b/python/tritonserver/CMakeLists.txt
+@@ -37,15 +37,9 @@ file(COPY _c/__init__.py DESTINATION ./_c/.)
+ file(GLOB PYTHON_MODULE_FILES ./_api/*.py)
+ file(COPY ${PYTHON_MODULE_FILES} DESTINATION ./_api/.)
+ 
+-include(FetchContent)
+-FetchContent_Declare(
+-  pybind11
+-  GIT_REPOSITORY "https://github.com/pybind/pybind11"
+-  # COMMIT ID for v2.12.0
+-  GIT_TAG "3e9dfa2866941655c56877882565e7577de6fc7b"
+-  GIT_SHALLOW ON
+-)
+-FetchContent_MakeAvailable(pybind11)
++set(PYBIND11_FINDPYTHON ON)
++find_package(pybind11 CONFIG REQUIRED)
++
+ set(
+   PYTHON_BINDING_SRCS
+   _c/tritonserver_pybind.cc
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 87ebcf8..ae23b59 100644
+index eb911fb..bbe5b66 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -38,24 +38,16 @@ endif()
- # We must include the transitive closure of all repos so that we can
- # override the tag.
- #
+@@ -32,30 +32,16 @@ if(NOT CMAKE_BUILD_TYPE)
+   set(CMAKE_BUILD_TYPE Release)
+ endif()
+ 
+-#
+-# Dependencies
+-#
+-# We must include the transitive closure of all repos so that we can
+-# override the tag.
+-#
 -include(FetchContent)
 -
 -FetchContent_Declare(
 -  repo-common
--  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
+-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/common.git
 -  GIT_TAG ${TRITON_COMMON_REPO_TAG}
 -)
 -
@@ -119,7 +291,7 @@ index 87ebcf8..ae23b59 100644
    message(STATUS "Using CUDA ${CUDA_VERSION}")
  endif() # TRITON_ENABLE_GPU
  
-@@ -69,7 +61,7 @@ message(STATUS "Using Boost ${Boost_VERSION}")
+@@ -71,7 +57,7 @@ message(STATUS "Using Boost ${Boost_VERSION}")
  # Protobuf
  #
  set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
@@ -128,7 +300,7 @@ index 87ebcf8..ae23b59 100644
  message(STATUS "Using protobuf ${Protobuf_VERSION}")
  
  #
-@@ -218,6 +210,7 @@ add_library(
+@@ -238,6 +224,7 @@ add_library(
    triton-core SHARED
    ${SERVER_SRCS} ${SERVER_HDRS}
  )
@@ -136,29 +308,30 @@ index 87ebcf8..ae23b59 100644
  
  add_library(
    TritonCore::triton-core ALIAS triton-core
-@@ -237,7 +230,7 @@ else()
+@@ -257,7 +244,7 @@ else()
    target_compile_options(
      triton-core
      PRIVATE
--      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
-+      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations
+-      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Wno-error=maybe-uninitialized -Werror
++      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Wno-error=maybe-uninitialized -Wno-cpp
    )
    set_target_properties(
      triton-core
-@@ -420,12 +413,10 @@ find_library(RE2_LIBRARY NAMES re2)
+@@ -452,13 +439,11 @@ find_package(re2 REQUIRED)
  target_link_libraries(
    triton-core
    PRIVATE
 -    proto-library                    # from repo-common
      triton-common-async-work-queue   # from repo-common
+     triton-common-thread-pool        # from repo-common
      triton-common-error              # from repo-common
      triton-common-model-config       # from repo-common
      triton-common-logging            # from repo-common
 -    triton-common-json               # from repo-common
      triton-common-table-printer      # from repo-common
      protobuf::libprotobuf
-     ${RE2_LIBRARY}
-@@ -475,12 +466,12 @@ if(${TRITON_ENABLE_AZURE_STORAGE})
+     re2::re2
+@@ -505,12 +490,12 @@ if(${TRITON_ENABLE_AZURE_STORAGE})
  endif() # TRITON_ENABLE_AZURE_STORAGE
  
  if(${TRITON_ENABLE_GPU})
@@ -173,7 +346,7 @@ index 87ebcf8..ae23b59 100644
    )
  endif() # TRITON_ENABLE_GPU
  
-@@ -499,8 +490,3 @@ install(
+@@ -529,8 +514,3 @@ install(
    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
  )
@@ -182,19 +355,28 @@ index 87ebcf8..ae23b59 100644
 -if (NOT WIN32)
 -  add_subdirectory(test test)
 -endif() # NOT WIN32
-diff --git a/src/filesystem.cc b/src/filesystem.cc
-index 009a612..7a6f8e9 100644
---- a/src/filesystem.cc
-+++ b/src/filesystem.cc
-@@ -2183,7 +2183,7 @@ ReadBinaryProto(const std::string& path, google::protobuf::MessageLite* msg)
+diff --git a/src/model_config_utils.cc b/src/model_config_utils.cc
+index a182fe3..19cfb5d 100644
+--- a/src/model_config_utils.cc
++++ b/src/model_config_utils.cc
+@@ -1936,7 +1936,7 @@ CollectInt64Fields(
+   const google::protobuf::Reflection* refl = message->GetReflection();
+   for (int i = 0; i < desc->field_count(); ++i) {
+     const google::protobuf::FieldDescriptor* field = desc->field(i);
+-    const std::string fullname = prefix + "::" + field->name();
++    const std::string fullname = prefix + "::" + std::string(field->name());
+     switch (field->type()) {
+       case google::protobuf::FieldDescriptor::TYPE_MESSAGE: {
+         if (field->is_repeated()) {
+@@ -2161,7 +2161,7 @@ ModelConfigToJson(
+   std::string config_json_str;
+   ::google::protobuf::util::JsonPrintOptions options;
+   options.preserve_proto_field_names = true;
+-  options.always_print_primitive_fields = true;
++  options.always_print_fields_with_no_presence = true;
+   ::google::protobuf::util::MessageToJsonString(
+       config, &config_json_str, options);
  
-   google::protobuf::io::CodedInputStream coded_stream(
-       reinterpret_cast<const uint8_t*>(msg_str.c_str()), msg_str.size());
--  coded_stream.SetTotalBytesLimit(INT_MAX, INT_MAX);
-+  //coded_stream.SetTotalBytesLimit(INT_MAX, INT_MAX);
-   if (!msg->ParseFromCodedStream(&coded_stream)) {
-     return Status(
-         Status::Code::INTERNAL, "Can't parse " + path + " as binary proto");
 -- 
-2.25.1
+2.34.1
 

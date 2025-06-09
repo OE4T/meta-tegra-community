@@ -1,19 +1,18 @@
-From f15068b197d56b2ee9ac1700b13f91a1bfedca11 Mon Sep 17 00:00:00 2001
-From: Roger Knecht <roger@norberthealth.com>
-Date: Fri, 21 Oct 2022 11:59:50 +0200
+From 26de9e8d2fcd78400e889ae7aba86be3cb1d628b Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Fri, 13 Jun 2025 18:08:57 +0100
 Subject: [PATCH] fix cmake build
 
 Upstream-Status: Inappropriate [OE-Specific]
 Signed-off-by: Khem Raj <raj.khem@gmail.com>
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt    | 111 ++++------------------------------------------
- src/pb_memory.h   |   2 +
- src/python.cc     |   4 +-
- src/shm_manager.h |   1 +
- 4 files changed, 14 insertions(+), 104 deletions(-)
+ CMakeLists.txt  | 146 +++---------------------------------------------
+ src/pb_memory.h |   2 +
+ 2 files changed, 10 insertions(+), 138 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index e1ea996..4c41736 100644
+index 0aaa95a..a572826 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -26,7 +26,7 @@
@@ -23,13 +22,16 @@ index e1ea996..4c41736 100644
 -project(tritonpythonbackend LANGUAGES C CXX)
 +project(triton-python-backend LANGUAGES C CXX)
  
- #
- # Options
-@@ -45,71 +45,14 @@ set(TRITON_CORE_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/co
- #
- # Dependencies
- #
--# FetchContent's composibility isn't very good. We must include the
+ # Use C++17 standard as Triton's minimum required.
+ set(TRITON_MIN_CXX_STANDARD 17 CACHE STRING "The minimum C++ standard which features are requested to build this target.")
+@@ -56,89 +56,13 @@ if(NOT CMAKE_BUILD_TYPE)
+   set(CMAKE_BUILD_TYPE Release)
+ endif()
+ 
+-#
+-# Dependencies
+-#
+-# FetchContent's composability isn't very good. We must include the
 -# transitive closure of all repos so that we can override the tag.
 -#
 -include(FetchContent)
@@ -40,17 +42,17 @@ index e1ea996..4c41736 100644
 -
 -FetchContent_Declare(
 -  repo-common
--  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
+-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/common.git
 -  GIT_TAG ${TRITON_COMMON_REPO_TAG}
 -)
 -FetchContent_Declare(
 -  repo-core
--  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
+-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/core.git
 -  GIT_TAG ${TRITON_CORE_REPO_TAG}
 -)
 -FetchContent_Declare(
 -  repo-backend
--  GIT_REPOSITORY https://github.com/triton-inference-server/backend.git
+-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/backend.git
 -  GIT_TAG ${TRITON_BACKEND_REPO_TAG}
 -)
 -FetchContent_MakeAvailable(repo-common repo-core repo-backend)
@@ -58,9 +60,21 @@ index e1ea996..4c41736 100644
 -FetchContent_Declare(
 -  pybind11
 -  GIT_REPOSITORY "https://github.com/pybind/pybind11"
--  GIT_TAG "v2.6"
+-  # COMMIT ID for v2.12.0
+-  GIT_TAG "3e9dfa2866941655c56877882565e7577de6fc7b"
 -  GIT_SHALLOW ON
 -)
+-
+-# RHEL base container has multiple version of Python installed. By default
+-# it seems like pybind will pickup v3.6, so we specifically assign it to
+-# search for 3.12 here.
+-set(RHEL_BUILD OFF)
+-if(LINUX)
+-  file(STRINGS "/etc/os-release" DISTRO_ID_LIKE REGEX "ID_LIKE")
+-  if(${DISTRO_ID_LIKE} MATCHES "rhel|centos")
+-    set(RHEL_BUILD ON)
+-  endif(${DISTRO_ID_LIKE} MATCHES "rhel|centos")
+-endif(LINUX)
 -FetchContent_MakeAvailable(pybind11)
 -
 -#
@@ -69,9 +83,12 @@ index e1ea996..4c41736 100644
 -FetchContent_Declare(
 -  dlpack
 -  GIT_REPOSITORY "https://github.com/dmlc/dlpack"
--  GIT_TAG "v0.5"
+-  GIT_TAG "v0.8"
 -  GIT_SHALLOW ON
 -)
+-# Option must be set off so WIN32 build does not break
+-set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+-set(BUILD_MOCK OFF)
 -FetchContent_MakeAvailable(dlpack)
 -
 -#
@@ -79,8 +96,8 @@ index e1ea996..4c41736 100644
 -#
 -ExternalProject_Add(
 -  boostorg
--  URL https://boostorg.jfrog.io/artifactory/main/release/1.76.0/source/boost_1_76_0.tar.gz
--  URL_HASH SHA256=7bd7ddceec1a1dfdcbdb3e609b60d01739c38390a5f956385a12f3122049f0ca
+-  URL https://archives.boost.io/release/1.79.0/source/boost_1_79_0.tar.gz
+-  URL_HASH SHA256=273f1be93238a068aba4f9735a4a2b003019af067b9c183ed227780b8f36062c
 -  PREFIX "boost-src"
 -  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E copy_directory
 -                    <SOURCE_DIR>/boost/ ${CMAKE_BINARY_DIR}/boost
@@ -88,7 +105,7 @@ index e1ea996..4c41736 100644
 -  BUILD_COMMAND ""
 -)
 -set(boostorg_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/boost/")
- 
+-
  #
  # CUDA
  #
@@ -98,15 +115,15 @@ index e1ea996..4c41736 100644
 +  find_package(CUDA REQUIRED)
 +  include_directories(${CUDA_INCLUDE_DIRS})
    message(STATUS "Using CUDA ${CUDA_VERSION}")
-   set(CUDA_NVCC_FLAGS -std=c++11)
+   set(CUDA_NVCC_FLAGS -std=c++${TRITON_MIN_CXX_STANDARD})
  elseif()
-@@ -192,16 +135,6 @@ list(APPEND
+@@ -250,16 +174,6 @@ list(APPEND
    ${COMMON_SRCS}
  )
  
 -add_executable(
 -  triton-python-backend-stub
--  ${PYTHNON_BACKEND_STUB_SRCS}
+-  ${PYTHON_BACKEND_STUB_SRCS}
 -)
 -
 -add_dependencies(triton-python-backend boostorg)
@@ -117,57 +134,78 @@ index e1ea996..4c41736 100644
  add_library(
    TritonPythonBackend::triton-python-backend ALIAS triton-python-backend
  )
-@@ -213,39 +146,17 @@ target_compile_options(
-     -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -Werror>
+@@ -272,32 +186,6 @@ target_compile_options(
+   $<$<CXX_COMPILER_ID:MSVC>:/Wall /D_WIN32_WINNT=0x0A00 /EHsc /Zc:preprocessor>
  )
  
--target_compile_features(triton-python-backend-stub PRIVATE cxx_std_11)
+-target_compile_features(triton-python-backend-stub PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
 -target_compile_options(
 -  triton-python-backend-stub PRIVATE
 -  $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
--  -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -Werror>
+-    -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -Werror>
+-  $<$<CXX_COMPILER_ID:MSVC>:/Wall /D_WIN32_WINNT=0x0A00 /EHsc /Zc:preprocessor>
 -)
 -target_compile_definitions(triton-python-backend-stub PRIVATE TRITON_PB_STUB)
 -
- target_link_libraries(
-   triton-python-backend
-   PRIVATE
--    dlpack
-     Threads::Threads
-     triton-backend-utils          # from repo-backend
-     -ldl                          # dlopen
--    -lrt                          # shared memory 
--    triton-core-serverstub        # from repo-core
-+    -lrt                          # shared memory
-     ZLIB::ZLIB
-     -larchive
- )
- 
--target_link_libraries(
--  triton-python-backend-stub
--  PRIVATE
--   dlpack
--   Threads::Threads
--   triton-backend-utils           # from repo-backend
--   pybind11::embed
--   dlpack
--   -lrt                           # shared memory 
--   -larchive                      # libarchive
--)
+-# RHEL assets are not released in a container environment nor do the current
+-# Python lib versions in the manylinux base container match those currently
+-# available for RHEL8 package managers. Therefore, we package the correct
+-# python libs in the backend folder and adjust the stub executable to look
+-# in its own folder at runtime.
+-if(RHEL_BUILD)
+-  set_target_properties(
+-    triton-python-backend-stub
+-    PROPERTIES
+-      SKIP_BUILD_RPATH TRUE
+-      BUILD_WITH_INSTALL_RPATH TRUE
+-      INSTALL_RPATH_USE_LINK_PATH FALSE
+-      INSTALL_RPATH "$\{ORIGIN\}"
+-  )
+-endif(RHEL_BUILD)
 -
- set_target_properties(
-   triton-python-backend PROPERTIES
-   POSITION_INDEPENDENT_CODE ON
-@@ -254,8 +165,6 @@ set_target_properties(
-   LINK_FLAGS "-Wl,--version-script libtriton_python.ldscript"
- )
+-
+ # For WIN32 do not link Threads and DL_LIBS
+ if(WIN32)
+   target_link_libraries(
+@@ -324,27 +212,14 @@ else()
+   target_link_libraries(
+     triton-python-backend
+     PRIVATE
+-      dlpack
+       Threads::Threads
+       triton-backend-utils          # from repo-backend
++      triton-backend-cuda-utils     # from repo-backend
+       ${CMAKE_DL_LIBS}              # dlopen and dlclose
+       -lrt                          # shared memory
+-      triton-core-serverstub        # from repo-core
+       ZLIB::ZLIB
+       -larchive
+   )
+-
+-  target_link_libraries(
+-    triton-python-backend-stub
+-    PRIVATE
+-    dlpack
+-    Threads::Threads
+-    triton-backend-utils           # from repo-backend
+-    ${CMAKE_DL_LIBS}               # dlopen and dlclose
+-    pybind11::embed
+-    -lrt                           # shared memory
+-    -larchive                      # libarchive
+-  )
+ endif()
+ 
+ if(WIN32)
+@@ -363,8 +238,6 @@ else()
+   )
+ endif()
  
 -add_subdirectory(./src/shm_monitor)
 -
  #
  # Install
  #
-@@ -265,12 +174,11 @@ set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/TritonPythonBackend)
+@@ -374,12 +247,10 @@ set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/TritonPythonBackend)
  install(
    TARGETS
      triton-python-backend
@@ -177,24 +215,23 @@ index e1ea996..4c41736 100644
 -  LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/python
 -  ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/python
 -  RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/python
-+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
++  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/python
++  RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/python
  )
  
  install(
-@@ -287,8 +195,7 @@ install(
+@@ -396,8 +267,7 @@ install(
  install(
    FILES
      src/resources/triton_python_backend_utils.py
 -  DESTINATION
 -    ${CMAKE_INSTALL_PREFIX}/backends/python
-+  DESTINATION ${CMAKE_INSTALL_LIBDIR}
++  DESTINATION ${CMAKE_INSTALL_LIBDIR}/python
  )
  
  include(CMakePackageConfigHelpers)
 diff --git a/src/pb_memory.h b/src/pb_memory.h
-index 61df776..55320f6 100644
+index ad79dae..fec8edc 100644
 --- a/src/pb_memory.h
 +++ b/src/pb_memory.h
 @@ -26,6 +26,8 @@
@@ -206,37 +243,6 @@ index 61df776..55320f6 100644
  #include "pb_utils.h"
  #include "shm_manager.h"
  #include "triton/backend/backend_common.h"
-diff --git a/src/python.cc b/src/python.cc
-index 1a3fd46..27d64d0 100644
---- a/src/python.cc
-+++ b/src/python.cc
-@@ -1848,7 +1848,7 @@ ModelInstanceState::ProcessRequests(
-                 shm_pool_, actual_memory_type, actual_memory_type_id,
-                 0 /* byte size */, nullptr /* data ptr */));
- 
--        gpu_output_buffers.push_back({std::move(output_buffer), {buffer, r}});
-+        gpu_output_buffers.push_back(std::move(std::pair<std::unique_ptr<PbMemory>, std::pair<void*, uint64_t>>(std::move(output_buffer), std::pair<void*, uint64_t>(buffer, r))));
-       }
- 
-       if (src_memory_type != TRITONSERVER_MEMORY_GPU) {
-@@ -1984,7 +1984,7 @@ ModelInstanceState::~ModelInstanceState()
-       }
- 
-       // Wait for all the futures to be finished.
--      thread_pool_->wait();
-+      thread_pool_->join();
- 
-       ipc_message->Command() = PYTHONSTUB_FinalizeRequest;
-       stub_message_queue_->Push(ipc_message->ShmHandle());
-diff --git a/src/shm_manager.h b/src/shm_manager.h
-index 705d087..1db3f26 100644
---- a/src/shm_manager.h
-+++ b/src/shm_manager.h
-@@ -26,6 +26,7 @@
- 
- #pragma once
- 
-+#include <functional>
- #include <sys/wait.h>
- #include <boost/interprocess/allocators/allocator.hpp>
- #include <boost/interprocess/detail/atomic.hpp>
+-- 
+2.34.1
+
