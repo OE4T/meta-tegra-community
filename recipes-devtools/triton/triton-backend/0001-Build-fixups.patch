@@ -1,65 +1,92 @@
-From 487abc42f0080f3dac1e4908857d913298cc7a4b Mon Sep 17 00:00:00 2001
-From: Ilies CHERGUI <ilies.chergui@gmail.com>
-Date: Thu, 10 Nov 2022 19:33:38 +0000
+From 872bbe2f647750442bd56a355b343f8d9c157e24 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Fri, 13 Jun 2025 17:24:13 +0100
 Subject: [PATCH] Build fixups
 
 Upstream-Status: Inappropriate [OE-Specific]
-Signed-off-by: Ilies CHERGUI <ilies.chergui@gmail.com>
 Signed-off-by: Roger Knecht <roger@norberthealth.com>
 Signed-off-by: Matt Madison <matt@madison.systems>
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt | 27 ++++++---------------------
- 1 file changed, 6 insertions(+), 21 deletions(-)
+ CMakeLists.txt | 49 +++++++++++++++++--------------------------------
+ 1 file changed, 17 insertions(+), 32 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 622f69a..de10095 100644
+index f5c3356..718a8b4 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -45,30 +45,17 @@ endif()
- #
- # Dependencies
- #
+@@ -55,32 +55,16 @@ if(TRITON_ENABLE_MEMORY_TRACKER AND NOT TRITON_ENABLE_GPU)
+   set(TRITON_ENABLE_MEMORY_TRACKER OFF CACHE BOOL "Device memory tracker disabled" FORCE)
+ endif()
+ 
+-#
+-# Dependencies
+-#
 -include(FetchContent)
 -
 -FetchContent_Declare(
 -  repo-common
--  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
+-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/common.git
 -  GIT_TAG ${TRITON_COMMON_REPO_TAG}
 -  GIT_SHALLOW ON
 -)
 -FetchContent_Declare(
 -  repo-core
--  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
+-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/core.git
 -  GIT_TAG ${TRITON_CORE_REPO_TAG}
 -  GIT_SHALLOW ON
 -)
 -FetchContent_MakeAvailable(repo-common repo-core)
- 
+-
  #
  # CUDA
  #
  if(${TRITON_ENABLE_GPU})
 -  find_package(CUDAToolkit REQUIRED)
 +  enable_language(CUDA)
-   find_package(CUDA REQUIRED)
++  find_package(CUDA REQUIRED)
 +  include_directories(${CUDA_INCLUDE_DIRS})
 +  link_directories(${CUDA_LIBRARIES})
-   message(STATUS "Using CUDA ${CUDA_VERSION}")
--  set(CUDA_NVCC_FLAGS -std=c++11)
-+  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -std=c++11")
+   set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
+-  message(STATUS "Using CUDA ${CUDAToolkit_VERSION}")
++  message(STATUS "Using CUDA ${CUDA_VERSION}")
  
-   if(CUDA_VERSION VERSION_GREATER "10.1" OR CUDA_VERSION VERSION_EQUAL "10.1")
+   if(CUDAToolkit_VERSION VERSION_GREATER "10.1" OR CUDAToolkit_VERSION VERSION_EQUAL "10.1")
      add_definitions(-DTRITON_ENABLE_CUDA_GRAPH=1)
-@@ -110,8 +97,6 @@ if(${TRITON_ENABLE_GPU})
-   cuda_add_library(
-     kernel-library-new
+@@ -115,17 +99,16 @@ add_library(
+ 
+ if(${TRITON_ENABLE_GPU})
+   add_library(
+-    kernel_library_new
++    triton-backend-cuda-utils
      src/kernel.cu src/kernel.h
--    OPTIONS -arch compute_53
--    OPTIONS -code compute_53,sm_53,sm_60,sm_61,sm_62,sm_70,sm_72,sm_75
-     OPTIONS -Xcompiler ${HOST_COMPILER_FLAGS}
    )
+ 
+   enable_language(CUDA)
+-  set_target_properties(kernel_library_new PROPERTIES LANGUAGE CUDA)
+-  set_target_properties(kernel_library_new PROPERTIES CUDA_ARCHITECTURES "75-real;80-real;86-real;87-real;89-real;90-real;100-real;101-real;120-real")
+-  set_target_properties(kernel_library_new PROPERTIES POSITION_INDEPENDENT_CODE ON)
+-  set_target_properties(kernel_library_new PROPERTIES LINKER_LANGUAGE CUDA)
+-  target_compile_features(kernel_library_new PUBLIC cxx_std_${TRITON_MIN_CXX_STANDARD})
+-  set_target_properties(kernel_library_new PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
++  set_target_properties(triton-backend-cuda-utils PROPERTIES LANGUAGE CUDA)
++  set_target_properties(triton-backend-cuda-utils PROPERTIES POSITION_INDEPENDENT_CODE ON)
++  set_target_properties(triton-backend-cuda-utils PROPERTIES LINKER_LANGUAGE CUDA)
++  target_compile_features(triton-backend-cuda-utils PUBLIC cxx_std_${TRITON_MIN_CXX_STANDARD})
++  set_target_properties(triton-backend-cuda-utils PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+ 
  endif() # TRITON_ENABLE_GPU
-@@ -171,7 +156,7 @@ set_target_properties(
+ 
+@@ -133,6 +116,8 @@ add_library(
+   TritonBackend::triton-backend-utils ALIAS triton-backend-utils
+ )
+ 
++set_target_properties(triton-backend-utils PROPERTIES LIBRARY_OUTPUT_NAME triton-backend-utils)
++
+ target_include_directories(
+   triton-backend-utils
+   PUBLIC
+@@ -191,7 +176,7 @@ set_target_properties(
    triton-backend-utils PROPERTIES
    WINDOWS_EXPORT_ALL_SYMBOLS TRUE
    POSITION_INDEPENDENT_CODE ON
@@ -68,12 +95,27 @@ index 622f69a..de10095 100644
  )
  
  target_link_libraries(
-@@ -187,7 +172,7 @@ if(${TRITON_ENABLE_GPU})
+@@ -207,9 +192,9 @@ if(${TRITON_ENABLE_GPU})
    target_link_libraries(
      triton-backend-utils
      PUBLIC
 -      CUDA::cudart
 +      cudart
      PRIVATE
-     kernel-library-new
+-      kernel_library_new
++      triton-backend-cuda-utils
    )
+   if(${TRITON_ENABLE_MEMORY_TRACKER})
+     target_link_libraries(
+@@ -238,7 +223,7 @@ install(
+ if(${TRITON_ENABLE_GPU})
+   install(
+     TARGETS
+-      kernel_library_new
++      triton-backend-cuda-utils
+     EXPORT
+       triton-backend-targets
+     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+-- 
+2.34.1
+
