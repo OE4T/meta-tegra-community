@@ -34,7 +34,7 @@ PACKAGECONFIG:class-nativesdk = ""
 
 PACKAGECONFIG[cryptodev-linux] = "enable-devcryptoeng,disable-devcryptoeng,cryptodev-linux,,cryptodev-module"
 
-S = "${WORKDIR}/openssl-${PV}"
+S = "${UNPACKDIR}/openssl-${PV}"
 B = "${WORKDIR}/build"
 do_configure[cleandirs] = "${B}"
 

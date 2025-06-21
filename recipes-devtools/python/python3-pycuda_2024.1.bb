@@ -10,7 +10,7 @@ SRC_URI:append = " file://0001-add-nvcc-flag-allow-unsupported-compiler-to-allow
 
 COMPATIBLE_MACHINE = "(tegra)"
 
-S = "${WORKDIR}/pycuda-${PV}"
+S = "${UNPACKDIR}/pycuda-${PV}"
 
 inherit pypi cuda setuptools3
 

@@ -19,7 +19,7 @@ EXTRA_OECMAKE = "-DCMAKE_INSTALL_PREFIX:PATH=${VPI_PREFIX}"
 PACKAGECONFIG ??= "${@bb.utils.contains('LICENSE_FLAGS_ACCEPTED', 'commercial', 'video', bb.utils.contains('LICENSE_FLAGS_ACCEPTED', 'commercial_ffmpeg', 'video', '', d), d)}"
 PACKAGECONFIG[video] = "-DBUILD_VIDEO_SAMPLES=ON,-DBUILD_VIDEO_SAMPLES=OFF,"
 
-S = "${WORKDIR}/vpi3-samples/opt/nvidia/vpi3/samples"
+S = "${UNPACKDIR}/vpi3-samples/opt/nvidia/vpi3/samples"
 
 DEPENDS = "libnvvpi3 opencv"
 
