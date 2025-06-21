@@ -10,8 +10,6 @@ SRC_URI = "git://github.com/NVIDIA-AI-IOT/jetcam.git;protocol=https;branch=maste
 SRCREV = "508ff3a402c5a0449a8d5776c05d2d17d6a87f46"
 PV = "git"
 
-S = "${WORKDIR}/git"
-
 RDEPENDS:${PN} += "python3-numpy \
                    python3-traitlets \
                    python3-opencv \

@@ -17,8 +17,6 @@ SRC_URI += "\
 
 COMPATIBLE_MACHINE = "(tegra)"
 
-S = "${WORKDIR}/git"
-
 do_install() {
     # Install scripts in /opt
     install -d ${D}/opt/nvidia-docker-tests/scripts

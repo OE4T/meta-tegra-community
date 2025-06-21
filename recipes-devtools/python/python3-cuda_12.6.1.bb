@@ -15,7 +15,6 @@ SRCREV = "c4cabc3322c4cce5e1bfa50f28421fb6fdb0030e"
 
 COMPATIBLE_MACHINE = "(tegra)"
 
-S = "${WORKDIR}/git"
 PEP517_SOURCE_PATH = "${S}/cuda"
 
 inherit cuda python_setuptools_build_meta

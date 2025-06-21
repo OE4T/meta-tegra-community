@@ -8,8 +8,6 @@ SRC_URI = "git://github.com/dmlc/dlpack.git;protocol=https;branch=main"
 
 SRCREV = "e2bdd3bee8cb6501558042633fa59144cc8b7f5f"
 
-S = "${WORKDIR}/git"
-
 inherit cmake
 
 PACKAGECONFIG = ""

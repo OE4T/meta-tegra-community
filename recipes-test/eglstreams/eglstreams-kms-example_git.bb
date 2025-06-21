@@ -14,8 +14,6 @@ PV = "1.0+git"
 COMPATIBLE_MACHINE = "(tegra)"
 PACKAGE_ARCH:tegra = "${TEGRA_PKGARCH}"
 
-S = "${WORKDIR}/git"
-
 inherit pkgconfig
 
 do_install() {

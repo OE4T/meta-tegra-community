@@ -10,8 +10,6 @@ SRC_URI = "\
 
 SRCREV = "1a167ab9eb1c6ffc23d12c04bc9ffbd3dede0856"
 
-S = "${WORKDIR}/git"
-
 DEPENDS = "\
     triton-common \
     triton-core \

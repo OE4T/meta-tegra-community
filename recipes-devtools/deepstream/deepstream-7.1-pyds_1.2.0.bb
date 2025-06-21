@@ -14,8 +14,6 @@ SRCREV = "cb7fd9c8aa012178527e0cb84f91d1f5a0ad37ff"
 
 COMPATIBLE_MACHINE = "(tegra)"
 
-S = "${WORKDIR}/git"
-
 DEPENDS = "deepstream-7.1 python3-pybind11 gstreamer1.0-python gstreamer1.0 glib-2.0"
 DS_PATH = "/opt/nvidia/deepstream/deepstream-7.1"
 

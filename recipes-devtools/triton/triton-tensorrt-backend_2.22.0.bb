@@ -10,8 +10,6 @@ SRC_URI = "git://github.com/triton-inference-server/tensorrt_backend.git;protoco
 
 SRCREV = "94bca597ccc3961cd137567578f9c392cff8c0eb"
 
-S = "${WORKDIR}/git"
-
 DEPENDS = "\
     triton-common \
     triton-core \

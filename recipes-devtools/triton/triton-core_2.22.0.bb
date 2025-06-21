@@ -10,8 +10,6 @@ SRC_URI = "\
 
 SRCREV = "70506c503ac44958d8531a6f51f4f3be8241c362"
 
-S = "${WORKDIR}/git"
-
 DEPENDS = "\
     boost \
     cnmem \

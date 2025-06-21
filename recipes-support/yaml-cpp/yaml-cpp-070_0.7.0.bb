@@ -10,8 +10,6 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=6a8aaf0595c2efc1a9c2e0913e9c1a2c"
 SRC_URI = "git://github.com/jbeder/yaml-cpp.git;branch=master;protocol=https"
 SRCREV = "0579ae3d976091d7d664aa9d2527e0d0cff25763"
 
-S = "${WORKDIR}/git"
-
 inherit cmake
 
 EXTRA_OECMAKE = "-DYAML_CPP_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=ON -DYAML_CPP_BUILD_TOOLS=OFF"

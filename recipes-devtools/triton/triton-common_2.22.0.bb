@@ -12,8 +12,6 @@ SRCREV = "feca9eadf25eb0230eaac0e9f2ce8f6447a0e9f1"
 
 COMPATIBLE_MACHINE = "(cuda)"
 
-S = "${WORKDIR}/git"
-
 inherit cmake
 
 PACKAGECONFIG ??= "protobuf rapidjson"

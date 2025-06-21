@@ -9,8 +9,6 @@ SRC_URI = "\
 
 SRCREV = "6133572a4f090721cc52e79595b70f383397b186"
 
-S = "${WORKDIR}/git"
-
 DEPENDS = " \
     zlib \
     libarchive \

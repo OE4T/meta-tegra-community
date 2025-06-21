@@ -10,8 +10,6 @@ SRC_URI = "gitsm://github.com/geventhttpclient/geventhttpclient.git;protocol=htt
            "
 SRCREV = "9c7f14c3acaec412f02cfefd067cd3802cb7ea85"
 
-S = "${WORKDIR}/git"
-
 inherit setuptools3
 
 RDEPENDS:${PN} = "python3"
