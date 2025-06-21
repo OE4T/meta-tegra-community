@@ -6,8 +6,7 @@ SRC_URI = "\
     file://run-tensorrt-tests.sh \
 "
 
-S = "${WORKDIR}/sources"
-UNPACKDIR = "${S}"
+S = "${UNPACKDIR}"
 
 COMPATIBLE_MACHINE = "(tegra)"
 

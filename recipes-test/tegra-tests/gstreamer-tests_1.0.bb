@@ -15,8 +15,7 @@ SRC_URI[sha256sum] = "34bbd52a4b89fdf63c8ace50b268da26653a59508288100cd3c23de276
 
 COMPATIBLE_MACHINE = "(tegra)"
 
-S = "${WORKDIR}/sources"
-UNPACKDIR = "${S}"
+S = "${UNPACKDIR}"
 B = "${WORKDIR}/build"
 
 do_compile() {
