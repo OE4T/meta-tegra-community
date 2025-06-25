@@ -6,6 +6,8 @@ SRC_URI = "git://github.com/NVIDIA/cnmem.git;protocol=https;branch=master"
 
 SRCREV = "c5573333feed2526d4301fca103c55cf3bcb9dcc"
 
+S = "${UNPACKDIR}/git"
+
 inherit cuda cmake
 
 do_install:append() {
