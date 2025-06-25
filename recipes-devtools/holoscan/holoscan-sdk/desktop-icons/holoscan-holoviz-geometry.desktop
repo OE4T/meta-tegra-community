@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Holoscan SDK: Holoviz Geometry
+Comment=Holoscan SDK Holoviz Geometry Sample Application
+Exec=rxvt -cd /opt/nvidia/holoscan -fg white -bg black -e examples/holoviz/cpp/holoviz_geometry
+Icon=holoscan-holoviz-geometry
+Categories=Holoscan

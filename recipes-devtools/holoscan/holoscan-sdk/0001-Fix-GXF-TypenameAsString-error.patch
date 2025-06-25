@@ -1,0 +1,64 @@
+From 956d5d11f68500b20e89515e2916ecdc7197fcde Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Tue, 24 Jun 2025 10:53:55 +0100
+Subject: [PATCH 1/7] Fix GXF TypenameAsString error
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ian Stewart <istewart@nvidia.com>
+---
+ include/holoscan/core/gxf/entity.hpp    | 4 ++--
+ include/holoscan/core/gxf/gxf_utils.hpp | 2 +-
+ src/core/gxf/entity.cpp                 | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/include/holoscan/core/gxf/entity.hpp b/include/holoscan/core/gxf/entity.hpp
+index 657f442..c98976c 100644
+--- a/include/holoscan/core/gxf/entity.hpp
++++ b/include/holoscan/core/gxf/entity.hpp
+@@ -74,7 +74,7 @@ class Entity : public nvidia::gxf::Entity {
+     // Try to get nvidia::gxf::Tensor from GXF Entity.
+     gxf_tid_t tid;
+     auto tid_result =
+-        GxfComponentTypeId(context(), nvidia::TypenameAsString<nvidia::gxf::Tensor>(), &tid);
++        GxfComponentTypeId(context(), TypenameAsString<nvidia::gxf::Tensor>(), &tid);
+     if (tid_result != GXF_SUCCESS) {
+       if (log_errors) {
+         HOLOSCAN_LOG_ERROR("Unable to get component type id from 'nvidia::gxf::Tensor' (error: {})",
+@@ -114,7 +114,7 @@ class Entity : public nvidia::gxf::Entity {
+   void add(const std::shared_ptr<DataT>& data, const char* name = nullptr) {
+     gxf_tid_t tid;
+     HOLOSCAN_GXF_CALL_FATAL(
+-        GxfComponentTypeId(context(), nvidia::TypenameAsString<nvidia::gxf::Tensor>(), &tid));
++        GxfComponentTypeId(context(), TypenameAsString<nvidia::gxf::Tensor>(), &tid));
+ 
+     gxf_uid_t cid;
+     HOLOSCAN_GXF_CALL_FATAL(GxfComponentAdd(context(), eid(), tid, name, &cid));
+diff --git a/include/holoscan/core/gxf/gxf_utils.hpp b/include/holoscan/core/gxf/gxf_utils.hpp
+index 6283cf1..c2ca7dd 100644
+--- a/include/holoscan/core/gxf/gxf_utils.hpp
++++ b/include/holoscan/core/gxf/gxf_utils.hpp
+@@ -228,7 +228,7 @@ inline gxf_uid_t find_component_handle(gxf_context_t context, gxf_uid_t componen
+ 
+   // Get the type id of the component we are are looking for.
+   gxf_tid_t tid;
+-  const gxf_result_t result_2 = GxfComponentTypeId(context, ::nvidia::TypenameAsString<S>(), &tid);
++  const gxf_result_t result_2 = GxfComponentTypeId(context, TypenameAsString<S>(), &tid);
+   if (result_2 != GXF_SUCCESS) { return 0; }
+ 
+   // Find the component in the indicated entity
+diff --git a/src/core/gxf/entity.cpp b/src/core/gxf/entity.cpp
+index e6d1cf8..841fb32 100644
+--- a/src/core/gxf/entity.cpp
++++ b/src/core/gxf/entity.cpp
+@@ -47,7 +47,7 @@ nvidia::gxf::Handle<nvidia::gxf::VideoBuffer> get_videobuffer(Entity entity, con
+ 
+   gxf_tid_t tid;
+   auto tid_result = GxfComponentTypeId(
+-      entity.context(), nvidia::TypenameAsString<nvidia::gxf::VideoBuffer>(), &tid);
++      entity.context(), TypenameAsString<nvidia::gxf::VideoBuffer>(), &tid);
+   if (tid_result != GXF_SUCCESS) {
+     throw std::runtime_error(
+         fmt::format("Unable to get component type id: (error: {})", GxfResultStr(tid_result)));
+-- 
+2.34.1
+
