@@ -9,6 +9,8 @@ SRC_URI = " \
 
 SRCREV = "e200bfa85bf253e9cfe1c1a9e705fccb176b9171"
 
+S = "${UNPACKDIR}/git"
+
 DEPENDS = "libevent"
 
 PACKAGECONFIG ??= "pthreads"
