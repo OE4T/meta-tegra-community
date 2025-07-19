@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.5)
+
 option(BUILD_VIDEO_SAMPLES "Build video samples requiring ffmpeg" OFF)
 set(SUBDIRS 01-convolve_2d 02-stereo_disparity 03-harris_corners 04-rescale 05-benchmark 07-fft 11-fisheye 15-image_view 17-template_matching 18-orb_feature_detector)
 if(BUILD_VIDEO_SAMPLES)
