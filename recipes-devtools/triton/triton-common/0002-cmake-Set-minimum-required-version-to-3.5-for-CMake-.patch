@@ -1,0 +1,84 @@
+From bbd34b98a7dffc1b50582f15530763ae280c4de6 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Tue, 19 Aug 2025 13:52:28 +0100
+Subject: [PATCH 2/2] cmake: Set minimum required version to 3.5 for CMake 4+
+ compatibility
+
+Fix:
+
+| CMake Error at CMakeLists.txt:1 (cmake_minimum_required):
+|   Compatibility with CMake < 3.5 has been removed from CMake.
+|
+|   Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+|   to tell CMake that the project requires at least <min> but has been updated
+|   to work with policies introduced by <max> or earlier.
+|
+|   Or, add -DCMAKE_POLICY_VERSION_MINIMUM=3.5 to try configuring anyway.
+|
+|
+| -- Configuring incomplete, errors occurred!
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ CMakeLists.txt                      | 2 +-
+ protobuf/CMakeLists.txt             | 2 +-
+ src/test/CMakeLists.txt             | 2 +-
+ src/test/triton_json/CMakeLists.txt | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 95ed3f6..6946097 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required(VERSION 3.17)
++cmake_minimum_required(VERSION 3.5)
+ 
+ project(tritoncommon LANGUAGES C CXX)
+ 
+diff --git a/protobuf/CMakeLists.txt b/protobuf/CMakeLists.txt
+index 781a758..c5063ec 100644
+--- a/protobuf/CMakeLists.txt
++++ b/protobuf/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required (VERSION 3.18)
++cmake_minimum_required(VERSION 3.5)
+ 
+ set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
+ find_package(Protobuf REQUIRED)
+diff --git a/src/test/CMakeLists.txt b/src/test/CMakeLists.txt
+index f5fd907..c0b3541 100644
+--- a/src/test/CMakeLists.txt
++++ b/src/test/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required (VERSION 3.18)
++cmake_minimum_required(VERSION 3.5)
+ 
+ find_package(GTest REQUIRED)
+ 
+diff --git a/src/test/triton_json/CMakeLists.txt b/src/test/triton_json/CMakeLists.txt
+index 3ef9311..8ab4d90 100644
+--- a/src/test/triton_json/CMakeLists.txt
++++ b/src/test/triton_json/CMakeLists.txt
+@@ -24,7 +24,7 @@
+ # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-cmake_minimum_required (VERSION 3.18)
++cmake_minimum_required(VERSION 3.5)
+ add_executable(triton-json-test triton_json_test.cc ../../error.cc)
+ target_link_libraries(
+   triton-json-test
+-- 
+2.34.1
+
