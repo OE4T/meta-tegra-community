@@ -5,6 +5,7 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=68e2a80f5f9020a66f4512962817cd66"
 SRC_URI = " \
     git://github.com/Yellow-Camper/libevhtp.git;protocol=https;branch=master \
     file://0001-fix-cmake-build.patch \
+    file://0002-cmake-Set-minimum-required-version-to-3.5-for-CMake-.patch \
 "
 
 SRCREV = "e200bfa85bf253e9cfe1c1a9e705fccb176b9171"
