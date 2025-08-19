@@ -1,0 +1,83 @@
+From 46e0bdcd591d25e13423d5e704388d33b5e5ede1 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Tue, 19 Aug 2025 15:23:12 +0100
+Subject: [PATCH 7/7] cmake: Set minimum required version to 3.5 for CMake 4+
+ compatibility
+
+Fix:
+
+| CMake Error at CMakeLists.txt:1 (cmake_minimum_required):
+|   Compatibility with CMake < 3.5 has been removed from CMake.
+|
+|   Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+|   to tell CMake that the project requires at least <min> but has been updated
+|   to work with policies introduced by <max> or earlier.
+|
+|   Or, add -DCMAKE_POLICY_VERSION_MINIMUM=3.5 to try configuring anyway.
+|
+|
+| -- Configuring incomplete, errors occurred!
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ third_party/FP16/CMakeLists.txt                         | 2 +-
+ third_party/NNPACK/CMakeLists.txt                       | 2 +-
+ third_party/gloo/CMakeLists.txt                         | 2 +-
+ third_party/psimd/CMakeLists.txt                        | 2 +-
+ third_party/tensorpipe/third_party/libuv/CMakeLists.txt | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/third_party/FP16/CMakeLists.txt b/third_party/FP16/CMakeLists.txt
+index e0d87f86c..1fee16e14 100644
+--- a/third_party/FP16/CMakeLists.txt
++++ b/third_party/FP16/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12 FATAL_ERROR)
++CMAKE_MINIMUM_REQUIRED(VERSION 3.5 FATAL_ERROR)
+ 
+ INCLUDE(GNUInstallDirs)
+ 
+diff --git a/third_party/NNPACK/CMakeLists.txt b/third_party/NNPACK/CMakeLists.txt
+index d808915a4..335073dba 100644
+--- a/third_party/NNPACK/CMakeLists.txt
++++ b/third_party/NNPACK/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12 FATAL_ERROR)
++CMAKE_MINIMUM_REQUIRED(VERSION 3.5 FATAL_ERROR)
+ 
+ INCLUDE(GNUInstallDirs)
+ INCLUDE(CheckCSourceCompiles)
+diff --git a/third_party/gloo/CMakeLists.txt b/third_party/gloo/CMakeLists.txt
+index b0db65e69..e9c66400c 100644
+--- a/third_party/gloo/CMakeLists.txt
++++ b/third_party/gloo/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 2.8.12 FATAL_ERROR)
++cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+ 
+ project(gloo CXX C)
+ 
+diff --git a/third_party/psimd/CMakeLists.txt b/third_party/psimd/CMakeLists.txt
+index bd69c6202..4ba1fed29 100644
+--- a/third_party/psimd/CMakeLists.txt
++++ b/third_party/psimd/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12 FATAL_ERROR)
++CMAKE_MINIMUM_REQUIRED(VERSION 3.5 FATAL_ERROR)
+ 
+ INCLUDE(GNUInstallDirs)
+ 
+diff --git a/third_party/tensorpipe/third_party/libuv/CMakeLists.txt b/third_party/tensorpipe/third_party/libuv/CMakeLists.txt
+index 09996d2ab..9c0be8c29 100644
+--- a/third_party/tensorpipe/third_party/libuv/CMakeLists.txt
++++ b/third_party/tensorpipe/third_party/libuv/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 3.4)
++cmake_minimum_required(VERSION 3.5)
+ project(libuv LANGUAGES C)
+ 
+ cmake_policy(SET CMP0057 NEW) # Enable IN_LIST operator
+-- 
+2.34.1
+

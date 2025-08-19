@@ -13,6 +13,7 @@ SRC_URI += " \
     file://0004-Use-native-protobuf-compiler.patch \
     file://0005-Disable-various-warnings.patch \
     file://0006-Fixups-for-cross-building-in-OE.patch \
+    file://0007-cmake-Set-minimum-required-version-to-3.5-for-CMake-.patch \
 "
 
 S = "${UNPACKDIR}/${PN}-v${PV}"
