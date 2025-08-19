@@ -6,6 +6,7 @@ SECTION = "libs"
 SRC_URI = "\
     git://github.com/triton-inference-server/common.git;protocol=https;branch=r25.05 \
     file://0001-Build-fixups.patch \
+    file://0002-cmake-Set-minimum-required-version-to-3.5-for-CMake-.patch \
 "
 
 SRCREV = "e4e00edd25af07d2f0e81e2025dbd40daa1dffc2"
