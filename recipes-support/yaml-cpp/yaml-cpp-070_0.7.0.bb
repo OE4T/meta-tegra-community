@@ -10,6 +10,7 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=6a8aaf0595c2efc1a9c2e0913e9c1a2c"
 SRC_URI = " \
     git://github.com/jbeder/yaml-cpp.git;branch=master;protocol=https;tag=yaml-cpp-${PV} \
     file://0001-Updates-for-OE-cross-builds.patch \
+    file://0002-cmake-Set-minimum-required-version-to-3.5-for-CMake-.patch \
 "
 SRCREV = "0579ae3d976091d7d664aa9d2527e0d0cff25763"
 
