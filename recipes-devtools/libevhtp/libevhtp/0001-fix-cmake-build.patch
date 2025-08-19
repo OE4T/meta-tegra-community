@@ -1,14 +1,16 @@
-From 491ecafe3b3b8651fa51a3234170cabb394e15d8 Mon Sep 17 00:00:00 2001
-From: Roger Knecht <roger@norberthealth.com>
-Date: Wed, 22 Jun 2022 11:17:05 +0200
-Subject: [PATCH] fix cmake build
+From 7270f3bf9f42dbdda847c79b232697d6f09d548f Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Tue, 19 Aug 2025 16:12:20 +0100
+Subject: [PATCH 1/2] fix cmake build
 
 Upstream-Status: Pending
 Signed-off-by: Khem Raj <raj.khem@gmail.com>
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt        | 4 ++--
- cmake/Config.cmake.in | 3 +++
- 2 files changed, 5 insertions(+), 2 deletions(-)
+ CMakeLists.txt            |  4 ++--
+ cmake/Config.cmake.in     |  3 +++
+ cmake/TestBigEndian.cmake | 18 +++++++++---------
+ 3 files changed, 14 insertions(+), 11 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
 index 481ddd0..dcf5685 100644
@@ -40,6 +42,58 @@ index b834857..20a2e07 100644
  set(package_deps @package_deps@)
  foreach(dep IN LISTS package_deps)
      find_package(${dep} REQUIRED)
+diff --git a/cmake/TestBigEndian.cmake b/cmake/TestBigEndian.cmake
+index fdc3adb..d9c7d31 100644
+--- a/cmake/TestBigEndian.cmake
++++ b/cmake/TestBigEndian.cmake
+@@ -56,25 +56,25 @@ macro(TEST_BIG_ENDIAN VARIABLE)
+     endif()
+ 
+ 
+-    configure_file("${CMAKE_ROOT}/Modules/TestEndianess.c.in"
+-                   "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/TestEndianess.c"
++    configure_file("${CMAKE_ROOT}/Modules/TestEndianness.c.in"
++                   "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/TestEndianness.c"
+                    @ONLY)
+ 
+-     file(READ "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/TestEndianess.c"
++     file(READ "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/TestEndianness.c"
+           TEST_ENDIANESS_FILE_CONTENT)
+ 
+      try_compile(HAVE_${VARIABLE}
+       "${CMAKE_BINARY_DIR}"
+-      "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/TestEndianess.c"
++      "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/TestEndianness.c"
+       OUTPUT_VARIABLE OUTPUT
+-      COPY_FILE "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/TestEndianess.bin" )
++      COPY_FILE "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/TestEndianness.bin" )
+ 
+       if(HAVE_${VARIABLE})
+ 
+-        file(STRINGS "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/TestEndianess.bin"
++        file(STRINGS "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/TestEndianness.bin"
+             CMAKE_TEST_ENDIANESS_STRINGS_LE LIMIT_COUNT 1 REGEX "THIS IS LITTLE ENDIAN")
+ 
+-        file(STRINGS "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/TestEndianess.bin"
++        file(STRINGS "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/TestEndianness.bin"
+             CMAKE_TEST_ENDIANESS_STRINGS_BE LIMIT_COUNT 1 REGEX "THIS IS BIG ENDIAN")
+ 
+         # on mac, if there are universal binaries built both will be true
+@@ -105,12 +105,12 @@ macro(TEST_BIG_ENDIAN VARIABLE)
+         endif()
+ 
+         file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log
+-          "Determining if the system is big endian passed with the following output:\n${OUTPUT}\nTestEndianess.c:\n${TEST_ENDIANESS_FILE_CONTENT}\n\n")
++          "Determining if the system is big endian passed with the following output:\n${OUTPUT}\nTestEndianness.c:\n${TEST_ENDIANESS_FILE_CONTENT}\n\n")
+ 
+       else()
+         message(STATUS "Check if the system is big endian - failed")
+         file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log
+-          "Determining if the system is big endian failed with the following output:\n${OUTPUT}\nTestEndianess.c:\n${TEST_ENDIANESS_FILE_CONTENT}\n\n")
++          "Determining if the system is big endian failed with the following output:\n${OUTPUT}\nTestEndianness.c:\n${TEST_ENDIANESS_FILE_CONTENT}\n\n")
+         set(${VARIABLE})
+       endif()
+   endif()
 -- 
-2.17.1
+2.34.1
 
