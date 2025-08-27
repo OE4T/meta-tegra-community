@@ -34,18 +34,13 @@ copy_resnet50_data() {
     cp -R "${SAMPLEROOT}"/data/resnet50 "${SAMPLEDATA}/"
 }
 
-run_algorithm_selector() {
-    copy_mnist_data
-    echo "Running algorithm-selector"
-    sample_algorithm_selector --datadir=${SAMPLEDATA}/mnist/
-}
-
 run_char-rnn() {
     echo "Running char-rnn"
     sample_char_rnn --datadir=${SAMPLEDATA}/char-rnn/
 }
 
 run_dynamic_reshape() {
+    copy_mnist_data
     echo "Running dynamic-reshape"
     sample_dynamic_reshape  --datadir=${SAMPLEDATA}/mnist/
 }
@@ -70,6 +65,23 @@ run_io_formats() {
     sample_io_formats --datadir=${SAMPLEDATA}/mnist/
 }
 
+run_progress_monitor() {
+    copy_mnist_data
+    echo "Running Progress Monitor"
+    sample_progress_monitor --datadir=${SAMPLEDATA}/mnist/
+}
+
+run_editable_timing_cache() {
+    echo "Running Editable Timing Cache"
+    sample_editable_timing_cache
+}
+
+run_non_zero_plugin() {
+    copy_mnist_data
+    echo "Running Non Zero Plugin"
+    sample_non_zero_plugin --datadir=${SAMPLEDATA}/mnist/
+}
+
 run_trtexec(){
     if [ ! -x "${SAMPLEROOT}/bin/trtexec" ]; then
         echo "Skipping trtexec"
@@ -82,8 +94,9 @@ run_trtexec(){
     trtexec --loadEngine=ResNet50.trt
 }
 
-TESTS="algorithm_selector char-rnn dynamic_reshape"
+TESTS="char-rnn dynamic_reshape"
 TESTS="$TESTS int8_api onnx_mnist io_formats"
+TESTS="$TESTS progress_monitor editable_timing_cache non_zero_plugin"
 TESTS="$TESTS trtexec"
 
 find_test() {
