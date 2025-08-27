@@ -1,0 +1,275 @@
+From d0142f83a0205a5c539a6b798276380f2f3a1e66 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Thu, 24 Apr 2025 12:39:18 +0100
+Subject: [PATCH] OE cross build fixups
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ Makefile.gnu                          | 59 ++++++++++++++-------------
+ Source/LibJXR/image/encode/strenc.c   | 17 +++++---
+ Source/LibJXR/image/sys/strcodec.c    | 18 --------
+ Source/LibJXR/image/sys/strcodec.h    | 22 ++++++++++
+ Source/LibJXR/jxrgluelib/JXRGlueJxr.c |  1 +
+ Source/ZLib/gzguts.h                  |  1 +
+ freeimage.pc.in                       | 10 +++++
+ 7 files changed, 75 insertions(+), 53 deletions(-)
+ create mode 100644 freeimage.pc.in
+
+diff --git a/Makefile.gnu b/Makefile.gnu
+index 92f6358..c54a6ff 100644
+--- a/Makefile.gnu
++++ b/Makefile.gnu
+@@ -4,12 +4,14 @@
+ include Makefile.srcs
+ 
+ # General configuration variables:
+-DESTDIR ?= /
+-INCDIR ?= $(DESTDIR)/usr/include
+-INSTALLDIR ?= $(DESTDIR)/usr/lib
+-
+-# Converts cr/lf to just lf
+-DOS2UNIX = dos2unix
++export prefix      ?= /usr/local
++export exec_prefix ?= $(prefix)
++export bindir      ?= $(exec_prefix)/bin
++export libdir      ?= $(exec_prefix)/lib
++export docdir      ?= $(prefix)/share/doc
++export libdbgdir   ?= $(prefix)/lib/debug$(libdir)
++export includedir  ?= $(prefix)/include
++export pkgconfdir  ?= $(libdir)/pkgconfig
+ 
+ LIBRARIES = -lstdc++
+ 
+@@ -18,12 +20,13 @@ MODULES := $(MODULES:.cpp=.o)
+ CFLAGS ?= -O3 -fPIC -fexceptions -fvisibility=hidden
+ # OpenJPEG
+ CFLAGS += -DOPJ_STATIC
++CFLAGS += -DPNG_ARM_NEON_OPT=0
+ # LibRaw
+ CFLAGS += -DNO_LCMS
+ # LibJXR
+ CFLAGS += -DDISABLE_PERF_MEASUREMENT -D__ANSI__
+ CFLAGS += $(INCLUDE)
+-CXXFLAGS ?= -O3 -fPIC -fexceptions -fvisibility=hidden -Wno-ctor-dtor-privacy
++CXXFLAGS += -std=c++14
+ # LibJXR
+ CXXFLAGS += -D__ANSI__
+ CXXFLAGS += $(INCLUDE)
+@@ -32,28 +35,18 @@ ifeq ($(shell sh -c 'uname -m 2>/dev/null || echo not'),x86_64)
+ 	CFLAGS += -fPIC
+ 	CXXFLAGS += -fPIC
+ endif
++CXXFLAGS += -DPNG_ARM_NEON_OPT=0
+ 
+ TARGET  = freeimage
+ STATICLIB = lib$(TARGET).a
+-SHAREDLIB = lib$(TARGET)-$(VER_MAJOR).$(VER_MINOR).so
+ LIBNAME	= lib$(TARGET).so
++SHAREDLIB = $(LIBNAME).$(VER_MAJOR).$(VER_MINOR)
+ VERLIBNAME = $(LIBNAME).$(VER_MAJOR)
+ HEADER = Source/FreeImage.h
+ 
+-
+-
+ default: all
+ 
+-all: dist
+-
+-dist: FreeImage
+-	mkdir -p Dist
+-	cp *.a Dist/
+-	cp *.so Dist/
+-	cp Source/FreeImage.h Dist/
+-
+-dos2unix:
+-	@$(DOS2UNIX) $(SRCS) $(INCLS)
++all: FreeImage
+ 
+ FreeImage: $(STATICLIB) $(SHAREDLIB)
+ 
+@@ -69,15 +62,23 @@ $(STATICLIB): $(MODULES)
+ $(SHAREDLIB): $(MODULES)
+ 	$(CC) -s -shared -Wl,-soname,$(VERLIBNAME) $(LDFLAGS) -o $@ $(MODULES) $(LIBRARIES)
+ 
+-install:
+-	install -d $(INCDIR) $(INSTALLDIR)
+-	install -m 644 -o root -g root $(HEADER) $(INCDIR)
+-	install -m 644 -o root -g root $(STATICLIB) $(INSTALLDIR)
+-	install -m 755 -o root -g root $(SHAREDLIB) $(INSTALLDIR)
+-	ln -sf $(SHAREDLIB) $(INSTALLDIR)/$(VERLIBNAME)
+-	ln -sf $(VERLIBNAME) $(INSTALLDIR)/$(LIBNAME)	
+-#	ldconfig
++freeimage.pc: freeimage.pc.in
++	sed -e "s|@prefix@|$(prefix)|" \
++	    -e "s|@exec_prefix@|$(exec_prefix)|" \
++	    -e "s|@libdir@|$(libdir)|" \
++	    -e "s|@includedir@|$(includedir)|" \
++	    -e "s|@version@|$(VER_MAJOR).$(VER_MINOR)|" \
++	    $< > $@
++
++install: freeimage.pc
++	install -d $(DESTDIR)$(libdir) $(DESTDIR)$(includedir)
++	install -m 0644 $(HEADER) $(DESTDIR)$(includedir)
++	install -m 0644 $(STATICLIB) $(DESTDIR)$(libdir)
++	install -m 0755 $(SHAREDLIB) $(DESTDIR)$(libdir)
++	ln -sf $(SHAREDLIB) $(DESTDIR)$(libdir)/$(VERLIBNAME)
++	ln -sf $(VERLIBNAME) $(DESTDIR)$(libdir)/$(LIBNAME)
++	install -d $(DESTDIR)$(pkgconfdir)
++	install -m 0644 freeimage.pc $(DESTDIR)$(pkgconfdir)
+ 
+ clean:
+ 	rm -f core Dist/*.* u2dtmp* $(MODULES) $(STATICLIB) $(SHAREDLIB) $(LIBNAME)
+-
+diff --git a/Source/LibJXR/image/encode/strenc.c b/Source/LibJXR/image/encode/strenc.c
+index d6e970e..ccdaab9 100644
+--- a/Source/LibJXR/image/encode/strenc.c
++++ b/Source/LibJXR/image/encode/strenc.c
+@@ -1,14 +1,14 @@
+ //*@@@+++@@@@******************************************************************
+ //
+-// Copyright © Microsoft Corp.
++// Copyright ï¿½ Microsoft Corp.
+ // All rights reserved.
+ // 
+ // Redistribution and use in source and binary forms, with or without
+ // modification, are permitted provided that the following conditions are met:
+ // 
+-// • Redistributions of source code must retain the above copyright notice,
++// ï¿½ Redistributions of source code must retain the above copyright notice,
+ //   this list of conditions and the following disclaimer.
+-// • Redistributions in binary form must reproduce the above copyright notice,
++// ï¿½ Redistributions in binary form must reproduce the above copyright notice,
+ //   this list of conditions and the following disclaimer in the documentation
+ //   and/or other materials provided with the distribution.
+ // 
+@@ -30,6 +30,7 @@
+ #include "strTransform.h"
+ #include <math.h>
+ #include "perfTimer.h"
++#include <unistd.h>
+ 
+ #ifdef MEM_TRACE
+ #define TRACE_MALLOC    1
+@@ -482,9 +483,13 @@ Int StrIOEncInit(CWMImageStrCodec* pSC)
+                 pSC->ppTempFile[i] = (char *)malloc(FILENAME_MAX * sizeof(char));
+                 if(pSC->ppTempFile[i] == NULL) return ICERR_ERROR;
+ 
+-                if ((pFilename = tmpnam(NULL)) == NULL)
+-                    return ICERR_ERROR;                
+-                strcpy(pSC->ppTempFile[i], pFilename);
++                char template[] = "/tmp/libjxr_XXXXXX";
++                int fd = mkstemp(template);
++                if (fd == -1) {
++                    return ICERR_ERROR;
++                }
++                close(fd);
++                strcpy(pSC->ppTempFile[i], template);
+ #endif
+                 if(CreateWS_File(pSC->ppWStream + i, pFilename, "w+b") != ICERR_OK) return ICERR_ERROR;                
+ 
+diff --git a/Source/LibJXR/image/sys/strcodec.c b/Source/LibJXR/image/sys/strcodec.c
+index 2312aac..cd22fe3 100644
+--- a/Source/LibJXR/image/sys/strcodec.c
++++ b/Source/LibJXR/image/sys/strcodec.c
+@@ -664,24 +664,6 @@ ERR detach_SB(SimpleBitIO* pSB)
+ //================================================================
+ // Memory access functions
+ //================================================================
+-#if (defined(WIN32) && !defined(UNDER_CE) && (!defined(__MINGW32__) || defined(__MINGW64_TOOLCHAIN__))) || (defined(UNDER_CE) && defined(_ARM_))
+-// WinCE ARM and Desktop x86
+-#else
+-// other platform
+-#ifdef _BIG__ENDIAN_
+-#define _byteswap_ulong(x)  (x)
+-#else // _BIG__ENDIAN_
+-U32 _byteswap_ulong(U32 bits)
+-{
+-    U32 r = (bits & 0xffu) << 24;
+-    r |= (bits << 8) & 0xff0000u;
+-    r |= ((bits >> 8) & 0xff00u);
+-    r |= ((bits >> 24) & 0xffu);
+-
+-    return r;
+-}
+-#endif // _BIG__ENDIAN_
+-#endif
+ 
+ U32 load4BE(void* pv)
+ {
+diff --git a/Source/LibJXR/image/sys/strcodec.h b/Source/LibJXR/image/sys/strcodec.h
+index 4715b6b..87c803e 100644
+--- a/Source/LibJXR/image/sys/strcodec.h
++++ b/Source/LibJXR/image/sys/strcodec.h
+@@ -504,6 +504,28 @@ Int allocatePredInfo(CWMImageStrCodec*);
+ Void freePredInfo(CWMImageStrCodec*);
+ Void advanceOneMBRow(CWMImageStrCodec*);
+ 
++//================================================================
++// Memory access functions
++//================================================================
++#if (defined(WIN32) && !defined(UNDER_CE) && (!defined(__MINGW32__) || defined(__MINGW64_TOOLCHAIN__))) || (defined(UNDER_CE) && defined(_ARM_))
++// WinCE ARM and Desktop x86
++#else
++// other platform
++#ifdef _BIG__ENDIAN_
++#define _byteswap_ulong(x)  (x)
++#else // _BIG__ENDIAN_
++static U32 _byteswap_ulong(U32 bits)
++{
++    U32 r = (bits & 0xffu) << 24;
++    r |= (bits << 8) & 0xff0000u;
++    r |= ((bits >> 8) & 0xff00u);
++    r |= ((bits >> 24) & 0xffu);
++
++    return r;
++}
++#endif // _BIG__ENDIAN_
++#endif
++
+ //================================================================
+ // bit I/O
+ //================================================================
+diff --git a/Source/LibJXR/jxrgluelib/JXRGlueJxr.c b/Source/LibJXR/jxrgluelib/JXRGlueJxr.c
+index 6e96a19..6f97666 100644
+--- a/Source/LibJXR/jxrgluelib/JXRGlueJxr.c
++++ b/Source/LibJXR/jxrgluelib/JXRGlueJxr.c
+@@ -26,6 +26,7 @@
+ // POSSIBILITY OF SUCH DAMAGE.
+ //
+ //*@@@---@@@@******************************************************************
++#include <wchar.h>
+ #include <limits.h>
+ #include <JXRGlue.h>
+ 
+diff --git a/Source/ZLib/gzguts.h b/Source/ZLib/gzguts.h
+index 990a4d2..24c6566 100644
+--- a/Source/ZLib/gzguts.h
++++ b/Source/ZLib/gzguts.h
+@@ -19,6 +19,7 @@
+ #endif
+ 
+ #include <stdio.h>
++#include <unistd.h>
+ #include "zlib.h"
+ #ifdef STDC
+ #  include <string.h>
+diff --git a/freeimage.pc.in b/freeimage.pc.in
+new file mode 100644
+index 0000000..afed376
+--- /dev/null
++++ b/freeimage.pc.in
+@@ -0,0 +1,10 @@
++prefix=@prefix@
++exec_prefix=@exec_prefix@
++libdir=@libdir@
++includedir=@includedir@
++
++Name: freeimage
++Description: FreeImage supports popular graphics image formats like PNG, BMP, JPEG, TIFF and others.
++Version: @version@
++Libs: -L${libdir} -lfreeimage
++Cflags: -I${includedir}/freeimage
+-- 
+2.34.1
+
