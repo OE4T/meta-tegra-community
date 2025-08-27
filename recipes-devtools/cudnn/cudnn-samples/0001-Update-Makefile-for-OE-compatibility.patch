@@ -1,0 +1,228 @@
+From 9110085f60dbb6d7db3f9f00f3b46f3021cfaa7f Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Tue, 8 Jul 2025 14:28:22 +0100
+Subject: [PATCH] Update Makefile for OE compatibility
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ RNN_v8.0/CMakeLists.txt           | 13 +++++++++---
+ common/CMakeLists.txt             |  9 +++++++--
+ conv_sample/CMakeLists.txt        | 13 +++++++++---
+ mnistCUDNN/CMakeLists.txt         | 33 +++++++++++++++++++++++++++----
+ mnistCUDNN/mnistCUDNN.cpp         |  8 +++++++-
+ multiHeadAttention/CMakeLists.txt | 11 +++++++++--
+ 6 files changed, 72 insertions(+), 15 deletions(-)
+
+diff --git a/RNN_v8.0/CMakeLists.txt b/RNN_v8.0/CMakeLists.txt
+index 59a42a4..82be79d 100644
+--- a/RNN_v8.0/CMakeLists.txt
++++ b/RNN_v8.0/CMakeLists.txt
+@@ -1,3 +1,8 @@
++enable_language(CUDA)
++find_package(CUDA REQUIRED)
++include_directories(${CUDA_INCLUDE_DIRS})
++link_directories(${CUDA_LIBRARIES})
++
+ add_executable(
+     RNN_v8.0
+     RNN_example.cu
+@@ -5,12 +10,14 @@ add_executable(
+ 
+ target_link_libraries(
+     RNN_v8.0
+-    CUDA::cublas
+-    CUDA::cudart_static
++    cublas
++    cudart_static
+     cudnn
+     fp16_emu
+ )
+ 
++install (TARGETS RNN_v8.0 RUNTIME DESTINATION ${CMAKE_INSTALL_CUDNN_SAMPLES})
++
+ foreach(TESTNUM RANGE 1 4)
+     math(EXPR MODENUM "${TESTNUM} - 1")
+     cmake_path(SET "wd" "${CMAKE_CURRENT_BINARY_DIR}/test_${TESTNUM}")
+@@ -32,4 +39,4 @@ foreach(TESTNUM RANGE 1 4)
+     set_tests_properties("create_dir_RNN8_test_${TESTNUM}" PROPERTIES FIXTURES_SETUP "fixture_${TESTNUM}")
+     set_tests_properties("setup_RNN8_test_${TESTNUM}" PROPERTIES FIXTURES_SETUP "fixture_${TESTNUM}")
+     set_tests_properties("RNN8_test_${TESTNUM}" PROPERTIES FIXTURES_REQUIRED "fixture_${TESTNUM}")
+-endforeach()
+\ No newline at end of file
++endforeach()
+diff --git a/common/CMakeLists.txt b/common/CMakeLists.txt
+index 7c4a81f..974a806 100644
+--- a/common/CMakeLists.txt
++++ b/common/CMakeLists.txt
+@@ -1,3 +1,8 @@
++enable_language(CUDA)
++find_package(CUDA REQUIRED)
++include_directories(${CUDA_INCLUDE_DIRS})
++link_directories(${CUDA_LIBRARIES})
++
+ add_library(
+     fp16_dev OBJECT
+     fp16_dev.cu
+@@ -11,12 +16,12 @@ add_library(
+ target_link_libraries(
+     fp16_dev
+     fp16_emu
+-    CUDA::cudart_static
++    cudart_static
+ )
+ 
+ target_link_libraries(
+     fp16_emu
+-    CUDA::cudart_static
++    cudart_static
+     cudnn
+ )
+ 
+diff --git a/conv_sample/CMakeLists.txt b/conv_sample/CMakeLists.txt
+index b6fd0e6..b90caa2 100644
+--- a/conv_sample/CMakeLists.txt
++++ b/conv_sample/CMakeLists.txt
+@@ -1,3 +1,8 @@
++enable_language(CUDA)
++find_package(CUDA REQUIRED)
++include_directories(${CUDA_INCLUDE_DIRS})
++link_directories(${CUDA_LIBRARIES})
++
+ add_executable(
+     conv_sample
+         conv_sample.cpp
+@@ -5,8 +10,8 @@ add_executable(
+ 
+ target_link_libraries(
+     conv_sample
+-        CUDA::cublas
+-        CUDA::cudart_static
++        cublas
++        cudart_static
+         cudnn
+         fp16_dev
+         fp16_emu
+@@ -145,4 +150,6 @@ add_test(
+     NAME conv_sample_test_21
+     COMMAND conv_sample
+         "-dgrad" "-c1024" "-h14" "-w14" "-k2048" "-r1" "-s1" "-pad_h0" "-pad_w0" "-u2" "-v2" "-fold"
+-)
+\ No newline at end of file
++)
++
++install (TARGETS conv_sample RUNTIME DESTINATION ${CMAKE_INSTALL_CUDNN_SAMPLES})
+diff --git a/mnistCUDNN/CMakeLists.txt b/mnistCUDNN/CMakeLists.txt
+index 7fd0e09..5dde952 100644
+--- a/mnistCUDNN/CMakeLists.txt
++++ b/mnistCUDNN/CMakeLists.txt
+@@ -1,4 +1,13 @@
+-add_subdirectory(FreeImage)
++find_package(PkgConfig REQUIRED)
++pkg_check_modules(FREEIMAGE REQUIRED freeimage)
++
++enable_language(CUDA)
++find_package(CUDA REQUIRED)
++include_directories(${CUDA_INCLUDE_DIRS})
++link_directories(${CUDA_LIBRARIES})
++
++include_directories(${FREEIMAGE_INCLUDE_DIRS})
++link_directories(${FREEIMAGE_LIBRARY_DIRS})
+ 
+ add_executable(
+     mnistCUDNN
+@@ -12,12 +21,12 @@ add_test(
+ )
+ target_link_libraries(
+     mnistCUDNN
+-    PRIVATE FreeImage
+-    CUDA::cublas
+-    CUDA::cudart_static
++    cublas
++    cudart_static
+     cudnn
+     fp16_dev
+     fp16_emu
++    ${FREEIMAGE_LIBRARIES}
+ )
+ 
+ if(WIN32)
+@@ -25,3 +34,19 @@ if(WIN32)
+ else()
+     target_compile_options(mnistCUDNN PRIVATE -fpermissive)
+ endif()
++
++install (TARGETS mnistCUDNN RUNTIME DESTINATION ${CMAKE_INSTALL_CUDNN_SAMPLES})
++install(FILES
++  ${CMAKE_CURRENT_SOURCE_DIR}/data/conv1.bias.bin
++  ${CMAKE_CURRENT_SOURCE_DIR}/data/conv1.bin
++  ${CMAKE_CURRENT_SOURCE_DIR}/data/conv2.bias.bin
++  ${CMAKE_CURRENT_SOURCE_DIR}/data/conv2.bin
++  ${CMAKE_CURRENT_SOURCE_DIR}/data/five_28x28.pgm
++  ${CMAKE_CURRENT_SOURCE_DIR}/data/ip1.bias.bin
++  ${CMAKE_CURRENT_SOURCE_DIR}/data/ip1.bin
++  ${CMAKE_CURRENT_SOURCE_DIR}/data/ip2.bias.bin
++  ${CMAKE_CURRENT_SOURCE_DIR}/data/ip2.bin
++  ${CMAKE_CURRENT_SOURCE_DIR}/data/one_28x28.pgm
++  ${CMAKE_CURRENT_SOURCE_DIR}/data/three_28x28.pgm
++  DESTINATION ${CMAKE_INSTALL_CUDNN_SAMPLES}/data
++)
+diff --git a/mnistCUDNN/mnistCUDNN.cpp b/mnistCUDNN/mnistCUDNN.cpp
+index b151099..382f7cb 100644
+--- a/mnistCUDNN/mnistCUDNN.cpp
++++ b/mnistCUDNN/mnistCUDNN.cpp
+@@ -25,6 +25,7 @@
+ #include <sstream>
+ #include <fstream>
+ #include <stdlib.h>
++#include <cstdlib>
+ 
+ #include <cuda.h>  // need CUDA_VERSION
+ #include <cudnn.h>
+@@ -57,7 +58,12 @@ const char* ip2_bias_bin   = "ip2.bias.bin";
+ 
+ void
+ get_path(std::string& sFilename, const char* fname, const char* pname) {
+-    sFilename = (std::string("data/") + std::string(fname));
++    const char* cudnn_data_path = std::getenv("CUDNN_DATA_PATH");
++    if (cudnn_data_path) {
++        sFilename = (std::string(cudnn_data_path) + std::string("/") + std::string(fname));
++    } else {
++        sFilename = (std::string("data/") + std::string(fname));
++    }
+ }
+ 
+ // Need the map, since scaling factor is of float type in half precision
+diff --git a/multiHeadAttention/CMakeLists.txt b/multiHeadAttention/CMakeLists.txt
+index 6257f96..935a003 100644
+--- a/multiHeadAttention/CMakeLists.txt
++++ b/multiHeadAttention/CMakeLists.txt
+@@ -1,3 +1,8 @@
++enable_language(CUDA)
++find_package(CUDA REQUIRED)
++include_directories(${CUDA_INCLUDE_DIRS})
++link_directories(${CUDA_LIBRARIES})
++
+ add_executable(
+     multiHeadAttention
+     multiHeadAttention.cpp
+@@ -5,8 +10,8 @@ add_executable(
+ 
+ target_link_libraries(
+     multiHeadAttention
+-    CUDA::cublas
+-    CUDA::cudart_static
++    cublas
++    cudart_static
+     cudnn
+     fp16_emu
+ )
+@@ -65,3 +70,5 @@ add_test(
+ 
+ set_tests_properties(setupMultiHeadAttentionTest PROPERTIES FIXTURES_SETUP MHA)
+ set_tests_properties(multiHeadAttentionTest PROPERTIES FIXTURES_REQUIRED MHA)
++
++install (TARGETS multiHeadAttention RUNTIME DESTINATION ${CMAKE_INSTALL_CUDNN_SAMPLES})
+-- 
+2.34.1
+
