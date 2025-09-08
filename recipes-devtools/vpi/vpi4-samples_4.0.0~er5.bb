@@ -8,21 +8,21 @@ COMPATIBLE_MACHINE = "(tegra)"
 
 inherit l4t_deb_pkgfeed cuda cmake
 
-SRC_COMMON_DEBS = "vpi3-samples_${PV}_arm64.deb;subdir=vpi3-samples"
-SRC_URI[sha256sum] = "e7850f6675856507b5064c23315934a025e811ebf1264f059670730e45885eec"
+SRC_COMMON_DEBS = "vpi4-samples_${PV}_arm64.deb;subdir=vpi4-samples"
+SRC_URI[sha256sum] = "ae24d37cc5b9f09c98486128193bb34e687d43f7d217bea221bebc23a99ae0f8"
 
-SRC_URI += "file://CMakeLists.txt;subdir=vpi3-samples/opt/nvidia/vpi3/samples"
+SRC_URI += "file://CMakeLists.txt;subdir=vpi4-samples/opt/nvidia/vpi4/samples"
 
-VPI_PREFIX = "/opt/nvidia/vpi3"
+VPI_PREFIX = "/opt/nvidia/vpi4"
 EXTRA_OECMAKE = "-DCMAKE_INSTALL_PREFIX:PATH=${VPI_PREFIX}"
 
 PACKAGECONFIG ??= "${@bb.utils.contains('LICENSE_FLAGS_ACCEPTED', 'commercial', 'video', bb.utils.contains('LICENSE_FLAGS_ACCEPTED', 'commercial_ffmpeg', 'video', '', d), d)}"
 PACKAGECONFIG[video] = "-DBUILD_VIDEO_SAMPLES=ON,-DBUILD_VIDEO_SAMPLES=OFF,"
 
-S = "${UNPACKDIR}/vpi3-samples/opt/nvidia/vpi3/samples"
+S = "${UNPACKDIR}/vpi4-samples/opt/nvidia/vpi4/samples"
 
-DEPENDS = "libnvvpi3 opencv"
+DEPENDS = "libnvvpi4 opencv"
 
-LDFLAGS += "-Wl,-rpath,/opt/nvidia/cupva-2.5/lib/aarch64-linux-gnu"
+RDEPENDS:${PN} += "tegra-libraries-pva"
 
 FILES:${PN} = "${VPI_PREFIX}"
