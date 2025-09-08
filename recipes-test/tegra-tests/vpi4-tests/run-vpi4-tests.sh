@@ -12,9 +12,11 @@
 chipid_from_compatible() {
     local compatible=$(tr '\0' ':' < /sys/firmware/devicetree/base/compatible)
     if echo "$compatible" | grep -q "nvidia,tegra234"; then
-	echo "0x23"
+        echo "0x23"
+    elif echo "$compatible" | grep -q "nvidia,tegra264"; then
+        echo "0x26"
     else
-	echo "UNKNOWN"
+        echo "UNKNOWN"
     fi
     return 0
 }
@@ -36,7 +38,7 @@ find_cuda_libdir() {
 }
 
 TEGRACHIPID="$(chipid_from_compatible)"
-SAMPLEROOT="/opt/nvidia/vpi3"
+SAMPLEROOT="/opt/nvidia/vpi4"
 PATH="$SAMPLEROOT/bin:$PATH"
 SAMPLEASSETS="$SAMPLEROOT/assets"
 SKIPCODE=97
@@ -99,11 +101,6 @@ run_perspwarp() {
     vpi_sample_10_perspwarp "$1" "$SAMPLEASSETS/noisy.mp4"
 }
 
-run_fisheye() {
-    echo "Running 11_fisheye"
-    vpi_sample_11_fisheye -c 10,7 -s 22 "$SAMPLEASSETS/fisheye/"*.jpg
-}
-
 run_optflow_lk() {
     if [ ! -x "$SAMPLEROOT/bin/vpi_sample_12_optflow_lk" ]; then
         echo "Skipping 12_optflow_lk"
@@ -119,7 +116,7 @@ run_optflow_dense() {
         return $SKIPCODE
     fi
     echo "Running 13_optflow_dense"
-    vpi_sample_13_optflow_dense "$1" "$SAMPLEASSETS/pedestrians.mp4" high 1 5
+    vpi_sample_13_optflow_dense "$1" "$SAMPLEASSETS/pedestrians.mp4" high 1 3
 }
 
 run_background_subtractor() {
@@ -160,7 +157,7 @@ export LD_LIBRARY_PATH="$CUDALIBDIR"
 
 # VPI samples list
 TESTS="convolve_2d stereo_disparity harris_corners rescale benchmark"
-TESTS="$TESTS klt_tracker fft tnr perspwarp fisheye optflow_lk optflow_dense"
+TESTS="$TESTS klt_tracker fft tnr perspwarp optflow_lk optflow_dense"
 TESTS="$TESTS background_subtractor image_view template_matching orb_feature_detector"
 
 # List of VPI backend per sample app
@@ -173,7 +170,6 @@ klt_tracker=("cpu" "cuda")
 fft=("cpu" "cuda")
 tnr=("cuda" "vic")
 perspwarp=("cpu" "cuda" "vic")
-fisheye=("cuda")
 optflow_lk=("cpu" "cuda")
 optflow_dense=("ofa")
 background_subtractor=("cpu" "cuda")
