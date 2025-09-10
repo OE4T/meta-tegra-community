@@ -7,13 +7,13 @@ SRC_URI = " \
     git://github.com/NVIDIA/nccl.git;protocol=https;branch=master;tag=v${PV} \
     file://0001-Fixups-for-cross-building-in-OE.patch \
 "
-SRCREV = "3000e3c797b4b236221188c07aa09c1f3a0170d4"
+SRCREV = "3ea7eedf3b9b94f1d9f99f4e55536dfcbd23c1ca"
 
 COMPATIBLE_MACHINE = "(cuda)"
 
-inherit cuda
+inherit cuda python3native
 
-DEPENDS += "coreutils-native"
+DEPENDS:append = " coreutils-native"
 
 do_compile () {
     export CXX="${CXX_FOR_CUDA}"
@@ -21,6 +21,8 @@ do_compile () {
     export CUDA_HOME="${CUDA_TOOLKIT_ROOT}"
     export NVCC_GENCODE="${CUDA_NVCC_ARCH_FLAGS}"
     export NVCUFLAGS="${CUFLAGS}"
+    export NVCUFLAGS_SYM="${CUFLAGS}"
+    export CUDA_VERSION="${CUDA_VERSION}"
     oe_runmake src.build
 }
 
