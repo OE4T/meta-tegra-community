@@ -15,15 +15,15 @@ DEPENDS:append:class-target = " \
     cuda-profiler-api \
     cuda-cudart \
     cuda-nvrtc \
+    cuda-cccl \
     googletest \
-    cccl \
     jitify-native \
 "
 
 EXTRA_OEMAKE:class-target = " \
     NVCC="${CUDA_NVCC_EXECUTABLE}" \
     CUDA_DIR="${CUDA_PATH}" \
-    CUB_DIR="${RECIPE_SYSROOT}${includedir}/cub" \
+    CUB_DIR="${RECIPE_SYSROOT}/usr/local/cuda-${CUDA_VERSION}/include/cccl/cub" \
     GTEST_LIB_DIR="${RECIPE_SYSROOT}${libdir}" \
     GTEST_INC_DIR="${RECIPE_SYSROOT}${includedir}" \
     STRINGIFY="${STAGING_DIR_NATIVE}${bindir}/stringify" \ 
@@ -35,26 +35,20 @@ do_compile:class-native () {
     oe_runmake stringify
 }
 
+do_compile:class-target () {
+    oe_runmake stringify
+}
+
 do_install:class-native () {
     install -d ${D}${bindir}
     install -m 0755 ${B}/stringify ${D}${bindir} 
 }
 
 do_install:class-target () {
-    install -d ${D}${bindir}
-    install -m 0755 ${B}/jitify_example ${D}${bindir}
-    install -m 0755 ${B}/jitify_test ${D}${bindir}
-    install -m 0755 ${B}/nvrtc_cli ${D}${bindir}
-    install -m 0755 ${B}/nvrtc_cli_test.sh ${D}${bindir}/nvrtc_cli_test
-
     install -d ${D}${includedir}
     install -m 0644 ${B}/jitify.hpp ${D}${includedir}
 }
 
-PACKAGES =+ "${PN}-test"
-
-FILES:${PN}-test = "${bindir}/nvrtc_cli_test ${bindir}/jitify_test ${bindir}/jitify_example"
-RDEPENDS:${PN}-test += "bash"
-INSANE_SKIP:${PN}-test = "ldflags buildpaths"
+INSANE_SKIP += "pep517-backend"
 
 BBCLASSEXTEND = "native"
