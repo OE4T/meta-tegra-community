@@ -14,6 +14,7 @@ SRC_URI += " \
     file://0005-Disable-various-warnings.patch \
     file://0006-Fixups-for-cross-building-in-OE.patch \
     file://0007-cmake-Set-minimum-required-version-to-3.5-for-CMake-.patch \
+    file://0008-Fixups-for-cross-building-in-OE-with-CUDA-13.0.patch \
 "
 
 S = "${UNPACKDIR}/${PN}-v${PV}"
@@ -26,12 +27,15 @@ EXTRA_OECMAKE += " \
     -DGLIBCXX_USE_CXX11_ABI=1 \
     -DBUILD_PYTHON=0 \
     -DBUILD_CUSTOM_PROTOBUF=0 \
+    -DUSE_CUDA=ON \
+    -DCUDA_VERSION="${CUDA_VERSION}" \
     -DUSE_OPENMP=OFF \
     -DUSE_XNNPACK=OFF \
     -DUSE_NCCL=OFF \
     -DUSE_CUSPARSELT=OFF \
     -DPROTOBUF_PROTOC_EXECUTABLE=${STAGING_BINDIR_NATIVE}/protoc \
     -DUSE_SYSTEM_PYBIND11=ON \
+    -DCUB_INCLUDE_DIR=${RECIPE_SYSROOT}/usr/local/cuda-${CUDA_VERSION}/include/ \
 "
 
 # Disable installing the fmt third-party library, which may cause conflicts

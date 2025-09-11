@@ -1,0 +1,1518 @@
+From d744ec81dd6ff06c725fec922303e47984dea435 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 14 Jul 2025 19:56:35 +0100
+Subject: [PATCH] Fixups for cross building in OE with CUDA 13.0
+
+Upstream-Status: Inappropriate [OE-specific]
+
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ aten/src/ATen/cuda/cub-RadixSortKeys.cu       |   2 +-
+ aten/src/ATen/cuda/cub.cu                     |  13 +
+ aten/src/ATen/cuda/cub.cuh                    | 250 ++++++++-
+ aten/src/ATen/cuda/cub_definitions.cuh        |  11 +-
+ aten/src/ATen/native/cuda/CuFFTUtils.h        |   6 +-
+ aten/src/ATen/native/cuda/Embedding.cu        |  17 +-
+ aten/src/ATen/native/cuda/EmbeddingBag.cu     |  26 +-
+ aten/src/ATen/native/cuda/Nonzero.cu          | 493 +++++++++++++++---
+ aten/src/ATen/native/cuda/TensorTopK.cu       | 184 ++++---
+ aten/src/ATen/native/cuda/UniqueCub.cu        |  18 +
+ cmake/Dependencies.cmake                      |   2 +-
+ .../channel/cuda_ipc/context_impl.cc          |   4 +-
+ torch/csrc/profiler/stubs/cuda.cpp            |   2 +-
+ 13 files changed, 842 insertions(+), 186 deletions(-)
+
+diff --git a/aten/src/ATen/cuda/cub-RadixSortKeys.cu b/aten/src/ATen/cuda/cub-RadixSortKeys.cu
+index 74e82ae55..565712951 100644
+--- a/aten/src/ATen/cuda/cub-RadixSortKeys.cu
++++ b/aten/src/ATen/cuda/cub-RadixSortKeys.cu
+@@ -50,7 +50,7 @@ void radix_sort_keys(
+       int64_t begin_bit,                                  \
+       int64_t end_bit);
+ 
+-AT_FORALL_SCALAR_TYPES_AND2(Bool, Half, AT_INSTATIATE_CUB_TEMPLATES)
++AT_FORALL_SCALAR_TYPES_AND3(Bool, BFloat16, Half, AT_INSTATIATE_CUB_TEMPLATES)
+ AT_INSTATIATE_CUB_TEMPLATES(uint16_t, UInt16)
+ AT_INSTATIATE_CUB_TEMPLATES(uint32_t, UInt32)
+ AT_INSTATIATE_CUB_TEMPLATES(uint64_t, UInt64)
+diff --git a/aten/src/ATen/cuda/cub.cu b/aten/src/ATen/cuda/cub.cu
+index 839652f58..1f6f53323 100644
+--- a/aten/src/ATen/cuda/cub.cu
++++ b/aten/src/ATen/cuda/cub.cu
+@@ -2,6 +2,11 @@
+ #include <ATen/cuda/cub.cuh>
+ #include <ATen/cuda/CUDAConfig.h>
+ 
++#if CUB_V3_PLUS()
++#include <cuda/std/functional>
++#include <thrust/iterator/transform_iterator.h>
++#endif
++
+ namespace at::cuda::cub {
+ 
+ namespace {
+@@ -15,8 +20,12 @@ struct SumOp {
+ 
+ template <typename input_t, typename output_t>
+ void inclusive_sum_truncating(const input_t *input, output_t *output, int64_t num_items) {
++#if CUB_V3_PLUS()
++  inclusive_scan(input, output, ::cuda::std::plus<>{}, num_items);
++#else
+   using NO_ROCM(at_cuda_detail)::cub::Sum;
+   inclusive_scan(input, output, Sum{}, num_items);
++#endif
+ }
+ 
+ template void inclusive_sum_truncating(const int32_t *input, int32_t *output, int64_t num_items);
+@@ -42,8 +51,12 @@ struct CountMaskOp {
+ 
+ void mask_exclusive_sum(const uint8_t *mask, int64_t *output_idx, int64_t n) {
+   CountMaskOp op{};
++#if CUB_V3_PLUS()
++  auto iter = thrust::transform_iterator<decltype(op), decltype(mask)>(mask, op);
++#else
+   auto iter = NO_ROCM(at_cuda_detail)::cub::TransformInputIterator<
+       bool, decltype(op), decltype(mask)>(mask, op);
++#endif
+   exclusive_scan(iter, output_idx, SumOp<int64_t>{}, int64_t{0}, n);
+ }
+ 
+diff --git a/aten/src/ATen/cuda/cub.cuh b/aten/src/ATen/cuda/cub.cuh
+index daa7f311f..bc8fbf78a 100644
+--- a/aten/src/ATen/cuda/cub.cuh
++++ b/aten/src/ATen/cuda/cub.cuh
+@@ -7,6 +7,12 @@
+ #include <limits>
+ 
+ #include <ATen/cuda/cub_definitions.cuh>
++#include <ATen/cuda/CUDAContextLight.h>
++
++#if CUB_V3_PLUS()
++#include <cuda/std/functional>
++#include <thrust/iterator/transform_iterator.h>
++#endif
+ 
+ #if USE_GLOBAL_CUB_WRAPPED_NAMESPACE()
+ 
+@@ -36,11 +42,10 @@
+ // handle the temporary storage and 'twice' calls for cub API
+ #define CUB_WRAPPER(func, ...) do {                                       \
+   size_t temp_storage_bytes = 0;                                          \
+-  func(nullptr, temp_storage_bytes, __VA_ARGS__);                         \
++  AT_CUDA_CHECK(func(nullptr, temp_storage_bytes, __VA_ARGS__));          \
+   auto& caching_allocator = *::c10::cuda::CUDACachingAllocator::get();    \
+   auto temp_storage = caching_allocator.allocate(temp_storage_bytes);     \
+-  func(temp_storage.get(), temp_storage_bytes, __VA_ARGS__);              \
+-  AT_CUDA_CHECK(cudaGetLastError());                                      \
++  AT_CUDA_CHECK(func(temp_storage.get(), temp_storage_bytes, __VA_ARGS__));\
+ } while (false)
+ 
+ #ifdef USE_ROCM
+@@ -270,8 +275,13 @@ inline void inclusive_scan(InputIteratorT input, OutputIteratorT output, ScanOpT
+         return x.value;
+       }
+     };
++#if CUB_V3_PLUS()
++    auto input_ = thrust::transform_iterator<decltype(input_iter_transform), ArgIndexInputIterator>(
++      ArgIndexInputIterator(input + i), input_iter_transform);
++#else
+     auto input_ = NO_ROCM(at_cuda_detail)::cub::TransformInputIterator<input_t, decltype(input_iter_transform), ArgIndexInputIterator>(
+       ArgIndexInputIterator(input + i), input_iter_transform);
++#endif
+     CUB_WRAPPER(NO_ROCM(at_cuda_detail)::cub::DeviceScan::InclusiveScan,
+         input_,
+         output + i,
+@@ -291,6 +301,220 @@ inline void inclusive_scan(InputIteratorT input, OutputIteratorT output, ScanOpT
+ #endif
+ }
+ 
++# if defined(CUDA_VERSION) || defined(USE_ROCM)
++
++template<typename T>
++struct BlockPrefixCallbackOp
++{
++    public:
++    T running_total;
++
++    __host__ __device__ BlockPrefixCallbackOp(T running_total) : running_total(running_total) {}
++
++    // Callback operator to be entered by the first warp of threads in the block.
++    // Thread-0 is responsible for returning a value for seeding the block-wide scan.
++    __host__ __device__ T operator()(T block_aggregate)
++    {
++        T old_prefix = running_total;
++        running_total += block_aggregate;
++        return old_prefix;
++    }
++};
++
++template<int BLOCK_THREADS, int ITEMS_PER_THREAD, typename T>
++__global__ void final_scan_kernel(const T* d_in, T* d_out, T* agg, int64_t nelem, int iters_per_cta) {
++  int64_t offset = BLOCK_THREADS * ITEMS_PER_THREAD * iters_per_cta * (int64_t)blockIdx.x;
++  int64_t remaining =  nelem - offset;
++  if (remaining <= 0) {
++    return;
++  }
++
++  d_in += offset;
++  d_out += offset;
++
++  using BlockLoadT = ROCM_HIPCUB(at_cuda_detail::cub)::BlockLoad<T, BLOCK_THREADS, ITEMS_PER_THREAD, ROCM_HIPCUB(at_cuda_detail::cub)::BLOCK_LOAD_WARP_TRANSPOSE>;
++
++  // Specialize BlockStore type for our thread block (uses warp-striped loads for coalescing, then transposes in shared
++  // memory to a blocked arrangement)
++  using BlockStoreT = ROCM_HIPCUB(at_cuda_detail::cub)::BlockStore<T, BLOCK_THREADS, ITEMS_PER_THREAD, ROCM_HIPCUB(at_cuda_detail::cub)::BLOCK_STORE_WARP_TRANSPOSE>;
++
++  // Specialize BlockScan type for our thread block
++  using BlockScanT = ROCM_HIPCUB(at_cuda_detail::cub)::BlockScan<T, BLOCK_THREADS, ROCM_HIPCUB(at_cuda_detail::cub)::BLOCK_SCAN_WARP_SCANS>;
++  using BlockReduceT = ROCM_HIPCUB(at_cuda_detail::cub)::BlockReduce<T, BLOCK_THREADS>;
++
++
++  // Shared memory
++  __shared__ union TempStorage
++  {
++    typename BlockLoadT::TempStorage load;
++    typename BlockStoreT::TempStorage store;
++    typename BlockScanT::TempStorage scan;
++    typename BlockReduceT::TempStorage reduce;
++  } temp_storage;
++
++  // load agg and reduce my starting value
++  T agg_data;
++  agg_data = threadIdx.x >= blockIdx.x ? T(0) : agg[threadIdx.x];
++  // if there are fewer threads than previous values to be read,
++  // read another value
++  if (threadIdx.x + blockDim.x < blockIdx.x) {
++    agg_data += agg[threadIdx.x + blockDim.x];
++  }
++  T aggregate = BlockReduceT(temp_storage.reduce).Sum(agg_data);
++  __syncthreads();
++  BlockPrefixCallbackOp prefix_op(aggregate);
++
++
++  // Per-thread tile data
++  T data[ITEMS_PER_THREAD];
++
++  for (int i=0; i<iters_per_cta; i++){
++  // Load items into a blocked arrangement
++    if (remaining >= BLOCK_THREADS * ITEMS_PER_THREAD) {
++      BlockLoadT(temp_storage.load).Load(d_in, data);
++    } else {
++       #pragma unroll
++       for (int j=0; j<ITEMS_PER_THREAD; j++) {
++         data[j] = 0;
++       }
++       BlockLoadT(temp_storage.load).Load(d_in, data, remaining);
++    }
++
++    // Barrier for smem reuse
++    __syncthreads();
++
++    // Compute inclusive prefix sum
++    BlockScanT(temp_storage.scan).InclusiveSum(data, data, prefix_op);
++
++    // Barrier for smem reuse
++    __syncthreads();
++
++    // Store items from a blocked arrangement
++    if (remaining >= BLOCK_THREADS * ITEMS_PER_THREAD) {
++      BlockStoreT(temp_storage.store).Store(d_out, data);
++    } else {
++      BlockStoreT(temp_storage.store).Store(d_out, data, remaining);
++    }
++    d_in += BLOCK_THREADS * ITEMS_PER_THREAD;
++    d_out += BLOCK_THREADS * ITEMS_PER_THREAD;
++    remaining -= BLOCK_THREADS * ITEMS_PER_THREAD;
++    if (remaining <= 0) return;
++    __syncthreads();
++  }
++
++}
++
++template <typename T, typename aggT, bool nonzero>
++struct TransformFunctor {
++  __device__ aggT operator()(T value) const {
++    if constexpr (!nonzero) {
++      return value;
++    } else {
++      return (value != T(0)) ? 1 : 0;
++    }
++  }
++};
++
++template<int BLOCK_THREADS, int ITEMS_PER_THREAD, bool nonzero, typename T, typename aggT>
++__global__ void calc_block_sums(const T * d_in, aggT * agg, int64_t nelem, int iters_per_cta){
++    int64_t offset = BLOCK_THREADS * ITEMS_PER_THREAD * iters_per_cta * (int64_t)blockIdx.x;
++    int64_t remaining = nelem - offset;
++    if (remaining <= 0) {
++      return;
++    }
++    d_in += offset;
++
++    using BlockLoadT = ROCM_HIPCUB(at_cuda_detail::cub)::BlockLoad<aggT, BLOCK_THREADS, ITEMS_PER_THREAD, ROCM_HIPCUB(at_cuda_detail::cub)::BLOCK_LOAD_STRIPED>;
++    using BlockReduceT = ROCM_HIPCUB(at_cuda_detail::cub)::BlockReduce<aggT, BLOCK_THREADS>;
++    // Shared memory
++    __shared__ union TempStorage
++    {
++      typename BlockLoadT::TempStorage load;
++      typename BlockReduceT::TempStorage reduce;
++    } temp_storage;
++    aggT data[ITEMS_PER_THREAD];
++    aggT agg_val = 0;
++    TransformFunctor<T, aggT, nonzero> transform_functor;
++#if CUB_V3_PLUS()
++    auto iter_in = thrust::transform_iterator<TransformFunctor<T, aggT, nonzero>, const T*>(d_in, transform_functor);
++#else
++    auto iter_in = ROCM_HIPCUB(at_cuda_detail::cub)::TransformInputIterator<aggT, TransformFunctor<T, aggT, nonzero>, const T*>(d_in, transform_functor);
++#endif
++    for (int i=0; i<iters_per_cta; i++){
++      if (remaining >= BLOCK_THREADS * ITEMS_PER_THREAD) {
++        BlockLoadT(temp_storage.load).Load(iter_in, data);
++        __syncthreads();
++        agg_val += BlockReduceT(temp_storage.reduce).Sum(data);
++
++      } else {
++        BlockLoadT(temp_storage.load).Load(iter_in, data, remaining, aggT(0));
++        __syncthreads();
++        agg_val += BlockReduceT(temp_storage.reduce).Sum(data);
++      }
++      iter_in += BLOCK_THREADS * ITEMS_PER_THREAD;
++      remaining -= BLOCK_THREADS * ITEMS_PER_THREAD;
++      if (remaining <= 0) {
++        // for nonzeros we need to write out last blocks
++        // accumulated value to be able to compute
++        // total number of nonzeros
++        if (nonzero && threadIdx.x == 0) {
++          agg[blockIdx.x] = agg_val;
++        }
++        return;
++      }
++      __syncthreads();
++
++    }
++    if (threadIdx.x == 0) {
++      agg[blockIdx.x] = agg_val;
++    }
++
++}
++
++template <typename T>
++struct NonZeroOp {
++  __host__ __device__ __forceinline__ int operator()(const T& a) const {
++    return (a != T(0));
++  }
++};
++
++template<int size>
++constexpr int block_threads(){
++  if constexpr (size >=16) {
++    return 128;
++  } else if constexpr (size >=8) {
++    return 256;
++  } else {
++    return 512;
++  }
++}
++
++template<typename scalar_t, typename ScanOpT>
++inline void inclusive_deterministic_scan(const scalar_t *  input, scalar_t * output, ScanOpT scan_op, int64_t num_items) {
++  static_assert(std::is_same_v<ScanOpT, std::plus<scalar_t>>, "");
++  constexpr int BLOCK_THREADS = block_threads<sizeof(scalar_t)>();
++  constexpr int ITEMS_PER_THREAD = 16;
++  auto grid_size = (num_items + BLOCK_THREADS * ITEMS_PER_THREAD - 1) / (BLOCK_THREADS * ITEMS_PER_THREAD);
++  const int64_t num_sms = at::cuda::getCurrentDeviceProperties()->multiProcessorCount;
++
++  const int iters_per_cta = (grid_size + num_sms - 1)/num_sms;
++  grid_size = std::min(num_sms, grid_size);
++  // simple reduction in scan kernel handles at most 2 items per thread
++  TORCH_INTERNAL_ASSERT(2 * BLOCK_THREADS >= grid_size);
++  auto& allocator = *c10::cuda::CUDACachingAllocator::get();
++  auto agg = allocator.allocate(grid_size * sizeof(scalar_t));
++  calc_block_sums<BLOCK_THREADS, ITEMS_PER_THREAD, false>
++  <<<grid_size, BLOCK_THREADS, 0, at::cuda::getCurrentCUDAStream()>>>(
++    input, (scalar_t*)agg.get(), num_items, iters_per_cta);
++  C10_CUDA_KERNEL_LAUNCH_CHECK();
++  final_scan_kernel<BLOCK_THREADS, ITEMS_PER_THREAD>
++  <<<grid_size, BLOCK_THREADS, 0, at::cuda::getCurrentCUDAStream()>>>(
++  input, output, (scalar_t*)agg.get(), num_items, iters_per_cta);
++  C10_CUDA_KERNEL_LAUNCH_CHECK();
++}
++
++#endif
++
+ template<typename InputIteratorT, typename OutputIteratorT, typename ScanOpT, typename InitValueT, int max_cub_size=impl::max_cub_size>
+ inline void exclusive_scan(InputIteratorT input, OutputIteratorT output, ScanOpT scan_op, InitValueT init_value, int64_t num_items) {
+ #if defined(USE_ROCM)
+@@ -356,16 +580,36 @@ template <typename KeysInputIteratorT, typename ValuesInputIteratorT, typename V
+ inline void inclusive_sum_by_key(KeysInputIteratorT keys, ValuesInputIteratorT input, ValuesOutputIteratorT output, int64_t num_items) {
+   TORCH_CHECK(num_items <= std::numeric_limits<int>::max(),
+     "cub InclusiveSumByKey does not support more than INT_MAX elements");
++#if !defined(USE_ROCM)
++#if CUB_V3_PLUS()
++  CUB_WRAPPER(at_cuda_detail::cub::DeviceScan::InclusiveSumByKey,
++      keys, input, output, num_items, ::cuda::std::equal_to<>(), at::cuda::getCurrentCUDAStream());
++#else
+   CUB_WRAPPER(at_cuda_detail::cub::DeviceScan::InclusiveSumByKey,
+       keys, input, output, num_items, at_cuda_detail::cub::Equality(), at::cuda::getCurrentCUDAStream());
++#endif // CUB_V3_PLUS()
++#else
++  CUB_WRAPPER(cub::DeviceScan::InclusiveSumByKey,
++      keys, input, output, num_items, hipcub::Equality(), at::cuda::getCurrentCUDAStream());
++#endif
+ }
+ 
+ template <typename KeysInputIteratorT, typename ValuesInputIteratorT, typename ValuesOutputIteratorT, typename ScanOpT>
+ inline void inclusive_scan_by_key(KeysInputIteratorT keys, ValuesInputIteratorT input, ValuesOutputIteratorT output, ScanOpT scan_op, int64_t num_items) {
+   TORCH_CHECK(num_items <= std::numeric_limits<int>::max(),
+     "cub InclusiveSumByKey does not support more than INT_MAX elements");
++#if !defined(USE_ROCM)
++#if CUB_V3_PLUS()
++  CUB_WRAPPER(at_cuda_detail::cub::DeviceScan::InclusiveScanByKey,
++      keys, input, output, scan_op, num_items, ::cuda::std::equal_to<>(), at::cuda::getCurrentCUDAStream());
++#else
+   CUB_WRAPPER(at_cuda_detail::cub::DeviceScan::InclusiveScanByKey,
+       keys, input, output, scan_op, num_items, at_cuda_detail::cub::Equality(), at::cuda::getCurrentCUDAStream());
++#endif // CUB_V3_PLUS()
++#else
++  CUB_WRAPPER(cub::DeviceScan::InclusiveScanByKey,
++      keys, input, output, scan_op, num_items, hipcub::Equality(), at::cuda::getCurrentCUDAStream());
++#endif
+ }
+ 
+ #endif
+diff --git a/aten/src/ATen/cuda/cub_definitions.cuh b/aten/src/ATen/cuda/cub_definitions.cuh
+index 55b2f21dd..425fae435 100644
+--- a/aten/src/ATen/cuda/cub_definitions.cuh
++++ b/aten/src/ATen/cuda/cub_definitions.cuh
+@@ -7,7 +7,7 @@
+ #if !defined(USE_ROCM)
+ #include <cub/version.cuh>
+ #else
+-#define CUB_VERSION 0
++#define CUB_VERSION 200001
+ #endif
+ 
+ // cub sort support for __nv_bfloat16 is added to cub 1.13 in:
+@@ -51,3 +51,12 @@
+ #else
+ #define CUB_SUPPORTS_FUTURE_VALUE() false
+ #endif
++
++// cub
++// There were many bc-breaking changes in CCCL
++// Please see https://nvidia.github.io/cccl/cccl/3.0_migration_guide.html
++#if CUB_VERSION >= 300000
++#define CUB_V3_PLUS() true
++#else
++#define CUB_V3_PLUS() false
++#endif
+diff --git a/aten/src/ATen/native/cuda/CuFFTUtils.h b/aten/src/ATen/native/cuda/CuFFTUtils.h
+index 4b02f914d..71d5f608e 100644
+--- a/aten/src/ATen/native/cuda/CuFFTUtils.h
++++ b/aten/src/ATen/native/cuda/CuFFTUtils.h
+@@ -38,17 +38,21 @@ static inline std::string _cudaGetErrorEnum(cufftResult error)
+       return "CUFFT_INVALID_SIZE";
+     case CUFFT_UNALIGNED_DATA:
+       return "CUFFT_UNALIGNED_DATA";
++#if CUDA_VERSION < 13000
+     case CUFFT_INCOMPLETE_PARAMETER_LIST:
+       return "CUFFT_INCOMPLETE_PARAMETER_LIST";
++#endif
+     case CUFFT_INVALID_DEVICE:
+       return "CUFFT_INVALID_DEVICE";
++#if CUDA_VERSION < 13000
+     case CUFFT_PARSE_ERROR:
+       return "CUFFT_PARSE_ERROR";
++#endif
+     case CUFFT_NO_WORKSPACE:
+       return "CUFFT_NO_WORKSPACE";
+     case CUFFT_NOT_IMPLEMENTED:
+       return "CUFFT_NOT_IMPLEMENTED";
+-#if !defined(USE_ROCM)
++#if !defined(USE_ROCM) && CUDA_VERSION < 13000
+     case CUFFT_LICENSE_ERROR:
+       return "CUFFT_LICENSE_ERROR";
+ #endif
+diff --git a/aten/src/ATen/native/cuda/Embedding.cu b/aten/src/ATen/native/cuda/Embedding.cu
+index b8fb51304..b53f94fb5 100644
+--- a/aten/src/ATen/native/cuda/Embedding.cu
++++ b/aten/src/ATen/native/cuda/Embedding.cu
+@@ -19,6 +19,11 @@
+ #include <thrust/iterator/reverse_iterator.h>
+ #endif
+ 
++#if CUB_V3_PLUS()
++#include <cuda/functional>
++#include <thrust/iterator/constant_iterator.h>
++#endif
++
+ #ifndef AT_PER_OPERATOR_HEADERS
+ #include <ATen/Functions.h>
+ #include <ATen/NativeFunctions.h>
+@@ -317,7 +322,11 @@ Tensor embedding_dense_backward_cuda(const Tensor & grad_, const Tensor & indice
+       auto count_data = count.mutable_data_ptr<index_t>();
+       cuda::cub::inclusive_sum_by_key(
+         sorted_data,
+-        at_cuda_detail::cub::ConstantInputIterator<index_t>(1),
++#if CUB_V3_PLUS()
++        thrust::constant_iterator<index_t>(1),
++#else
++        NO_ROCM(at_cuda_detail)ROCM_HIPCUB(::cub)::ConstantInputIterator<index_t>(1),
++#endif
+         count_data,
+         num_indices
+       );
+@@ -329,7 +338,11 @@ Tensor embedding_dense_backward_cuda(const Tensor & grad_, const Tensor & indice
+         thrust::make_reverse_iterator(sorted_data + num_indices),
+         thrust::make_reverse_iterator(static_cast<const index_t*>(count_data) + num_indices),
+         thrust::make_reverse_iterator(count_data + num_indices),
+-        at_cuda_detail::cub::Max(),
++#if CUB_V3_PLUS()
++        ::cuda::maximum<>{},
++#else
++        NO_ROCM(at_cuda_detail)ROCM_HIPCUB(::cub)::Max(),
++#endif
+         num_indices
+       );
+     });
+diff --git a/aten/src/ATen/native/cuda/EmbeddingBag.cu b/aten/src/ATen/native/cuda/EmbeddingBag.cu
+index 97f69c1cc..1e8d515c4 100644
+--- a/aten/src/ATen/native/cuda/EmbeddingBag.cu
++++ b/aten/src/ATen/native/cuda/EmbeddingBag.cu
+@@ -35,6 +35,11 @@
+ #include <thrust/iterator/reverse_iterator.h>
+ #endif
+ 
++#if CUB_V3_PLUS()
++#include <cuda/functional>
++#include <thrust/iterator/constant_iterator.h>
++#endif
++
+ namespace at::native {
+ 
+ #if !CUB_SUPPORTS_SCAN_BY_KEY()
+@@ -136,9 +141,10 @@ __global__ void EmbeddingBag_updateOutputKernel_sum_mean(
+       accscalar_t weightFeatSum = 0;
+       int64_t bag_size_ = 0;
+       for (int64_t emb = begin; emb < end; emb++) {
+-        bool pad = (input[emb] == padding_idx);
+-        CUDA_KERNEL_ASSERT(input[emb] < numRows);
+-        const int64_t weightRow = input[emb] * weight_stride0;
++        index_t input_idx = input[emb];
++        bool pad = (input_idx == padding_idx);
++        CUDA_KERNEL_ASSERT(0 <= input_idx && input_idx < numRows);
++        const int64_t weightRow = input_idx * weight_stride0;
+         scalar_t weightValue = weightFeat[weightRow];
+         weightValue = pad ? static_cast<scalar_t>(0) : weightValue;
+         if (per_sample_weights) {
+@@ -209,7 +215,11 @@ Tensor embedding_bag_backward_cuda_sum_avg(
+       auto count_data = count.mutable_data_ptr<index_t>();
+       cuda::cub::inclusive_sum_by_key(
+         sorted_data,
+-        at_cuda_detail::cub::ConstantInputIterator<index_t>(1),
++#if CUB_V3_PLUS()
++        thrust::constant_iterator<index_t>(1),
++#else
++        NO_ROCM(at_cuda_detail)ROCM_HIPCUB(::cub)::ConstantInputIterator<index_t>(1),
++#endif
+         count_data,
+         num_indices
+       );
+@@ -221,7 +231,11 @@ Tensor embedding_bag_backward_cuda_sum_avg(
+         thrust::make_reverse_iterator(sorted_data + num_indices),
+         thrust::make_reverse_iterator(count_data + num_indices),
+         thrust::make_reverse_iterator(count_data + num_indices),
+-        at_cuda_detail::cub::Max(),
++#if CUB_V3_PLUS()
++        ::cuda::maximum<>(),
++#else
++        NO_ROCM(at_cuda_detail)ROCM_HIPCUB(::cub)::Max(),
++#endif
+         num_indices
+       );
+     });
+@@ -462,7 +476,7 @@ Tensor _embedding_bag_dense_backward_cuda(const Tensor &grad_, const Tensor &ind
+               padding_idx);
+ 
+     default:
+-      AT_ERROR(
++      TORCH_CHECK(false,
+           "Unknown mode for embedding_bag_backward_cuda ", mode);
+   }
+ }
+diff --git a/aten/src/ATen/native/cuda/Nonzero.cu b/aten/src/ATen/native/cuda/Nonzero.cu
+index e5fb9230d..46e2a4422 100644
+--- a/aten/src/ATen/native/cuda/Nonzero.cu
++++ b/aten/src/ATen/native/cuda/Nonzero.cu
+@@ -1,13 +1,13 @@
+ #define TORCH_ASSERT_ONLY_METHOD_OPERATORS
+-#include <ATen/core/Tensor.h>
+ #include <ATen/Dispatch.h>
+ #include <ATen/EmptyTensor.h>
++#include <ATen/core/Tensor.h>
+ #include <ATen/cuda/CUDAContext.h>
+-#include <c10/cuda/CUDACachingAllocator.h>
+ #include <ATen/cuda/EmptyTensor.h>
+ #include <ATen/cuda/detail/KernelUtils.h>
+-#include <ATen/cuda/detail/OffsetCalculator.cuh> //for MAX_DIMS
++#include <c10/cuda/CUDACachingAllocator.h>
+ #include <ATen/cuda/cub.cuh>
++#include <ATen/cuda/detail/OffsetCalculator.cuh> //for MAX_DIMS
+ 
+ #ifndef AT_PER_OPERATOR_HEADERS
+ #include <ATen/NativeFunctions.h>
+@@ -16,20 +16,23 @@
+ #include <ATen/ops/nonzero_native.h>
+ #endif
+ 
++#if CUB_V3_PLUS()
++#include <thrust/iterator/transform_iterator.h>
++#include <thrust/iterator/counting_iterator.h>
++#endif
+ 
+ namespace at::native {
+ 
+-namespace{
+-template<typename T>
+-struct NonZeroOp
+-{
+-    __host__ __device__ __forceinline__ bool operator()(const T& a) const {
+-      return (a!=T(0));
+-    }
++namespace {
++template <typename T>
++struct NonZeroOp {
++  __host__ __device__ __forceinline__ bool operator()(const T& a) const {
++    return (a != T(0));
++  }
+ };
+ 
+-//TODO: actually support int64_t index_t
+-template<typename index_t>
++// TODO: actually support int64_t index_t
++template <typename index_t>
+ struct TensorDims {
+   index_t sizes[MAX_DIMS];
+ };
+@@ -39,9 +42,12 @@ __global__ void write_indices(
+     int64_t* inp,
+     TensorDims<index_t> dims,
+     int ndim,
+-    index_t n) {
+-  auto index = threadIdx.x + blockIdx.x * blockDim.x;
+-  if (index < n) {
++    index_t n,
++    int64_t * total = nullptr,
++    int64_t fill_value = -1) {
++  auto index = threadIdx.x + (int64_t)blockIdx.x * blockDim.x;
++  bool cond = (total == nullptr || index < *total);
++  if (index < n && cond) {
+     index_t div = 1;
+     int64_t idx_flat = inp[index];
+ #pragma unroll
+@@ -52,89 +58,424 @@ __global__ void write_indices(
+       inp[index + dim * n] = (idx_flat / div) % dim_size;
+       div *= dim_size;
+     }
++  } else if (index < n) {
++    // 0th dim has correct values already
++    for (int dim = ndim - 1; dim > 0; dim--) {
++      inp[index + dim * n] = fill_value;
++    }
++  }
++}
++
++__global__ void write_fill_value(int64_t * inp, int64_t * total, int64_t fill_value, int64_t n){
++  int64_t total_val = *total;
++  // not aiming for vectorized stores
++
++  for (int64_t idx = total_val + (int64_t)blockIdx.x * blockDim.x + threadIdx.x; idx < n; idx += blockDim.x * gridDim.x) {
++      inp[idx] = fill_value;
++  }
++}
++
++template <int BLOCK_THREADS>
++__global__ void compute_agg(int32_t * agg, int64_t * agg_cum, uint32_t n_blocks) {
++
++  using BlockScanT = ROCM_HIPCUB(at_cuda_detail::cub)::BlockScan<int64_t, BLOCK_THREADS, ROCM_HIPCUB(at_cuda_detail::cub)::BLOCK_SCAN_WARP_SCANS>;
++  __shared__ typename BlockScanT::TempStorage temp_storage;
++  int agg_data;
++  int64_t agg_cum_data;
++  agg_data = threadIdx.x < n_blocks ? agg[threadIdx.x] : 0;
++  BlockScanT(temp_storage).InclusiveSum(agg_data, agg_cum_data);
++  if (threadIdx.x < n_blocks) {
++    agg_cum[threadIdx.x] = agg_cum_data;
++  }
++}
++
++template<int BLOCK_THREADS, int ITEMS_PER_THREAD, typename T>
++__global__ void flag_kernel(const T* d_in, int64_t * d_out, const int64_t * agg, int64_t input_nelem, int64_t output_nelem, int iters_per_cta) {
++  int64_t start_idx = BLOCK_THREADS * ITEMS_PER_THREAD * iters_per_cta * (int64_t)blockIdx.x;
++  if (start_idx >= input_nelem) return;
++  d_in += start_idx;
++
++  using BlockLoadT = ROCM_HIPCUB(at_cuda_detail::cub)::BlockLoad<int, BLOCK_THREADS, ITEMS_PER_THREAD, ROCM_HIPCUB(at_cuda_detail::cub)::BLOCK_LOAD_WARP_TRANSPOSE>;
++
++  // Specialize BlockScan type for our thread block
++  using BlockScanT = ROCM_HIPCUB(at_cuda_detail::cub)::BlockScan<int, BLOCK_THREADS, ROCM_HIPCUB(at_cuda_detail::cub)::BLOCK_SCAN_WARP_SCANS>;
++#if CUB_V3_PLUS()
++  using TransformInputIteratorT = thrust::transform_iterator<NonZeroOp<T>, const T*>;
++#else
++  using TransformInputIteratorT = ROCM_HIPCUB(at_cuda_detail::cub)::TransformInputIterator<int, NonZeroOp<T>, const T*>;
++#endif
++  using BlockExchangeT =  ROCM_HIPCUB(at_cuda_detail::cub)::BlockExchange<int, BLOCK_THREADS, ITEMS_PER_THREAD>;
++
++  // Shared memory
++  __shared__ union TempStorage
++  {
++    typename BlockLoadT::TempStorage load;
++    typename BlockScanT::TempStorage scan;
++    typename BlockExchangeT::TempStorage exchange;
++  } temp_storage;
++
++  int64_t aggregate = blockIdx.x == 0 ? 0 : agg[blockIdx.x - 1];
++  d_out += aggregate;
++
++  TransformInputIteratorT t_input_itr(d_in, NonZeroOp<T>());
++
++  // Per-thread tile data
++  int data[ITEMS_PER_THREAD];
++  int out_indices[ITEMS_PER_THREAD];
++
++  int64_t remaining =  input_nelem - start_idx;
++  int64_t out_remaining = output_nelem - aggregate;
++  for (int i=0; i<iters_per_cta; i++){
++
++  // Load items into a blocked arrangement
++    if (remaining >= BLOCK_THREADS * ITEMS_PER_THREAD) {
++      BlockLoadT(temp_storage.load).Load(t_input_itr, data);
++    } else {
++      BlockLoadT(temp_storage.load).Load(t_input_itr, data, remaining, int(0));
++    }
++
++    // Barrier for smem reuse
++    __syncthreads();
++
++    // Compute inclusive prefix sum
++    int aggregate;
++    __shared__ int aggregate_sh;
++    BlockScanT(temp_storage.scan).ExclusiveSum(data, out_indices, aggregate);
++
++    if (threadIdx.x == 0){
++      aggregate_sh = aggregate;
++    }
++
++    // Barrier for smem reuse
++    __syncthreads();
++    // striped arrangement will provide a slightly better
++    // coalescing for writes (although it's still bad because it's indirect indexing)
++    BlockExchangeT(temp_storage.exchange).BlockedToStriped(data);
++    __syncthreads();
++    BlockExchangeT(temp_storage.exchange).BlockedToStriped(out_indices);
++    for (int ii=0; ii<ITEMS_PER_THREAD; ii++){
++      if (data[ii] != 0 && out_indices[ii] < out_remaining) {
++        int64_t inp_idx = start_idx + threadIdx.x + blockDim.x * ii;
++        d_out[out_indices[ii]] = inp_idx;
++      }
++    }
++
++    out_remaining -= aggregate_sh;
++    remaining -= BLOCK_THREADS * ITEMS_PER_THREAD;
++    if (remaining <= 0 || out_remaining <= 0) return;
++    d_out += aggregate_sh;
++    t_input_itr += BLOCK_THREADS * ITEMS_PER_THREAD;
++    start_idx += BLOCK_THREADS * ITEMS_PER_THREAD;
++    __syncthreads();
+   }
++
+ }
+ 
+-} //anonymous namespace
+ 
+-template<typename scalar_t>
+-void nonzero_cuda_out_impl(const Tensor& self, Tensor& out){
++
++} // anonymous namespace
++
++template <typename scalar_t>
++void nonzero_cuda_out_impl(const Tensor& self, Tensor& out) {
+   Tensor self_ = self.contiguous();
+-  int N = self_.numel();
+   const cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+-// compute number of nonzero elements
+-  size_t temp_storage_bytes=0;
++  int64_t chunk_size, num_chunks;
++  if (self.numel() < std::numeric_limits<int>::max()) {
++    chunk_size = self.numel();
++    num_chunks = 1;
++  } else {
++    chunk_size = std::numeric_limits<int>::max() / 2 + 1; // 2**30
++    num_chunks = (self.numel() + chunk_size - 1) / chunk_size;
++  }
++  // compute number of nonzero elements
++  size_t temp_storage_bytes = 0;
+   auto& allocator = *c10::cuda::CUDACachingAllocator::get();
+-  auto num_nonzeros = allocator.allocate(sizeof(int));
+-  cub::TransformInputIterator<bool, NonZeroOp<scalar_t>, const scalar_t*> itr(self_.const_data_ptr<scalar_t>(), NonZeroOp<scalar_t>());
+-  cub::DeviceReduce::Sum(nullptr, temp_storage_bytes, itr, (int*)num_nonzeros.get(), N, stream);
+-  auto temp_storage = allocator.allocate(temp_storage_bytes);
+-  cub::DeviceReduce::Sum(temp_storage.get(), temp_storage_bytes, itr, (int*)num_nonzeros.get(), N, stream);
+-  int num_nonzeros_h;
++  auto num_nonzeros = allocator.allocate(sizeof(int) * num_chunks);
++  for (int64_t idx = 0; idx < num_chunks; idx++) {
++    int64_t remaining = std::min(chunk_size, self.numel() - idx * chunk_size);
++#if CUB_V3_PLUS()
++    thrust::transform_iterator<NonZeroOp<scalar_t>, const scalar_t*> itr(
++        self_.const_data_ptr<scalar_t>() + idx * chunk_size,
++        NonZeroOp<scalar_t>());
++#else
++    cub::TransformInputIterator<bool, NonZeroOp<scalar_t>, const scalar_t*> itr(
++        self_.const_data_ptr<scalar_t>() + idx * chunk_size,
++        NonZeroOp<scalar_t>());
++#endif
++    AT_CUDA_CHECK(cub::DeviceReduce::Sum(
++        nullptr,
++        temp_storage_bytes,
++        itr,
++        ((int*)num_nonzeros.get()) + idx,
++        remaining,
++        stream));
++    auto temp_storage = allocator.allocate(temp_storage_bytes);
++    AT_CUDA_CHECK(cub::DeviceReduce::Sum(
++        temp_storage.get(),
++        temp_storage_bytes,
++        itr,
++        ((int*)num_nonzeros.get()) + idx,
++        remaining,
++        stream));
++  }
+   auto pinned_num_nonzeros_h = at::detail::empty_cpu(
+-            {1}, /* size */
+-            c10::CppTypeToScalarType<int>(), /* dtype */
+-            std::nullopt, /* layout */
+-            std::nullopt, /* device */
+-            true, /* pin_memory */
+-            std::nullopt /* memory format */
+-          );
+-  at::cuda::memcpy_and_sync((void *)pinned_num_nonzeros_h.const_data_ptr<int>(), num_nonzeros.get(), sizeof(int), cudaMemcpyDeviceToHost, stream);
+-  num_nonzeros_h = (int)*(pinned_num_nonzeros_h.const_data_ptr<int>());
+-  //expected output size is num_nonzeros x ndim
+-  //we are producing output with size {num_nonzeros, ndim} and strides {1, num_nonzeros} (that is, transposed ndim x num_nonzeros output)
+-  //we are able to directly use passed output with this size and strides, and we can also (per contract)
+-  //resize passed output with incorrect sizes anyway we want.
+-  //However, out with correct sizes and incorrect strides will have to be copied to from the intermediate we've produced.
+-  bool need_to_copy = out.dim() == 2 && out.sizes()[0] == num_nonzeros_h && out.sizes()[1] == self.dim() && !out.t().is_contiguous();
+-  at::Tensor out_temp = need_to_copy ?
+-      Tensor(at::detail::empty_cuda({self.dim(), num_nonzeros_h}, out.options())) :
+-      out.resize_({self.dim(), num_nonzeros_h});
+-  //Scalars are expected to produce output of size (1,0), so we can't write to it
++      {num_chunks}, /* size */
++      c10::CppTypeToScalarType<int>(), /* dtype */
++      std::nullopt, /* layout */
++      std::nullopt, /* device */
++      true, /* pin_memory */
++      std::nullopt /* memory format */
++  );
++  at::cuda::memcpy_and_sync(
++      (void*)pinned_num_nonzeros_h.const_data_ptr<int>(),
++      num_nonzeros.get(),
++      sizeof(int) * num_chunks,
++      cudaMemcpyDeviceToHost,
++      stream);
++  int64_t num_nonzeros_h = 0;
++
++  for (int64_t idx = 0; idx < num_chunks; idx++) {
++    num_nonzeros_h += (int)*(pinned_num_nonzeros_h.const_data_ptr<int>() + idx);
++  }
++  // num_nonzeros_h = (int)*(pinned_num_nonzeros_h.const_data_ptr<int>());
++  // expected output size is num_nonzeros x ndim
++  // we are producing output with size {num_nonzeros, ndim} and strides {1,
++  // num_nonzeros} (that is, transposed ndim x num_nonzeros output) we are able
++  // to directly use passed output with this size and strides, and we can also
++  // (per contract) resize passed output with incorrect sizes anyway we want.
++  // However, out with correct sizes and incorrect strides will have to be
++  // copied to from the intermediate we've produced.
++  bool need_to_copy = out.dim() == 2 && out.sizes()[0] == num_nonzeros_h &&
++      out.sizes()[1] == self.dim() && !out.t().is_contiguous();
++  at::Tensor out_temp = need_to_copy
++      ? Tensor(
++            at::detail::empty_cuda({self.dim(), num_nonzeros_h}, out.options()))
++      : out.resize_({self.dim(), num_nonzeros_h});
++  // Scalars are expected to produce output of size (1,0), so we can't write to
++  // it
++  int64_t curr_nonzeros = 0;
+   if (self.dim() > 0) {
+-    cub::CountingInputIterator<int64_t> counting_itr(0);
+-    temp_storage_bytes = 0;
+-    cub::DeviceSelect::Flagged(nullptr, temp_storage_bytes, counting_itr, itr,
+-      out_temp.mutable_data_ptr<int64_t>(), (int*)num_nonzeros.get(), N, stream);
+-    temp_storage = allocator.allocate(temp_storage_bytes);
+-    cub::DeviceSelect::Flagged(temp_storage.get(), temp_storage_bytes, counting_itr, itr,
+-      out_temp.mutable_data_ptr<int64_t>(), (int*)num_nonzeros.get(), N, stream);
+-    if (num_nonzeros_h > 0 && self.dim() > 1){
+-        TensorDims<int> dims;
+-        for (int i=0; i<self.dim(); i++){
+-            dims.sizes[i] = self.sizes()[i];
+-        }
+-        const int nthreads = 256;
+-        const int nblocks = (num_nonzeros_h + nthreads -1)/nthreads;
+-        write_indices<<<nblocks, nthreads, 0, stream>>>(out_temp.mutable_data_ptr<int64_t>(),
+-        dims, self.dim(), num_nonzeros_h);
+-        C10_CUDA_KERNEL_LAUNCH_CHECK();
++    for (int64_t idx = 0; idx < num_chunks; idx++) {
++      int remaining = std::min(chunk_size, self.numel() - idx * chunk_size);
++
++#if CUB_V3_PLUS()
++      thrust::counting_iterator<int64_t> counting_itr(idx * chunk_size);
++      thrust::transform_iterator<NonZeroOp<scalar_t>, const scalar_t*>
++          itr(self_.const_data_ptr<scalar_t>() + idx * chunk_size,
++              NonZeroOp<scalar_t>());
++#else
++      cub::CountingInputIterator<int64_t> counting_itr(idx * chunk_size);
++      cub::TransformInputIterator<bool, NonZeroOp<scalar_t>, const scalar_t*>
++          itr(self_.const_data_ptr<scalar_t>() + idx * chunk_size,
++              NonZeroOp<scalar_t>());
++#endif
++      temp_storage_bytes = 0;
++      AT_CUDA_CHECK(cub::DeviceSelect::Flagged(
++          nullptr,
++          temp_storage_bytes,
++          counting_itr,
++          itr,
++          out_temp.mutable_data_ptr<int64_t>(),
++          ((int*)num_nonzeros.get()) + idx,
++          remaining,
++          stream));
++      auto temp_storage = allocator.allocate(temp_storage_bytes);
++      AT_CUDA_CHECK(cub::DeviceSelect::Flagged(
++          temp_storage.get(),
++          temp_storage_bytes,
++          counting_itr,
++          itr,
++          out_temp.mutable_data_ptr<int64_t>() + curr_nonzeros,
++          ((int*)num_nonzeros.get()) + idx,
++          remaining,
++          stream));
++      curr_nonzeros +=
++          (int)*(pinned_num_nonzeros_h.const_data_ptr<int>() + idx);
++    }
++    if (num_nonzeros_h > 0 && self.dim() > 1) {
++      TensorDims<int64_t> dims;
++      for (int i = 0; i < self.dim(); i++) {
++        dims.sizes[i] = self.sizes()[i];
++      }
++      const int nthreads = 256;
++      const int nblocks = (num_nonzeros_h + nthreads - 1) / nthreads;
++      write_indices<<<nblocks, nthreads, 0, stream>>>(
++          out_temp.mutable_data_ptr<int64_t>(),
++          dims,
++          self.dim(),
++          num_nonzeros_h);
++      C10_CUDA_KERNEL_LAUNCH_CHECK();
+     }
+   }
+   if (need_to_copy) {
+     out.copy_(out_temp.t());
+   } else {
+-    //transpose out so it is correct size
++    // transpose out so it is correct size
+     Tensor out_ = out_temp.t();
+     out.set_(out_);
+   }
+ }
+ 
+-Tensor& nonzero_out_cuda(const Tensor& self, Tensor& out){
+-  TORCH_CHECK(self.numel() < std::numeric_limits<int>::max(), "nonzero is not supported for tensors with more than INT_MAX elements, \
+-  See https://github.com/pytorch/pytorch/issues/51871");
+-  TORCH_CHECK(out.dtype() == at::kLong, "Expected object of scalar type ", at::kLong, " as out, but got ", out.dtype());
+-  TORCH_CHECK(self.device() == out.device(), "expected self and out to be on the same device, but got out on ",
+-  out.device(), " and self on ", self.device());
+-  TORCH_CHECK(self.dim() <= MAX_DIMS, "nonzero is not supported for tensor with more than ", MAX_DIMS, " dimensions");
+-  AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(at::ScalarType::ComplexHalf, at::ScalarType::Bool, at::ScalarType::BFloat16, at::ScalarType::Half,
+-    self.scalar_type(), "nonzero_cuda",
+-    [&] {nonzero_cuda_out_impl<scalar_t>(self, out);});
++template <typename scalar_t>
++void nonzero_static_cuda_out_impl(
++    const Tensor& self,
++    int64_t size,
++    int64_t fill_value,
++    Tensor& out) {
++#if defined(CUDA_VERSION) || defined(USE_ROCM)
++
++  Tensor self_contiguous_ = self.contiguous();
++  // see comment in nonzero_cuda_out_impl on reqs for out
++  bool out_correct_size =
++      out.dim() == 2 && out.sizes()[0] == size && out.sizes()[1] == self.dim();
++  bool need_to_copy = out_correct_size && !out.t().is_contiguous();
++  if (!out_correct_size) {
++    out.resize_({self.dim(), size}).t();
++  }
++  if (out.numel() == 0) return;
++  // we need to allocate temporary out to then copy to user provided out
++  at::Tensor out_temp;
++  if (need_to_copy) {
++    out_temp =
++        Tensor(at::detail::empty_cuda({self.dim(), size}, out.options())).t();
++  }
++  int64_t* out_data_ptr = need_to_copy ? out_temp.mutable_data_ptr<int64_t>()
++                                       : out.mutable_data_ptr<int64_t>();
++
++  const scalar_t * in_data_ptr = self_contiguous_.const_data_ptr<scalar_t>();
++  constexpr int BLOCK_THREADS = 512; //block_threads<sizeof(scalar_t)>();
++  constexpr int ITEMS_PER_THREAD = 16;
++  auto grid_size = (self.numel() + BLOCK_THREADS * ITEMS_PER_THREAD - 1) / (BLOCK_THREADS * ITEMS_PER_THREAD);
++  const int64_t num_sms = at::cuda::getCurrentDeviceProperties()->multiProcessorCount;
++  int64_t target_blocks = sizeof(scalar_t) == 1 ? 2 * num_sms : num_sms;
++  const int iters_per_cta = (grid_size + target_blocks - 1)/target_blocks;
++  grid_size = (self.numel() + iters_per_cta * BLOCK_THREADS * ITEMS_PER_THREAD - 1) / (iters_per_cta * BLOCK_THREADS * ITEMS_PER_THREAD);
++  auto& allocator = *c10::cuda::CUDACachingAllocator::get();
++  auto agg = allocator.allocate(grid_size * sizeof(int));
++  at::cuda::cub::calc_block_sums<BLOCK_THREADS, ITEMS_PER_THREAD, true>
++  <<<grid_size, BLOCK_THREADS, 0, at::cuda::getCurrentCUDAStream()>>>(
++    in_data_ptr, (int*)agg.get(), self.numel(), iters_per_cta);
++  C10_CUDA_KERNEL_LAUNCH_CHECK();
++  auto agg_cum = allocator.allocate(grid_size * sizeof(int64_t));
++  // computing partial sums in int64 in the flag kernel
++  // leads to 20-30% slowdown, so compute them in a separate 2 us kernel
++  compute_agg<BLOCK_THREADS><<<1, BLOCK_THREADS, 0, at::cuda::getCurrentCUDAStream()>>>(
++   (int*)agg.get(), (int64_t*)agg_cum.get(), grid_size
++  );
++  C10_CUDA_KERNEL_LAUNCH_CHECK();
++  flag_kernel<BLOCK_THREADS, ITEMS_PER_THREAD>
++  <<<grid_size, BLOCK_THREADS, 0, at::cuda::getCurrentCUDAStream()>>>(
++    in_data_ptr, out_data_ptr, (int64_t*)agg_cum.get(), self.numel(), size, iters_per_cta);
++  C10_CUDA_KERNEL_LAUNCH_CHECK();
++  int64_t out_grid = std::min(num_sms, (size + BLOCK_THREADS - 1)/BLOCK_THREADS);
++  write_fill_value<<<out_grid, BLOCK_THREADS, 0, at::cuda::getCurrentCUDAStream()>>>(out_data_ptr, (int64_t *)agg_cum.get() + grid_size - 1, fill_value, size);
++  if (self.dim() > 1) {
++    TensorDims<int64_t> dims;
++    for (int i = 0; i < self.dim(); i++) {
++      dims.sizes[i] = self.sizes()[i];
++    }
++    const int nthreads = 256;
++    const int nblocks = (size + nthreads - 1) / nthreads;
++    write_indices<<<nblocks, nthreads, 0, at::cuda::getCurrentCUDAStream()>>>(
++        out_data_ptr,
++        dims,
++        self.dim(),
++        size,
++        (int64_t *)agg_cum.get() + grid_size - 1,
++        fill_value);
++    C10_CUDA_KERNEL_LAUNCH_CHECK();
++  }
++  if (need_to_copy) {
++    out.copy_(out_temp);
++  }
++#else
++  TORCH_CHECK(false, "Nonzero_static is not supported for cuda <= 11.4");
++#endif
++}
++
++Tensor& nonzero_out_cuda(const Tensor& self, Tensor& out) {
++  TORCH_CHECK(
++      out.dtype() == at::kLong,
++      "Expected object of scalar type ",
++      at::kLong,
++      " as out, but got ",
++      out.dtype());
++  TORCH_CHECK(
++      self.device() == out.device(),
++      "expected self and out to be on the same device, but got out on ",
++      out.device(),
++      " and self on ",
++      self.device());
++  TORCH_CHECK(
++      self.dim() <= MAX_DIMS,
++      "nonzero is not supported for tensor with more than ",
++      MAX_DIMS,
++      " dimensions");
++  AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(
++      at::ScalarType::ComplexHalf,
++      at::ScalarType::Bool,
++      at::ScalarType::BFloat16,
++      at::ScalarType::Half,
++      self.scalar_type(),
++      "nonzero_cuda",
++      [&] { nonzero_cuda_out_impl<scalar_t>(self, out); });
+   return out;
+ }
+ 
+-Tensor nonzero_cuda(const Tensor& self){
++Tensor nonzero_cuda(const Tensor& self) {
+   Tensor out = at::detail::empty_cuda({0}, self.options().dtype(kLong));
+   return at::native::nonzero_out_cuda(self, out);
+ }
+-} //namespace at::native
++
++Tensor& nonzero_static_out_cuda(
++    const Tensor& self,
++    int64_t size,
++    int64_t fill_value,
++    Tensor& out) {
++  TORCH_CHECK(
++      out.dtype() == at::kLong,
++      "nonzero_static: Expected out tensor to have scalar type ",
++      at::kLong,
++      " but got ",
++      out.dtype());
++  TORCH_CHECK(
++      self.device() == out.device(),
++      "expected self and out to be on the same device, but got out on ",
++      out.device(),
++      " and self on ",
++      self.device());
++  TORCH_CHECK(
++      self.dim() <= MAX_DIMS,
++      "nonzero_static is not supported for tensor with more than ",
++      MAX_DIMS,
++      " dimensions");
++  TORCH_CHECK(
++      size >= 0, "nonzero_static: 'size' must be an non-negative integer"
++  )
++  AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(
++      at::ScalarType::ComplexHalf,
++      at::ScalarType::Bool,
++      at::ScalarType::BFloat16,
++      at::ScalarType::Half,
++      self.scalar_type(),
++      "nonzero_cuda",
++      [&] {
++        nonzero_static_cuda_out_impl<scalar_t>(self, size, fill_value, out);
++      });
++  return out;
++}
++
++Tensor nonzero_static_cuda(
++    const Tensor& self,
++    int64_t size,
++    int64_t fill_value) {
++  TORCH_CHECK(
++      size >= 0, "nonzero_static: 'size' must be an non-negative integer"
++  )
++  Tensor out = Tensor(at::detail::empty_cuda(
++                          {self.dim(), size}, self.options().dtype(kLong)))
++                   .t();
++  return at::native::nonzero_static_out_cuda(self, size, fill_value, out);
++}
++
++} // namespace at::native
+diff --git a/aten/src/ATen/native/cuda/TensorTopK.cu b/aten/src/ATen/native/cuda/TensorTopK.cu
+index d06efa663..fbd6ea666 100644
+--- a/aten/src/ATen/native/cuda/TensorTopK.cu
++++ b/aten/src/ATen/native/cuda/TensorTopK.cu
+@@ -17,6 +17,11 @@
+ 
+ #include <c10/macros/Macros.h>
+ 
++#if CUB_V3_PLUS()
++#include <thrust/iterator/transform_iterator.h>
++#include <thrust/iterator/counting_iterator.h>
++#endif
++
+ using namespace at::native;
+ 
+ namespace at::native {
+@@ -249,21 +254,15 @@ C10_LAUNCH_BOUNDS_1(BLOCK_THREADS)
+ __global__ void radixFindKthValues(
+     at::cuda::detail::TensorInfo<const T, IndexType> input,
+     uint32_t slice_size,
+-    uint32_t* ks_to_find,  // size: num_slices
+-
++    uint32_t* ks_to_find,  // size: num_slices, unused arg but for mysterious reasons perf is better when it's present
+     uint32_t num_slices,
+     IndexType withinSliceStride,
+-
+     int current_bit,
+     int items_per_thread,
+     uint32_t blocks_per_slice,
+     Bitwise desiredMask,
+-
+-    // outputs
+-    uint32_t* semaphores,  // size: num_slices
+     Bitwise* desires,      // size: num_slices
+-    short* counts,         // size: num_slices * blocks_per_slice * radix_digits
+-    T* kthValues           // size: num_slices, only write when current_bit reaches 0
++    short* counts         // size: num_slices * blocks_per_slice * radix_digits
+   ) {
+ 
+   int items_per_block = items_per_thread * BLOCK_THREADS;
+@@ -276,17 +275,13 @@ __global__ void radixFindKthValues(
+   }
+ 
+   Bitwise desired = desires[slice_idx];
+-  uint32_t k_to_find = ks_to_find[slice_idx];
+   IndexType slice_start_index = at::cuda::detail::IndexToOffset<const T, IndexType, Dim>::get(slice_idx, input);
+   const T* data = &input.data[slice_start_index];
+ 
+-  typedef cub::BlockScan<uint32_t, BLOCK_THREADS> BlockScan;
+   static_assert(MAX_ITEMS_PER_THREAD * BLOCK_THREADS < std::numeric_limits<short>::max(),
+     "blockwise counter too large");
+   union __align__(16) TempStorage {
+     uint32_t digit_counters[RADIX_DIGITS];
+-    uint32_t digit_count_cumsum[RADIX_DIGITS]; // only used if this it the last block for this slice
+-    typename BlockScan::TempStorage scan_storage;
+   };
+   __shared__ TempStorage temp_storage;
+ 
+@@ -329,33 +324,48 @@ __global__ void radixFindKthValues(
+   if (tidx < RADIX_DIGITS) {
+     counts[block_idx * RADIX_DIGITS + tidx] = digit_count;
+   }
+-  // if blocks_per_slice == 1, there is no need to do cross-block reduction
+-  // in this case we use counts saved at registers directly
+-  if (blocks_per_slice > 1) {
+-    __threadfence(); // make sure writes are globally visible
+-    __syncthreads(); // make sure all writes are finished before update semaphores
+-  }
+-
+-  // the last block of each slice accumulates counters from multiple blocks and updates desired and ks_to_find
+-  __shared__ bool s_is_last_block_done;
+-
+-  if (tidx == 0) {
+-    if (blocks_per_slice == 1) {
+-      s_is_last_block_done = true;
+-    } else {
+-      uint32_t blocks_finished_old = atomicAdd(&semaphores[slice_idx], 1);
+-      s_is_last_block_done = (blocks_finished_old == blocks_per_slice - 1);
+-    }
+-  }
++}
+ 
+-  __syncthreads();
++// Assumption: k can not be larger than UINT32_MAX
++template <typename Bitwise, typename T>
++C10_LAUNCH_BOUNDS_1(RADIX_DIGITS)  // one thread per digit
++__global__ void computeBlockwiseWithinKCounts(
++  Bitwise* desires_in,          // size: num_slices
++  short* counts,             // size: num_slices * blocks_per_slice * radix_digits
++  uint32_t* ks_to_find_in,  // size: num_slices
++  uint32_t blocks_per_slice,
++  int current_bit,
++  bool largest,
++  // outputs:
++  uint32_t* withinKCounts,  // size: num_slices * blocks_per_slice == num_blocks
++  T* kthValues,           // size: num_slices, only write when current_bit reaches 0
++  uint32_t* ks_to_find_out,
++  Bitwise* desires_out,
++  uint32_t num_blocks
++) {
++  // This kernel should be launched with the same number of blocks as the `radixFindKthValues` kernel.
++  int tidx = threadIdx.x;
++  uint32_t block_idx = getLinearBlockId<uint32_t>();
++  uint32_t slice_idx = block_idx / blocks_per_slice;
+ 
+-  if (!s_is_last_block_done)
++  // The grid is computed from `getGridFromTiles`, when there are lots of
++  // elements, we will use both blockIdx.x and blockIdx.y, and maybe blockIdx.z
++  // when this is the case, the number of blocks that we are launching can be
++  // more than the number of blocks we need. So we need to check the range of
++  // `block_idx`.
++  if (block_idx >= num_blocks) {
+     return;
++  }
++  typedef cub::BlockScan<uint32_t, BLOCK_THREADS> BlockScan;
++  union __align__(16) TempStorage {
++    uint32_t digit_count_cumsum[RADIX_DIGITS]; // only used if this it the last block for this slice
++    typename BlockScan::TempStorage scan_storage;
++  };
++  __shared__ TempStorage temp_storage;
+ 
+   // accumulates counters from multiple blocks
+-  if (tidx < RADIX_DIGITS && blocks_per_slice > 1) {
+-    digit_count = 0;
++  uint32_t digit_count = 0;
++  if (tidx < RADIX_DIGITS) {
+     for (int blk = 0; blk < blocks_per_slice; ++blk) {
+       digit_count += counts[(slice_idx * blocks_per_slice + blk) * RADIX_DIGITS + tidx];
+     }
+@@ -371,57 +381,35 @@ __global__ void radixFindKthValues(
+   }
+   __syncthreads();
+ 
++  __shared__ Bitwise desired;
++  uint32_t k_to_find = ks_to_find_in[slice_idx];
++
+   if (tidx < RADIX_DIGITS) {
+     uint32_t digit_count_cumsum_left = (tidx == 0) ? 0 : temp_storage.digit_count_cumsum[tidx - 1];
+ 
+     // if not the last pass: update desired and ks_to_find
+     // if last pass: write out the kth value
++    // only one thread in block enters this condition
+     if (digit_count_cumsum_left < k_to_find && k_to_find <= digit_count_cumsum) {
++      desired = desires_in[slice_idx];
+       desired = at::cuda::Bitfield<Bitwise>::setBitfield(desired, tidx, current_bit, RADIX_BITS);
+-      desires[slice_idx] = desired;
+-      if (current_bit > 0) {
+-        ks_to_find[slice_idx] = k_to_find - digit_count_cumsum_left;
+-      } else {
+-        kthValues[slice_idx] = TopKTypeConfig<T>::deconvert(desired);
++      // let a single block per slice update the values
++      if (block_idx == slice_idx * blocks_per_slice) {
++        desires_out[slice_idx] = desired;
++        if (current_bit > 0) {
++          ks_to_find_out[slice_idx] = k_to_find - digit_count_cumsum_left;
++        } else {
++          kthValues[slice_idx] = TopKTypeConfig<T>::deconvert(desired);
++        }
+       }
+     }
+   }
++  __syncthreads();
+ 
+-  // reset semaphores for the next pass
+-  if (tidx == 0) {
+-    semaphores[slice_idx] = 0;
+-  }
+-}
+-
+-#if CUB_SUPPORTS_SCAN_BY_KEY()
+-// Assumption: k can not be larger than UINT32_MAX
+-template <typename Bitwise>
+-C10_LAUNCH_BOUNDS_1(RADIX_DIGITS)  // one thread per digit
+-__global__ void computeBlockwiseWithinKCounts(
+-  Bitwise* desires,          // size: num_slices
+-  short* counts,             // size: num_slices * blocks_per_slice * radix_digits
+-  uint32_t blocks_per_slice,
+-  int current_bit,
+-  bool largest,
+-  // outputs:
+-  uint32_t* withinKCounts,  // size: num_slices * blocks_per_slice == num_blocks
+-  uint32_t num_blocks
+-) {
+-  // This kernel should be launched with the same number of blocks as the `radixFindKthValues` kernel.
+-  int tidx = threadIdx.x;
+-  uint32_t block_idx = getLinearBlockId<uint32_t>();
+-  uint32_t slice_idx = block_idx / blocks_per_slice;
+-
+-  // The grid is computed from `getGridFromTiles`, when there are lots of
+-  // elements, we will use both blockIdx.x and blockIdx.y, and maybe blockIdx.z
+-  // when this is the case, the number of blocks that we are launching can be
+-  // more than the number of blocks we need. So we need to check the range of
+-  // `block_idx`.
+-  if (block_idx >= num_blocks) {
+-    return;
+-  }
++#if !CUB_SUPPORTS_SCAN_BY_KEY()
++  return;
++#endif
+ 
+-  Bitwise desired = doLdg(desires + slice_idx);
+   Bitwise desired_digit = at::cuda::Bitfield<Bitwise>::getBitfield(desired, current_bit, RADIX_BITS);
+ 
+   // if largest, then only threads that has tidx > desired_digit are active
+@@ -473,6 +461,7 @@ __global__ void computeBlockwiseWithinKCounts(
+   }
+ }
+ 
++#if CUB_SUPPORTS_SCAN_BY_KEY()
+ // Assumption: slice_size can not be larger than UINT32_MAX
+ template <typename Bitwise>
+ __global__ void computeBlockwiseKthCounts(
+@@ -612,17 +601,8 @@ int get_items_per_thread(uint64_t num_slices, uint64_t slice_size) {
+   constexpr int REGS_PER_BLOCK = REGS_PER_THREAD * BLOCK_THREADS;
+   cudaDeviceProp* prop = at::cuda::getCurrentDeviceProperties();
+   int mpc = prop->multiProcessorCount;
+-#if defined(USE_ROCM)
+-  int regs_per_mp = prop->regsPerBlock;
+-  int max_blocks_per_mp = 32;
+-#else
+   int regs_per_mp = prop->regsPerMultiprocessor;
+-#if !defined(USE_ROCM)
+   int max_blocks_per_mp = prop->maxBlocksPerMultiProcessor;
+-#else
+-  int max_blocks_per_mp = 32;
+-#endif
+-#endif
+   int blocks_per_mp = std::min(regs_per_mp / REGS_PER_BLOCK, max_blocks_per_mp);
+   int64_t items_per_thread = at::ceil_div((int64_t)(slice_size * num_slices), (int64_t)(mpc * blocks_per_mp * BLOCK_THREADS));
+   items_per_thread = std::max(MIN_ITEMS_PER_THREAD, std::min((int)items_per_thread, MAX_ITEMS_PER_THREAD)); // clamp to (4, 64)
+@@ -674,14 +654,14 @@ void launch(
+   uint32_t* semaphores = reinterpret_cast<uint32_t*>(semaphores_buffer.get());
+   AT_CUDA_CHECK(cudaMemsetAsync(semaphores, 0, numInputSlices * sizeof(uint32_t), stream));
+ 
+-  auto ks_to_find_buffer = allocator.allocate(numInputSlices * sizeof(uint32_t));
++  auto ks_to_find_buffer = allocator.allocate(2 * numInputSlices * sizeof(uint32_t));
+   uint32_t* ks_to_find = reinterpret_cast<uint32_t*>(ks_to_find_buffer.get());
+   uint32_t k_to_find = largest ? inputSliceSize - outputSliceSize + 1: outputSliceSize;
+   fill<uint32_t><<<std::min(((int64_t)numInputSlices + 511) / 512, (int64_t)1073741824), 512, 0, stream>>>(
+     ks_to_find, k_to_find, numInputSlices);
+   C10_CUDA_KERNEL_LAUNCH_CHECK();
+ 
+-  auto desired_buffer = allocator.allocate(numInputSlices * sizeof(Bitwise));
++  auto desired_buffer = allocator.allocate(2 * numInputSlices * sizeof(Bitwise));
+   Bitwise* desired = reinterpret_cast<Bitwise*>(desired_buffer.get());
+ 
+   auto counts_buffer = allocator.allocate(num_blocks * RADIX_DIGITS * sizeof(short));
+@@ -696,6 +676,8 @@ void launch(
+ 
+   auto kthCounts_buffer = allocator.allocate(num_blocks * sizeof(uint32_t));
+   uint32_t* kthCounts = reinterpret_cast<uint32_t*>(kthCounts_buffer.get());
++#else
++  uint32_t* withinKCounts = nullptr;
+ #endif
+ 
+   Bitwise desiredMask = 0;
+@@ -703,38 +685,54 @@ void launch(
+   TORCH_INTERNAL_ASSERT(getGridFromTiles(num_blocks, grid), "Too many slices for topk");
+   dim3 block(BLOCK_THREADS);
+ 
++  uint32_t * ks_to_find_in = ks_to_find;
++  uint32_t * ks_to_find_out = ks_to_find + numInputSlices;
++  Bitwise * desired_in = desired;
++  Bitwise * desired_out = desired + numInputSlices;
++
+   // iterate radix bits for multiple passes
+   for (int current_bit = sizeof(T) * 8 - RADIX_BITS; current_bit >= 0; current_bit -= RADIX_BITS) {
+     radixFindKthValues<T, IndexType, Bitwise, Dim><<<grid, block, 0, stream>>>(
+         input,
+         inputSliceSize,
+-        ks_to_find,
++        ks_to_find_in, // unused arg
+         numInputSlices,
+         inputWithinSliceStride,
+         current_bit,
+         items_per_thread,
+         blocks_per_slice,
+         desiredMask,
+-        semaphores,
+-        desired,
+-        counts,
+-        kthValues);
++        desired_in,
++        counts);
+     C10_CUDA_KERNEL_LAUNCH_CHECK();
+-#if CUB_SUPPORTS_SCAN_BY_KEY()
+-    computeBlockwiseWithinKCounts<Bitwise><<<grid, RADIX_DIGITS, 0, stream>>>(
+-      desired, counts, blocks_per_slice, current_bit, largest, withinKCounts, num_blocks);
++    // we unconditionally call this kernel to update desired/ks_to_find/kthValues
++    // if cub supports scan_by_key we additionally do k counts
++    computeBlockwiseWithinKCounts<Bitwise, T><<<grid, RADIX_DIGITS, 0, stream>>>(
++      desired_in, counts, ks_to_find_in, blocks_per_slice, current_bit, largest, withinKCounts, kthValues, ks_to_find_out, desired_out, num_blocks);
+     C10_CUDA_KERNEL_LAUNCH_CHECK();
+-#endif
++    // swap desired/ks_to_find in and out for next iter
++    auto tmp_desired = desired_in;
++    desired_in = desired_out;
++    desired_out = tmp_desired;
++    auto tmp_ks = ks_to_find_in;
++    ks_to_find_in = ks_to_find_out;
++    ks_to_find_out = tmp_ks;
+     desiredMask = at::cuda::Bitfield<Bitwise>::setBitfield(desiredMask, RADIX_MASK, current_bit, RADIX_BITS);
+   }
++  desired = desired_in;
+ 
+ #if CUB_SUPPORTS_SCAN_BY_KEY()
+   computeBlockwiseKthCounts<Bitwise><<<std::min(((int64_t)numInputSlices + 255) / 256, (int64_t)1073741824), 256, 0, stream>>>(
+     desired, counts, num_blocks, blocks_per_slice, kthCounts);
+   C10_CUDA_KERNEL_LAUNCH_CHECK();
+   // Do a prefix scan of withinKCounts and kthCounts using slice_idx as keys to get the starting index of each block
++#if CUB_V3_PLUS()
++  using counting_iter_t = thrust::counting_iterator<uint32_t, uint32_t>;
++  using slice_idx_iter_t = thrust::transform_iterator<BlockIdxToKey, counting_iter_t>;
++#else
+   using counting_iter_t = cub::CountingInputIterator<uint32_t, uint32_t>;
+   using slice_idx_iter_t = cub::TransformInputIterator<uint32_t, BlockIdxToKey, counting_iter_t>;
++#endif
+   slice_idx_iter_t slice_idx_iter(counting_iter_t(0), BlockIdxToKey(blocks_per_slice));
+   at::cuda::cub::inclusive_sum_by_key(slice_idx_iter, withinKCounts, withinKCounts, num_blocks);
+   at::cuda::cub::inclusive_sum_by_key(slice_idx_iter, kthCounts, kthCounts, num_blocks);
+diff --git a/aten/src/ATen/native/cuda/UniqueCub.cu b/aten/src/ATen/native/cuda/UniqueCub.cu
+index bbd8673bc..259e05d22 100644
+--- a/aten/src/ATen/native/cuda/UniqueCub.cu
++++ b/aten/src/ATen/native/cuda/UniqueCub.cu
+@@ -16,6 +16,11 @@
+ #include <ATen/ops/empty.h>
+ #endif
+ 
++#if CUB_V3_PLUS()
++#include <cuda/std/functional>
++#include <thrust/iterator/transform_iterator.h>
++#endif
++
+ namespace at::native::internal {
+ 
+ namespace {
+@@ -54,8 +59,13 @@ struct LoadBoolOp {
+ auto wrap_input_iterator(const bool *data) {
+   // See NOTE [Loading boolean values]
+   LoadBoolOp op;
++#if CUB_V3_PLUS()
++  return thrust::transform_iterator<LoadBoolOp, const uint8_t*, int>(
++      reinterpret_cast<const uint8_t*>(data), op);
++#else
+   return NO_ROCM(at_cuda_detail)::cub::TransformInputIterator<bool, LoadBoolOp, const uint8_t*, int>(
+       reinterpret_cast<const uint8_t*>(data), op);
++#endif
+ }
+ 
+ // A variation of compute_unique (defined in Unique.cu) that doesn't allow
+@@ -259,10 +269,17 @@ struct UniqueCub<bool> {
+ 
+     const bool* self_data = self.const_data_ptr<bool>();
+     MapNumberOfTrueValues op;
++#if CUB_V3_PLUS()
++    thrust::transform_iterator<MapNumberOfTrueValues, const uint8_t*, int>
++        data_iter(reinterpret_cast<const uint8_t*>(self_data), op);
++    at::cuda::cub::reduce(data_iter, tmp_num_true.get(), num_inp,
++                          ::cuda::std::plus<>{}, 0);
++#else
+     NO_ROCM(at_cuda_detail)::cub::TransformInputIterator<int, MapNumberOfTrueValues, const uint8_t*, int>
+         data_iter(reinterpret_cast<const uint8_t*>(self_data), op);
+     at::cuda::cub::reduce(data_iter, tmp_num_true.get(), num_inp,
+                           NO_ROCM(at_cuda_detail)::cub::Sum{}, 0);
++#endif
+ 
+     auto options = self.options();
+     output = at::empty({2}, self.options());
+@@ -339,6 +356,7 @@ INSTANTIATE_UNIQUE_CUDA_TEMPLATE(uint32_t);
+ INSTANTIATE_UNIQUE_CUDA_TEMPLATE(uint64_t);
+ INSTANTIATE_UNIQUE_CUDA_TEMPLATE(uint16_t);
+ INSTANTIATE_UNIQUE_CUDA_TEMPLATE(bool);
++INSTANTIATE_UNIQUE_CUDA_TEMPLATE(BFloat16);
+ INSTANTIATE_UNIQUE_CUDA_TEMPLATE(at::Half);
+ 
+ #undef INSTANTIATE
+diff --git a/cmake/Dependencies.cmake b/cmake/Dependencies.cmake
+index 5d3e08bf5..9e99f80a1 100644
+--- a/cmake/Dependencies.cmake
++++ b/cmake/Dependencies.cmake
+@@ -1138,7 +1138,7 @@ if(USE_UCC)
+ endif()
+ 
+ # ---[ CUB
+-if(USE_CUDA)
++if(USE_CUDA AND CUDA_VERSION VERSION_LESS 13.0)
+   find_package(CUB)
+   if(NOT CUB_FOUND)
+     message(FATAL_ERROR "Cannot find CUB.")
+diff --git a/third_party/tensorpipe/tensorpipe/channel/cuda_ipc/context_impl.cc b/third_party/tensorpipe/tensorpipe/channel/cuda_ipc/context_impl.cc
+index 69db487d0..177eb1076 100644
+--- a/third_party/tensorpipe/tensorpipe/channel/cuda_ipc/context_impl.cc
++++ b/third_party/tensorpipe/tensorpipe/channel/cuda_ipc/context_impl.cc
+@@ -233,7 +233,9 @@ std::shared_ptr<ContextImpl> ContextImpl::create() {
+ 
+     // The other two compute modes are "exclusive" and "prohibited", both of
+     // which prevent access from an other process.
+-    if (props.computeMode != cudaComputeModeDefault) {
++    int computeMode;
++    TP_CUDA_CHECK(cudaDeviceGetAttribute(&computeMode, cudaDevAttrComputeMode, device.index));
++    if (computeMode != cudaComputeModeDefault) {
+       TP_VLOG(4) << "CUDA IPC channel is not viable because CUDA device "
+                  << device.index << " is not in default compute mode";
+       return nullptr;
+diff --git a/torch/csrc/profiler/stubs/cuda.cpp b/torch/csrc/profiler/stubs/cuda.cpp
+index 5ade5379d..649e5623c 100644
+--- a/torch/csrc/profiler/stubs/cuda.cpp
++++ b/torch/csrc/profiler/stubs/cuda.cpp
+@@ -3,7 +3,7 @@
+ #ifdef TORCH_CUDA_USE_NVTX3
+ #include <nvtx3/nvtx3.hpp>
+ #else
+-#include <nvToolsExt.h>
++#include <nvtx3/nvToolsExt.h>
+ #endif
+ 
+ #include <c10/cuda/CUDAGuard.h>
+-- 
+2.34.1
+
