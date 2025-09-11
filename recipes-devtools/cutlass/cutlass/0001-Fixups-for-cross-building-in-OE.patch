@@ -1,15 +1,17 @@
-From dfc2e61a0ff83a6abf3e6db69903a1ff2d79d6ea Mon Sep 17 00:00:00 2001
+From b267aa0f9166a1a50e0b4e3439ee6be69ef32ae8 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Mon, 28 Apr 2025 10:55:04 +0100
+Date: Thu, 11 Sep 2025 16:36:47 +0100
 Subject: [PATCH] Fixups for cross building in OE
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt                 | 23 -----------------------
- cmake/googletest.cmake         | 24 +-----------------------
- python/cutlass/emit/pytorch.py |  5 -----
- 3 files changed, 1 insertion(+), 51 deletions(-)
+ CMakeLists.txt                        | 23 -----------------------
+ cmake/googletest.cmake                | 24 +-----------------------
+ include/cutlass/cuda_host_adapter.hpp |  2 +-
+ include/cutlass/platform/platform.h   | 10 +++++-----
+ python/cutlass/emit/pytorch.py        |  5 -----
+ 5 files changed, 7 insertions(+), 57 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
 index 7419bdf5..5fd29087 100755
@@ -53,7 +55,7 @@ index 7419bdf5..5fd29087 100755
  
  include(CTest)
 diff --git a/cmake/googletest.cmake b/cmake/googletest.cmake
-index 0350fb2d..f675eb03 100644
+index 0350fb2d..97ecac3b 100644
 --- a/cmake/googletest.cmake
 +++ b/cmake/googletest.cmake
 @@ -26,26 +26,4 @@
@@ -83,7 +85,57 @@ index 0350fb2d..f675eb03 100644
 -  endif()
 -  add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR} EXCLUDE_FROM_ALL)
 -endif()
-+find_package(GTest 1.16.0 REQUIRED)
++find_package(GTest REQUIRED)
+diff --git a/include/cutlass/cuda_host_adapter.hpp b/include/cutlass/cuda_host_adapter.hpp
+index f9ff723c..f0196ff1 100644
+--- a/include/cutlass/cuda_host_adapter.hpp
++++ b/include/cutlass/cuda_host_adapter.hpp
+@@ -99,7 +99,7 @@ namespace cutlass {
+ 
+ #else // defined(CUTLASS_ENABLE_DIRECT_CUDA_DRIVER_CALL)
+ 
+-#if (__CUDACC_VER_MAJOR__ >= 12 && __CUDACC_VER_MINOR__ >= 5)
++#if (__CUDACC_VER_MAJOR__ > 12  || (__CUDACC_VER_MAJOR__ == 12 && __CUDACC_VER_MINOR__ >= 5))
+ 
+ #define CUTLASS_CUDA_DRIVER_WRAPPER_DECL(func, ver)             \
+   template <typename... Args>                                   \
+diff --git a/include/cutlass/platform/platform.h b/include/cutlass/platform/platform.h
+index e6a445ea..7ca86605 100644
+--- a/include/cutlass/platform/platform.h
++++ b/include/cutlass/platform/platform.h
+@@ -605,11 +605,11 @@ struct alignment_of<float4> {
+   enum { value = 16 };
+ };
+ template <>
+-struct alignment_of<long4> {
++struct alignment_of<long4_32a> {
+   enum { value = 16 };
+ };
+ template <>
+-struct alignment_of<ulong4> {
++struct alignment_of<ulong4_32a> {
+   enum { value = 16 };
+ };
+ template <>
+@@ -625,15 +625,15 @@ struct alignment_of<double2> {
+   enum { value = 16 };
+ };
+ template <>
+-struct alignment_of<longlong4> {
++struct alignment_of<longlong4_32a> {
+   enum { value = 16 };
+ };
+ template <>
+-struct alignment_of<ulonglong4> {
++struct alignment_of<ulonglong4_32a> {
+   enum { value = 16 };
+ };
+ template <>
+-struct alignment_of<double4> {
++struct alignment_of<double4_32a> {
+   enum { value = 16 };
+ };
+ 
 diff --git a/python/cutlass/emit/pytorch.py b/python/cutlass/emit/pytorch.py
 index ac13e866..75acfb6c 100644
 --- a/python/cutlass/emit/pytorch.py

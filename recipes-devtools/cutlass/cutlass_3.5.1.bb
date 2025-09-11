@@ -37,5 +37,7 @@ PACKAGES += "${PN}-test"
 FILES:${PN}-dev += "${includedir}/41_fused_multi_head_attention"
 FILES:${PN}-test += "${prefix}/test"
 
-INSANE_SKIP:${PN} = "dev-deps buildpaths"
-INSANE_SKIP:${PN}-dev = "dev-elf"
+SOLIBS = "*.so*"
+FILES_SOLIBSDEV = ""
+
+INSANE_SKIP:${PN} = "buildpaths"
