@@ -1,19 +1,43 @@
-From fcc6c2b7974a42ac8f9466e1cd8e29bb4734c9c6 Mon Sep 17 00:00:00 2001
-From: Matt Madison <matt@madison.systems>
-Date: Sat, 19 Oct 2024 08:02:15 -0700
+From 145eb3450621515a6328a7c1a0d8a400015e2526 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 15 Sep 2025 15:37:06 +0100
 Subject: [PATCH] OE cross-build fixups
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Matt Madison <matt@madison.systems>
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- cuda/setup.py | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+ cuda_bindings/pyproject.toml |  4 ++--
+ cuda_bindings/setup.py       | 15 ++-------------
+ 2 files changed, 4 insertions(+), 15 deletions(-)
 
-diff --git a/cuda/setup.py b/cuda/setup.py
-index ec52362..12565e5 100644
---- a/cuda/setup.py
-+++ b/cuda/setup.py
-@@ -155,26 +155,15 @@ for file in input_files:
+diff --git a/cuda_bindings/pyproject.toml b/cuda_bindings/pyproject.toml
+index d78d8f37..aab1dbac 100644
+--- a/cuda_bindings/pyproject.toml
++++ b/cuda_bindings/pyproject.toml
+@@ -2,7 +2,7 @@
+ # SPDX-License-Identifier: LicenseRef-NVIDIA-SOFTWARE-LICENSE
+ 
+ [build-system]
+-requires = ["setuptools>=77.0.0", "cython>=3.0,<3.1.0", "pyclibrary>=0.1.7"]
++requires = ["setuptools>=77.0.0", "cython>=3.0,<=3.1.2", "pyclibrary>=0.1.7"]
+ build-backend = "setuptools.build_meta"
+ 
+ [project]
+@@ -41,7 +41,7 @@ all = [
+ ]
+ 
+ test = [
+-    "cython>=3.0,<3.1.0",
++    "cython>=3.0,<=3.1.2",
+     "setuptools>=77.0.0",
+     "numpy>=1.21.1",
+     "pytest>=6.2.4",
+diff --git a/cuda_bindings/setup.py b/cuda_bindings/setup.py
+index 4ba35760..b305815b 100644
+--- a/cuda_bindings/setup.py
++++ b/cuda_bindings/setup.py
+@@ -234,26 +234,15 @@ for file in input_files:
  # Prepare compile arguments
  
  # For Cython
@@ -26,19 +50,22 @@ index ec52362..12565e5 100644
  
  extra_compile_args = []
  extra_cythonize_kwargs = {}
- if sys.platform != 'win32':
+ if sys.platform != "win32":
      extra_compile_args += [
--        '-std=c++14',
-         '-fpermissive',
--        '-Wno-deprecated-declarations',
--        '-D _GLIBCXX_ASSERTIONS',
--        '-fno-var-tracking-assignments'
+-        "-std=c++14",
+         "-fpermissive",
+-        "-Wno-deprecated-declarations",
+-        "-D _GLIBCXX_ASSERTIONS",
+-        "-fno-var-tracking-assignments",
      ]
--    if '--debug' in sys.argv:
--        extra_cythonize_kwargs['gdb_debug'] = True
--        extra_compile_args += ['-g', '-O0']
+-    if "--debug" in sys.argv:
+-        extra_cythonize_kwargs["gdb_debug"] = True
+-        extra_compile_args += ["-g", "-O0"]
 -    else:
--        extra_compile_args += ['-O3']
+-        extra_compile_args += ["-O3"]
  
  # For Setup
  extensions = []
+-- 
+2.34.1
+
