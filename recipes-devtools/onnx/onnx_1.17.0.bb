@@ -27,4 +27,8 @@ EXTRA_OECMAKE = " \
     -DONNX_DISABLE_STATIC_REGISTRATION=ON \
 "
 
-INSANE_SKIP:${PN}-dev = "buildpaths"
+do_install:append() {
+    # remove lines with tmpdir references, they're harmful when we build against this later
+    sed -i '/CMAKE_PREFIX_PATH/d' ${D}${libdir}/cmake/ONNX/ONNXConfig.cmake
+    sed -i '/Protobuf_INCLUDE_DIR/d' ${D}${libdir}/cmake/ONNX/ONNXConfig.cmake
+}
