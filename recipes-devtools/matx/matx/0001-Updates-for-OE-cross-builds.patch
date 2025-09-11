@@ -1,0 +1,93 @@
+From b953e6f2b196f2530fc9a1ba9be87170fbb1cbc9 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 1 Sep 2025 23:11:39 +0100
+Subject: [PATCH] Updates for OE cross builds
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ CMakeLists.txt | 46 ++++++++++++----------------------------------
+ 1 file changed, 12 insertions(+), 34 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index f07e0c10..9d0eb683 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -9,25 +9,19 @@ else()
+   set(NOT_SUBPROJECT OFF)
+ endif()
+ 
+-# CMake 3.24 can auto-detect GPUs, but it's not standard on any distrobution. For now, rapids-cmake has a utility
+-# function to do it, so we grab that as a dependency. The user can optionally override GPU_ARCH to specify
+-# their own. We check if rapids-cmake exists for projects that already include it so we don't have conflicting
+-# directories
+-if(NOT DEFINED rapids-cmake-dir)
+-  include(FetchContent)
+-  # Tell FetchContent to just use the local copy of rapids-cmake:
+-  FetchContent_Declare(rapids-cmake SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/rapids-cmake")
+-
+-  # Tell FetchContent to download remote copy of rapids-cmake:
+-  #FetchContent_Declare(rapids-cmake URL https://github.com/rapidsai/rapids-cmake/archive/refs/heads/branch-24.12.zip)
+-  FetchContent_MakeAvailable(rapids-cmake)
+-else()
+-  # The include() commands below search the module path for the corresponding .cmake files
+-  list(APPEND CMAKE_MODULE_PATH "${rapids-cmake-dir}")
+-endif()
++find_package(CCCL REQUIRED)
++find_package(CUB REQUIRED)
++find_package(libcudacxx REQUIRED)
++find_package(Thrust REQUIRED)
++
++
++set(CPM_DOWNLOAD_VERSION 0.40.0)
++set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
++message(STATUS "CPM download location: ${CPM_DOWNLOAD_LOCATION}")
+ 
+-include(${rapids-cmake-dir}/cpm/cccl.cmake)
+-include(${rapids-cmake-dir}/cpm/nvbench.cmake)
++list(APPEND CMAKE_MODULE_PATH "${RAPIDS_CMAKE_DIR}/rapids-cmake")
++set(rapids-cmake-dir "${RAPIDS_CMAKE_DIR}/rapids-cmake")
++include("${RAPIDS_CMAKE_DIR}/RAPIDS.cmake")
+ include(rapids-cmake)
+ include(rapids-cpm)
+ include(rapids-cuda)
+@@ -36,13 +30,6 @@ include(rapids-find)
+ 
+ rapids_cpm_init(OVERRIDE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json")
+ 
+-if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+-    include(rapids-cuda)
+-    set(CMAKE_CUDA_ARCHITECTURES "NATIVE")
+-    message(STATUS "Auto-detecting GPU architectures since CMAKE_CUDA_ARCHITECTURES not defined")
+-    rapids_cuda_init_architectures(MATX)
+-endif()
+-
+ # This needs to go after rapids initialization otherwise we get a rapids_export_parse_version error
+ project(MATX
+         LANGUAGES CUDA CXX
+@@ -50,9 +37,6 @@ project(MATX
+         VERSION ${MATX_VERSION}
+         HOMEPAGE_URL "https://github.com/NVIDIA/MatX")
+ 
+-if (NOT CMAKE_CUDA_ARCHITECTURES)
+-    set(CMAKE_CUDA_ARCHITECTURES "70;80")
+-endif()
+ message(STATUS "Using GPU architectures ${CMAKE_CUDA_ARCHITECTURES}")
+ 
+ rapids_cmake_write_version_file(include/version_config.h)
+@@ -130,12 +114,6 @@ if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)
+     message(FATAL_ERROR "MatX requires CUDA 11.5 or higher. Please update before using.")
+ endif()
+ 
+-message(STATUS "Finding CCCL...")
+-rapids_cpm_cccl(
+-    BUILD_EXPORT_SET matx-exports
+-    INSTALL_EXPORT_SET matx-exports
+-)
+-
+ target_link_libraries(matx INTERFACE CCCL::CCCL)
+ 
+ # Set flags for compiling tests faster (only for nvcc)
+-- 
+2.34.1
+
