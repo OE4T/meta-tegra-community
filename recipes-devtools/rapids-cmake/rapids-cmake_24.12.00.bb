@@ -3,11 +3,8 @@ HOMEPAGE = "https://github.com/rapidsai/rapids-cmake"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=3ced5b165b4647193d419f133b7461c2"
 
-SRC_URI = " \
-    git://gitlab.com/nvidia/rapidsai/rapids-cmake.git;protocol=https;nobranch=1;tag=v${PV} \
-    file://0001-Update-CPM.cmake-md5sum.patch \
-"
-SRCREV = "0d6b5a59184f9c70c611349cc63dfdbf28cf8ded"
+SRC_URI = "git://github.com/rapidsai/rapids-cmake.git;protocol=https;nobranch=1;protocol=https;nobranch=1;tag=v${PV}"
+SRCREV = "4cb2123dc08ef5d47ecdc9cc51c96bea7b5bb79c"
 
 do_configure[noexec] = "1"
 do_compile[noexec] = "1"
