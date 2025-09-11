@@ -1,0 +1,28 @@
+From cb7ba5d0333eb05e7cadf43233ae56ef0de011bd Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Thu, 17 Jul 2025 11:55:44 +0100
+Subject: [PATCH] update CPM version
+
+Upstream-Status: Inappropriate [OE-specific]
+
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ cmake/CPM.cmake | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/cmake/CPM.cmake b/cmake/CPM.cmake
+index b273c3b..55b883d 100644
+--- a/cmake/CPM.cmake
++++ b/cmake/CPM.cmake
+@@ -42,7 +42,7 @@ if(NOT COMMAND cpm_message)
+   endfunction()
+ endif()
+ 
+-set(CURRENT_CPM_VERSION 1.0.0-development-version)
++set(CURRENT_CPM_VERSION 0.40.0)
+ 
+ get_filename_component(CPM_CURRENT_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}" REALPATH)
+ if(CPM_DIRECTORY)
+-- 
+2.34.1
+

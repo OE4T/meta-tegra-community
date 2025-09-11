@@ -3,8 +3,11 @@ DESCRIPTION = "CMake's missing package manager. A small CMake script for \
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=39b0e14f0c3e37b2643eba051401548f"
 
-SRC_URI = "git://github.com/cpm-cmake/CPM.cmake.git;protocol=https;nobranch=1;tag=v${PV}"
-SRCREV = "d6d5d0d5abca0b9ffe253353f75befc704e81bec"
+SRC_URI = " \
+    git://github.com/cpm-cmake/CPM.cmake.git;protocol=https;nobranch=1;tag=v${PV} \
+    file://0001-update-CPM-version.patch \
+"
+SRCREV = "d416d9b22ccc9d58bf5b18cf36ab92b58b25a877"
 
 do_configure[noexec] = "1"
 do_compile[noexec] = "1"
