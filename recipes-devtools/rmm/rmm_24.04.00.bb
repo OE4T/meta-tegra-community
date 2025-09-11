@@ -13,9 +13,10 @@ SRC_URI = " \
 "
 SRCREV = "8f19c9c3aacf6e612a0cd61f4cf882903bf045aa"
 
-DEPENDS += "fmt spdlog cccl cpm-cmake rapids-cmake"
+DEPENDS += "fmt spdlog cuda-cccl cpm-cmake rapids-cmake"
 
 EXTRA_OECMAKE:append = " \
+    -DCCCL_DIR=${RECIPE_SYSROOT}/usr/local/cuda-${CUDA_VERSION}/lib/cmake/cccl \
     -DCPM_SOURCE_CACHE=${RECIPE_SYSROOT}${datadir} \
     -DRAPIDS_CMAKE_DIR=${RECIPE_SYSROOT}/opt/nvidia/rapids-cmake \
     -DBUILD_TESTS=OFF \
