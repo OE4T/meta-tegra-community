@@ -1,15 +1,16 @@
-From dd28c5e28646529f6fedf4fb34f99903c3e7f3a5 Mon Sep 17 00:00:00 2001
+From 889e1271748184bee6a59bf9b8d89569b605e5d7 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 1 May 2025 14:37:06 +0100
-Subject: [PATCH] remove TypenameAsString from nvidia namespace
+Date: Tue, 2 Sep 2025 22:06:10 +0100
+Subject: [PATCH] OE cross build fixups
 
 Upstream-Status: Inappropriate [OE-specific]
 
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- gxf-install/include/common/type_name.hpp | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ gxf-install/include/common/type_name.hpp        | 5 +----
+ gxf-install/include/gxf/core/expected_macro.hpp | 2 +-
+ 2 files changed, 2 insertions(+), 5 deletions(-)
 
 diff --git a/gxf-install/include/common/type_name.hpp b/gxf-install/include/common/type_name.hpp
 index 333ea17..e4bae84 100644
@@ -36,6 +37,19 @@ index 333ea17..e4bae84 100644
 -}  // namespace nvidia
 -
  #endif  // NVIDIA_COMMON_TYPE_NAME_HPP_
+diff --git a/gxf-install/include/gxf/core/expected_macro.hpp b/gxf-install/include/gxf/core/expected_macro.hpp
+index 4fc79f5..82349ec 100644
+--- a/gxf-install/include/gxf/core/expected_macro.hpp
++++ b/gxf-install/include/gxf/core/expected_macro.hpp
+@@ -21,7 +21,7 @@
+ 
+ #include "gxf/core/common_expected_macro.hpp"
+ #include "gxf/core/expected.hpp"
+-#include "magic_enum.hpp"  // NOLINT(build/include)
++#include <magic_enum/magic_enum.hpp>
+ 
+ //////////////////////////////////////////
+ // Configuration for using bool as status:
 -- 
 2.34.1
 
