@@ -4,13 +4,12 @@ LICENSE = "BSD-3-Clause"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=cbe4fe88c540f18985ee4d32d590f683"
 
 SRC_URI = " \
-    git://github.com/openucx/ucx.git;protocol=https;branch=v1.18.x;tag=v${PV} \
-    file://0001-Fix-CMAKE-library-import-paths.patch \
-    file://0002-Add-option-to-enable-NVML.patch \
-    file://0003-fix-build-issues-with-gcc-15.patch \
-    file://0004-add-inclusion-of-omp.h-outside-the-extern-C-block.patch \
+    git://github.com/openucx/ucx.git;protocol=https;nobranch=1;tag=v${PV} \
+    file://0001-fix-cmake-library-import-paths.patch \
+    file://0002-add-option-to-enable-NVML.patch \
+    file://0003-add-inclusion-of-omp.h-outside-the-extern-C-block.patch \
 "
-SRCREV = "d9aa5650d4cbcbb00d61af980614dbe9dd27a1f2"
+SRCREV = "e4636149592d5a435c2c911fe7727444a13bfa2e"
 
 COMPATIBLE_MACHINE = "(cuda)"
 
@@ -32,4 +31,11 @@ EXTRA_OECONF:append = " \
     --enable-mt \
 "
 
-INSANE_SKIP:${PN} += "dev-so buildpaths"
+EXTRA_OEMAKE += "NVCC='${CUDA_NVCC_EXECUTABLE} -ccbin ${CUDAHOSTCXX} ${CUDAFLAGS}'"
+
+FILES:${PN}-dev += "\
+    ${libdir}/*.so \
+    ${libdir}/ucx/*.so \
+"
+
+INSANE_SKIP:${PN} = "buildpaths"

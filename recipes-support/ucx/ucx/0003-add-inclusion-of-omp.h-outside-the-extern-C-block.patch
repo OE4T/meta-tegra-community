@@ -1,7 +1,7 @@
-From b7dd9983ce6135de7acc2afda399c85efb062999 Mon Sep 17 00:00:00 2001
+From d5b0f57960774a82c017a3b0f085fe0355e756a7 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 27 May 2025 13:01:30 +0100
-Subject: [PATCH 4/4] add inclusion of <omp.h> outside the extern "C" block
+Date: Thu, 11 Sep 2025 12:09:45 +0100
+Subject: [PATCH 3/3] add inclusion of <omp.h> outside the extern "C" block
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
@@ -10,14 +10,14 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  1 file changed, 1 insertion(+)
 
 diff --git a/src/ucs/sys/compiler_def.h b/src/ucs/sys/compiler_def.h
-index b6e8b88d4..5381361ef 100644
+index b6e8b88d4..102d9e447 100644
 --- a/src/ucs/sys/compiler_def.h
 +++ b/src/ucs/sys/compiler_def.h
 @@ -13,6 +13,7 @@
  /* Note: Place "@file <file name>.h" after BEGIN_C_DECS
   * to avoid bugs in a documentation */
  #ifdef __cplusplus
-+#include <omp.h> 
++#include <omp.h>
  # define BEGIN_C_DECLS  extern "C" {
  # define END_C_DECLS    }
  #else
