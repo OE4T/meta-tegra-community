@@ -1,6 +1,6 @@
-From 48cb50c7bf07559c25ca91ee5eedd6fa9d850ef2 Mon Sep 17 00:00:00 2001
+From 1948d905d21b1608530047d0445d844ccb9f31fb Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 24 Jun 2025 11:02:06 +0100
+Date: Thu, 11 Sep 2025 18:38:18 +0100
 Subject: [PATCH 3/7] Build python libs with install RPATH
 
 Upstream-Status: Inappropriate [OE-specific]
@@ -10,7 +10,7 @@ Signed-off-by: Ian Stewart <istewart@nvidia.com>
  1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/python/holoscan/CMakeLists.txt b/python/holoscan/CMakeLists.txt
-index f70f903..390c54f 100644
+index 635b3e9..6c1c75d 100644
 --- a/python/holoscan/CMakeLists.txt
 +++ b/python/holoscan/CMakeLists.txt
 @@ -73,9 +73,8 @@ function(holoscan_pybind11_module pybind11_module_name)

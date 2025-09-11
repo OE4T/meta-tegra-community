@@ -1,6 +1,6 @@
-From 6d02fd1748e5494c866a037baa350f9159cfac57 Mon Sep 17 00:00:00 2001
+From def41f64d6ae4b6039235c1a3364e6a64cbaefb4 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 3 Jul 2025 13:52:04 +0100
+Date: Thu, 11 Sep 2025 18:37:42 +0100
 Subject: [PATCH 2/7] Use external library dependencies
 
 This changes the dependencies on the following libraries so
@@ -30,14 +30,20 @@ fetched, built, and installed by CMake:
  - magic_enum
  - onnxruntime
  - ucx
+ - ucxx
  - Protobuf
+ - Eigen3
+ - concurrentqueue
+ - matx
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt                                |  38 -
+ CMakeLists.txt                                |  85 +-
  cmake/deps/cli11_rapids.cmake                 |  18 +-
+ cmake/deps/concurrent_queue.cmake             |  18 +-
  cmake/deps/dlpack_rapids.cmake                |  18 +-
+ cmake/deps/eigen3_urm.cmake                   |  77 +-
  cmake/deps/expected_rapids.cmake              |  21 +-
  cmake/deps/fmt_rapids.cmake                   |  26 +-
  cmake/deps/glfw_rapids.cmake                  |  20 +-
@@ -48,60 +54,89 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  cmake/deps/hwloc.private.config.h.in          | 882 ------------------
  cmake/deps/hwloc.static-components.h.in       |  32 -
  cmake/deps/magic_enum.cmake                   |  29 +-
+ cmake/deps/matx.cmake                         |  33 +-
  cmake/deps/nvtx3.cmake                        |  35 -
- cmake/deps/pybind11.cmake                     |  19 +-
- cmake/deps/rmm.cmake                          |  30 +-
+ cmake/deps/pybind11.cmake                     |  20 +-
+ cmake/deps/rmm.cmake                          |  44 +-
  cmake/deps/spdlog_rapids.cmake                |  29 +-
- cmake/deps/ucx.cmake                          |  15 -
+ cmake/deps/ucx.cmake                          |  55 +-
+ cmake/deps/ucxx_rapids.cmake                  | 132 +--
  cmake/deps/yaml-cpp_rapids.cmake              |  51 +-
  cmake/modules/FindONNXRuntime.cmake           |  45 +-
- cmake/modules/SetupCUDA.cmake                 |  26 -
+ cmake/modules/SetupCUDA.cmake                 |  44 -
  cmake/modules/SetupCache.cmake                |   3 -
- cmake/modules/SetupRapidsCMake.cmake          |  13 +-
- cmake/setup_dependencies.cmake                |   1 -
+ cmake/modules/SetupRapidsCMake.cmake          |  12 +-
+ cmake/setup_dependencies.cmake                |   4 -
  .../cpp/operator_status_tracking.cpp          |   2 +-
- include/holoscan/logger/logger.hpp            |  11 +-
+ .../matx/matx_basic/cpp/CMakeLists.min.txt    |  21 +-
+ .../distributed_pose_tree/cpp/CMakeLists.txt  |   6 +-
+ .../pose_tree_basic/cpp/CMakeLists.txt        |   6 +-
+ .../core/resources/async_data_logger.hpp      |   2 +-
  include/holoscan/profiler/nvtx3.hpp           |   2 +-
- modules/holoinfer/src/CMakeLists.txt          |  13 +-
+ modules/holoinfer/src/CMakeLists.txt          |  15 +-
  .../holoinfer/src/infer/onnx/CMakeLists.txt   |   8 +-
  .../holoinfer/src/infer/torch/CMakeLists.txt  |   3 +-
  modules/holoviz/examples/demo/CMakeLists.txt  |  14 +-
  .../holoviz/examples/depth_map/CMakeLists.txt |  14 +-
  .../holoviz/tests/functional/CMakeLists.txt   |  14 +-
- .../holoviz/thirdparty/imgui/CMakeLists.txt   |  28 +-
+ .../holoviz/thirdparty/imgui/CMakeLists.txt   |  44 +-
  .../holoscan/operators/holoviz/CMakeLists.txt |   5 +-
  python/holoscan/operators/holoviz/holoviz.cpp |   2 +-
- src/CMakeLists.txt                            |  29 +-
+ src/CMakeLists.txt                            |  39 +-
+ src/core/conditions/gxf/asynchronous.cpp      |   2 +-
+ src/core/gxf/gxf_utils.cpp                    |   2 +-
+ src/core/resources/async_data_logger.cpp      |   2 +-
+ .../simple_text_serializer.cpp                |   2 +-
  src/operators/holoviz/holoviz.cpp             |   2 +-
  .../v4l2_video_capture/v4l2_video_capture.cpp |   2 +-
- 39 files changed, 102 insertions(+), 1817 deletions(-)
+ .../system/distributed/receive_tensor_gxf.hpp |  97 +-
+ 51 files changed, 223 insertions(+), 2235 deletions(-)
  delete mode 100644 cmake/deps/hwloc.config.h.in
  delete mode 100644 cmake/deps/hwloc.private.config.h.in
  delete mode 100644 cmake/deps/hwloc.static-components.h.in
  delete mode 100644 cmake/deps/nvtx3.cmake
+ mode change 120000 => 100644 tests/system/distributed/receive_tensor_gxf.hpp
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 9b59284..d0f3c65 100644
+index a3bef36..63351fb 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -248,8 +248,6 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS
+@@ -246,16 +246,11 @@ endif()
+ # List targets to export/install
+ list(APPEND HOLOSCAN_INSTALL_TARGETS
+     core
+-    eigen3_interface
+     holoviz
+     holoviz_imgui
      holoinfer
      infer_utils
      logger
+-    matx
+-    holoscan_matx
 -    nvtx3-c
 -    nvtx3-cpp
+     data_loggers_async_console_logger
+     data_loggers_basic_console_logger
      op_async_ping_rx
-     op_async_ping_tx
-     op_bayer_demosaic
-@@ -268,7 +266,6 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS
-     op_v4l2
+@@ -278,7 +273,6 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS
+     pose_tree
      profiler
      spdlog_logger
 -    yaml-cpp
  )
  if(HOLOSCAN_BUILD_LIBTORCH)
    list(APPEND HOLOSCAN_INSTALL_TARGETS holoinfer_torch)
-@@ -293,30 +290,6 @@ install(DIRECTORY include/holoscan/
+@@ -291,8 +285,7 @@ if(HOLOSCAN_BUILD_PYTHON)
+ endif()
+ 
+ # Copy library files
+-# Note: ucxx is handled separately since it's only available in build targets, not install targets
+-install(TARGETS ${HOLOSCAN_INSTALL_TARGETS} ucxx
++install(TARGETS ${HOLOSCAN_INSTALL_TARGETS}
+     DESTINATION ${HOLOSCAN_INSTALL_LIB_DIR}
+     EXPORT ${HOLOSCAN_PACKAGE_NAME}-exports
+     COMPONENT holoscan-core
+@@ -304,36 +297,6 @@ install(DIRECTORY include/holoscan/
      COMPONENT holoscan-core
  )
  
@@ -114,6 +149,12 @@ index 9b59284..d0f3c65 100644
 -# Copy bundled dlpack headers
 -install(DIRECTORY ${dlpack_SOURCE_DIR}/include/dlpack/
 -    DESTINATION include/3rdparty/dlpack
+-    COMPONENT holoscan-core
+-)
+-
+-# Copy bundled concurrent_queue.h header
+-install(FILES ${concurrent_queue_SOURCE_DIR}/concurrentqueue.h
+-    DESTINATION include/3rdparty/
 -    COMPONENT holoscan-core
 -)
 -
@@ -132,7 +173,7 @@ index 9b59284..d0f3c65 100644
  # Copy version file
  install(FILES ${${HOLOSCAN_PACKAGE_NAME}_BINARY_DIR}/include/holoscan/version_config.hpp
      DESTINATION include/holoscan
-@@ -426,17 +399,6 @@ foreach(gxf_component IN LISTS _GXF_components)
+@@ -443,52 +406,6 @@ foreach(gxf_component IN LISTS _GXF_components)
    endif()
  endforeach()
  
@@ -145,6 +186,41 @@ index 9b59284..d0f3c65 100644
 -        APPEND PROPERTY
 -            INTERFACE_INCLUDE_DIRECTORIES "${PACKAGE_PREFIX_DIR}/include/3rdparty/ucx"
 -    )
+-endif()
+-
+-# Find holoscan::ucp that is prerequisite of holoscan::ucxx
+-if(NOT TARGET holoscan::ucp)
+-  find_package(ucx QUIET)
+-  # Create an alias for ucx::ucp to support downstream holoscan::ucxx export set
+-  unset(UCP_IMPORTED_LOCATION)
+-  if(TARGET ucx::ucp)
+-      get_target_property(UCP_IMPORTED_LOCATION ucx::ucp IMPORTED_LOCATION)
+-      if(NOT UCP_IMPORTED_LOCATION)
+-          get_target_property(UCP_IMPORTED_LOCATION ucx::ucp IMPORTED_LOCATION_${CMAKE_BUILD_TYPE})
+-      endif()
+-      get_target_property(UCP_INCLUDE_DIRS ucx::ucp INTERFACE_INCLUDE_DIRECTORIES)
+-  else()
+-    set(UCP_IMPORTED_LOCATION "${PACKAGE_PREFIX_DIR}/lib/libucp.so")
+-    set(UCP_INCLUDE_DIRS "${PACKAGE_PREFIX_DIR}/include/3rdparty/ucx")
+-  endif()
+-  add_library(holoscan::ucp SHARED IMPORTED)
+-  set_target_properties(holoscan::ucp PROPERTIES
+-      INTERFACE_INCLUDE_DIRECTORIES "${UCP_INCLUDE_DIRS}"
+-      IMPORTED_LOCATION "${UCP_IMPORTED_LOCATION}"
+-      IMPORTED_SONAME "libucp.so"
+-  )
+-endif()
+-
+-if(NOT TARGET holoscan::ucxx)
+-  # Create imported target holoscan::ucxx
+-  add_library(holoscan::ucxx SHARED IMPORTED)
+-
+-  set_target_properties(holoscan::ucxx PROPERTIES
+-    INTERFACE_COMPILE_DEFINITIONS "UCXX_ENABLE_RMM;RMM_LOG_ACTIVE_LEVEL=RAPIDS_LOGGER_LEVEL_INFO"
+-    INTERFACE_INCLUDE_DIRECTORIES "${PACKAGE_PREFIX_DIR}/include/3rdparty/ucxx"
+-    INTERFACE_LINK_LIBRARIES "GXF::rmm;holoscan::ucp"
+-    INTERFACE_POSITION_INDEPENDENT_CODE "ON"
+-  )
 -endif()
 -
  if(NOT TARGET GXF::gxe)
@@ -176,6 +252,32 @@ index db010da..c2b602c 100644
 -# root project can use it to include headers
 -set(cli11_SOURCE_DIR ${CLI11_SOURCE_DIR} PARENT_SCOPE)
 +rapids_find_package(CLI11 2.3.2 REQUIRED)
+diff --git a/cmake/deps/concurrent_queue.cmake b/cmake/deps/concurrent_queue.cmake
+index 059f2c4..d7d9692 100644
+--- a/cmake/deps/concurrent_queue.cmake
++++ b/cmake/deps/concurrent_queue.cmake
+@@ -13,20 +13,4 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-include(${rapids-cmake-dir}/cpm/find.cmake)
+-
+-rapids_cpm_find(concurrent_queue 1.0.4
+-    GLOBAL_TARGETS concurrent_queue
+-    BUILD_EXPORT_SET ${HOLOSCAN_PACKAGE_NAME}-exports
+-    CPM_ARGS
+-
+-    GITHUB_REPOSITORY cameron314/concurrentqueue
+-    GIT_TAG v1.0.4
+-    GIT_SHALLOW TRUE
+-
+-    EXCLUDE_FROM_ALL
+-)
+-
+-# Set 'concurrent_queue_SOURCE_DIR' with PARENT_SCOPE so that
+-# root project can use it to include headers
+-set(concurrent_queue_SOURCE_DIR ${concurrent_queue_SOURCE_DIR} PARENT_SCOPE)
++rapids_find_package(concurrentqueue 1.0.0 REQUIRED)
 diff --git a/cmake/deps/dlpack_rapids.cmake b/cmake/deps/dlpack_rapids.cmake
 index d207b18..dda7379 100644
 --- a/cmake/deps/dlpack_rapids.cmake
@@ -202,6 +304,91 @@ index d207b18..dda7379 100644
 -# root project can use it to include headers
 -set(dlpack_SOURCE_DIR ${dlpack_SOURCE_DIR} PARENT_SCOPE)
 +rapids_find_package(dlpack 1.0 REQUIRED)
+diff --git a/cmake/deps/eigen3_urm.cmake b/cmake/deps/eigen3_urm.cmake
+index 38863ec..8a2b5c8 100644
+--- a/cmake/deps/eigen3_urm.cmake
++++ b/cmake/deps/eigen3_urm.cmake
+@@ -13,79 +13,4 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-include(FetchContent)
+-
+-set(EIGEN_PATCH_FILEPATH "${CMAKE_SOURCE_DIR}/cmake/deps/patches/eigen3_urm_neon_memcpy_fix.patch")
+-
+-FetchContent_Declare(
+-    eigen3
+-    URL https://edge.urm.nvidia.com/artifactory/sw-holoscan-thirdparty-generic-local/eigen/eigen-3.4.0.tar.gz
+-    # sha256sum eigen-3.4.0.tar.gz
+-    URL_HASH SHA256=e4b6347ba6e9874f59de6f6f972e48f11c92b08331497152b7d99fd00b9e9aee
+-)
+-
+-FetchContent_GetProperties(eigen3)
+-if(NOT eigen3_POPULATED)
+-    FetchContent_Populate(eigen3)
+-    # eigen3_SOURCE_DIR is now available
+-endif()
+-
+-# --------------------------------------------------------------------
+-# Apply the NEON memcpy-fix patch
+-# (Addresses GCC's -Werror=class-memaccess, which triggers an error on arm64)
+-# --------------------------------------------------------------------
+-
+-# Locate the "patch" program
+-find_program(PATCH_EXECUTABLE patch)
+-if(NOT PATCH_EXECUTABLE)
+-    message(FATAL_ERROR "Cannot find the 'patch' tool needed to patch Eigen.")
+-endif()
+-
+-# Apply the patch once (idempotent thanks to -N)
+-execute_process(
+-    COMMAND "${PATCH_EXECUTABLE}" -N -p1 -i "${EIGEN_PATCH_FILEPATH}"
+-    WORKING_DIRECTORY "${eigen3_SOURCE_DIR}"
+-    RESULT_VARIABLE _eigen_patch_result
+-)
+-
+-if(_eigen_patch_result GREATER 1)   # 0 = success, 1 = already applied
+-    message(FATAL_ERROR "Failed to apply Eigen NEON memcpy patch "
+-                        "(exit code ${_eigen_patch_result}).")
+-endif()
+-
+-# Create a regular INTERFACE library for Eigen's properties
+-add_library(eigen3_interface INTERFACE)
+-
+-# Define include directory for the interface library
+-# Use generator expressions to handle both build-time and install-time include paths
+-target_include_directories(eigen3_interface INTERFACE
+-    $<BUILD_INTERFACE:${eigen3_SOURCE_DIR}/include>
+-    $<INSTALL_INTERFACE:include/3rdparty>
+-)
+-
+-# Set EIGEN_MPL2_ONLY flag to restrict Eigen usage to MPL2-licensed code only
+-target_compile_definitions(eigen3_interface INTERFACE
+-    EIGEN_MPL2_ONLY
+-)
+-
+-# Create an ALIAS target `holoscan::eigen3`
+-add_library(holoscan::eigen3 ALIAS eigen3_interface)
+-
+-# Set the EXPORT_NAME property on the original interface target
+-# This name is used when the target is exported as part of a CMake package.
+-set_target_properties(eigen3_interface PROPERTIES
+-    EXPORT_NAME eigen3  # This will allow it to be found as Holoscan::eigen3
+-)
+-
+-# Install the Eigen headers for SDK development.
+-# This makes the headers available in the CMAKE_INSTALL_PREFIX.
+-if(IS_DIRECTORY "${eigen3_SOURCE_DIR}/include/Eigen")
+-    install(
+-        DIRECTORY "${eigen3_SOURCE_DIR}/include/Eigen/" # Source is the 'Eigen' folder itself
+-        DESTINATION include/3rdparty/Eigen                             # Destination path relative to CMAKE_INSTALL_PREFIX
+-        COMPONENT "holoscan-dependencies"                              # Matches existing component name
+-    )
+-else()
+-    message(FATAL_ERROR "Eigen headers not found in ${eigen3_SOURCE_DIR}/include/Eigen. "
+-                        "The downloaded Eigen archive from URM might have an unexpected structure, or the download failed.")
+-endif()
++find_package(Eigen3 REQUIRED)
 diff --git a/cmake/deps/expected_rapids.cmake b/cmake/deps/expected_rapids.cmake
 index 680c6ee..3cfa92a 100644
 --- a/cmake/deps/expected_rapids.cmake
@@ -1715,6 +1902,47 @@ index 3f8203b..bff89fc 100644
 -        )
 -endif()
 +rapids_find_package(magic_enum 0.9.7 REQUIRED)
+diff --git a/cmake/deps/matx.cmake b/cmake/deps/matx.cmake
+index 65ae225..1f06550 100644
+--- a/cmake/deps/matx.cmake
++++ b/cmake/deps/matx.cmake
+@@ -13,35 +13,4 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_find_package.html#
+-include(${rapids-cmake-dir}/cpm/find.cmake)
+-
+-rapids_cpm_find(matx 0.9.2
+-    GLOBAL_TARGETS matx
+-    BUILD_EXPORT_SET ${HOLOSCAN_PACKAGE_NAME}-exports
+-
+-    CPM_ARGS
+-    GITHUB_REPOSITORY NVIDIA/MatX
+-    GIT_TAG v0.9.2
+-    GIT_SHALLOW TRUE
+-    EXCLUDE_FROM_ALL
+-)
+-
+-if(matx_ADDED)
+-    # Correct the include directories for MatX target.
+-    # MatX's own CMakeLists.txt sets install-interface include directories that are incorrect
+-    # for the Holoscan SDK's 3rdparty directory layout. We clear them and set the correct ones.
+-    set_target_properties(matx PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "")
+-    target_include_directories(matx INTERFACE
+-        $<BUILD_INTERFACE:${matx_SOURCE_DIR}/include>
+-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/3rdparty/matx>
+-    )
+-
+-    # Install the headers needed for development with the SDK
+-    # Note: MatX's umbrella header is located in include/matx.h along with 'matx' folder having
+-    # the actual implementation.
+-    install(DIRECTORY ${matx_SOURCE_DIR}/include/
+-        DESTINATION include/3rdparty/matx
+-        COMPONENT "holoscan-dependencies"
+-        )
+-endif()
++rapids_find_package(matx 0.9.1 REQUIRED)
 diff --git a/cmake/deps/nvtx3.cmake b/cmake/deps/nvtx3.cmake
 deleted file mode 100644
 index 6b9ccf8..0000000
@@ -1757,17 +1985,16 @@ index 6b9ccf8..0000000
 -        )
 -endif()
 diff --git a/cmake/deps/pybind11.cmake b/cmake/deps/pybind11.cmake
-index 3aa140e..2dce9bf 100644
+index 3aa140e..ec475f2 100644
 --- a/cmake/deps/pybind11.cmake
 +++ b/cmake/deps/pybind11.cmake
-@@ -14,22 +14,5 @@
+@@ -14,22 +14,4 @@
  # limitations under the License.
  #
  
 -# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_find_package.html#
 -include(${rapids-cmake-dir}/cpm/find.cmake)
-+rapids_find_package(pybind11 2.11.1 REQUIRED)
- 
+-
 -rapids_cpm_find(pybind11 2.13.6
 -    GLOBAL_TARGETS pybind11
 -
@@ -1784,18 +2011,31 @@ index 3aa140e..2dce9bf 100644
 -if(NOT PYTHON_EXECUTABLE)
 -    set(PYTHON_EXECUTABLE /usr/bin/python3 PARENT_SCOPE)
 -endif()
++rapids_find_package(pybind11 2.11.1 REQUIRED)
 diff --git a/cmake/deps/rmm.cmake b/cmake/deps/rmm.cmake
-index 4fbde88..856b2bb 100644
+index 803fbeb..a5e6f23 100644
 --- a/cmake/deps/rmm.cmake
 +++ b/cmake/deps/rmm.cmake
-@@ -13,28 +13,8 @@
+@@ -13,42 +13,8 @@
  # See the License for the specific language governing permissions and
  # limitations under the License.
  
 -# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_cpm_find.html
 -include(${rapids-cmake-dir}/cpm/find.cmake)
 -
--set(rmm_PATCH_FILEPATH "${CMAKE_SOURCE_DIR}/cmake/deps/patches/rmm.patch")
+-set(rmm_PATCH_FILEPATH "${CMAKE_CURRENT_LIST_DIR}/patches/rmm.diff")
+-
+-# Copy the patch file to rapids-cmake's patch directory.
+-# Note: rapids-cmake automatically applies patches from its '${rapids-cmake-dir}/cpm/patches' directory.
+-# (see https://docs.rapids.ai/api/rapids-cmake/stable/cpm/#rapids-cpm-command-line-controls)
+-# The patch file extension (.diff or .patch) determines how it's processed.
+-# (see https://github.com/rapidsai/rapids-cmake/blob/v24.04.00/rapids-cmake/cpm/patches/command_template.cmake.in#L38-L62)
+-# If the patch contains 'diff' text, it may be skipped silently.
+-# Check for errors in: <build_dir>/rapids-cmake/patches/rmm/err
+-if(NOT EXISTS "${rmm_PATCH_FILEPATH}")
+-  message(FATAL_ERROR "RMM patch file not found: ${rmm_PATCH_FILEPATH}")
+-endif()
+-file(COPY ${rmm_PATCH_FILEPATH} DESTINATION ${rapids-cmake-dir}/cpm/patches/rmm)
 -
 -rapids_cpm_find(rmm 24.04.00
 -    GLOBAL_TARGETS rmm
@@ -1804,8 +2044,10 @@ index 4fbde88..856b2bb 100644
 -
 -    GITHUB_REPOSITORY rapidsai/rmm
 -    GIT_TAG v24.04.00
+-    # Note: If 'rmm' item is available in 'cmake/deps/rapids-cmake-packages.json', 'PATCH_COMMAND' is
+-    #       ignored so the following statement is meaningless.
+-    # PATCH_COMMAND git apply "${rmm_PATCH_FILEPATH}"
 -    GIT_SHALLOW TRUE
--    PATCH_COMMAND git apply -p0 "${rmm_PATCH_FILEPATH}"
 -
 -    EXCLUDE_FROM_ALL
 -)
@@ -1860,21 +2102,60 @@ index 74baaa7..cf07302 100644
 -endif()
 +rapids_find_package(spdlog 1.13.0 REQUIRED)
 diff --git a/cmake/deps/ucx.cmake b/cmake/deps/ucx.cmake
-index af23ffc..b30bbd3 100644
+index 90fa701..ef90732 100644
 --- a/cmake/deps/ucx.cmake
 +++ b/cmake/deps/ucx.cmake
-@@ -14,18 +14,3 @@
+@@ -13,57 +13,4 @@
+ # See the License for the specific language governing permissions and
  # limitations under the License.
  
- find_package(ucx 1.17.0 REQUIRED)
+-find_package(ucx 1.17.0 REQUIRED)
 -
+-# Install UCX shared libs under <prefix>/lib/libuc*.so*
+-file(GLOB TOP_UCX_LIB_FILES "${UCX_LIBRARIES}/libuc*.so*")
 -install(
--  DIRECTORY ${UCX_LIBRARIES}
--  DESTINATION "${HOLOSCAN_INSTALL_LIB_DIR}/.."
+-  FILES ${TOP_UCX_LIB_FILES}
+-  DESTINATION "${HOLOSCAN_INSTALL_LIB_DIR}"
+-  COMPONENT "holoscan-dependencies"
+-)
+-
+-# Set RPATH on installed UCX libraries so they can find each other
+-# Note: CPack sets and requires the DESTDIR prefix. See:
+-# https://gitlab.kitware.com/cmake/cmake/-/issues/24212
+-install(CODE "
+-  file(GLOB UCX_INSTALLED_LIBS \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${HOLOSCAN_INSTALL_LIB_DIR}/libuc*.so*\")
+-  list(LENGTH UCX_INSTALLED_LIBS UCX_INSTALLED_LIBS_COUNT)
+-  if(UCX_INSTALLED_LIBS_COUNT LESS_EQUAL 0)
+-    message(WARNING \"No UCX libraries found in \$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${HOLOSCAN_INSTALL_LIB_DIR}/\")
+-  endif()
+-  foreach(ucx_lib \${UCX_INSTALLED_LIBS})
+-    if(NOT IS_SYMLINK \${ucx_lib})
+-      execute_process(COMMAND patchelf --set-rpath \$ORIGIN \${ucx_lib})
+-    endif()
+-  endforeach()
+-" COMPONENT "holoscan-dependencies")
+-
+-# Install UCX shared libs under <prefix>/lib/ucx
+-install(
+-  DIRECTORY ${UCX_LIBRARIES}/ucx
+-  DESTINATION "${HOLOSCAN_INSTALL_LIB_DIR}"
 -  COMPONENT "holoscan-dependencies"
 -  FILES_MATCHING PATTERN "*.so*"
 -)
 -
+-# Set RPATH on installed UCX extension libraries so they can find base UCX libraries
+-# Note: CPack sets and requires the DESTDIR prefix. See:
+-# https://gitlab.kitware.com/cmake/cmake/-/issues/24212
+-install(CODE "
+-  file(GLOB UCX_EXT_INSTALLED_LIBS \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${HOLOSCAN_INSTALL_LIB_DIR}/ucx/*.so*\")
+-  foreach(ucx_ext_lib \${UCX_EXT_INSTALLED_LIBS})
+-    if(NOT IS_SYMLINK \${ucx_ext_lib})
+-      execute_process(COMMAND patchelf --set-rpath \$ORIGIN:\$ORIGIN/.. \${ucx_ext_lib})
+-    endif()
+-  endforeach()
+-" COMPONENT "holoscan-dependencies")
+-
+-# Install UCX headers
 -foreach(ucx_target ucm ucp ucs uct)
 -  install(
 -    DIRECTORY ${UCX_INCLUDE_DIRS}/${ucx_target}
@@ -1882,6 +2163,147 @@ index af23ffc..b30bbd3 100644
 -    COMPONENT "holoscan-dependencies"
 -  )
 -endforeach()
++find_package(ucx 1.19.0 REQUIRED)
+diff --git a/cmake/deps/ucxx_rapids.cmake b/cmake/deps/ucxx_rapids.cmake
+index bf0f43b..cc4d34f 100644
+--- a/cmake/deps/ucxx_rapids.cmake
++++ b/cmake/deps/ucxx_rapids.cmake
+@@ -13,134 +13,4 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_cpm_find.html
+-include(${rapids-cmake-dir}/cpm/find.cmake)
+-
+-rapids_cpm_find(ucxx 0.44.0
+-    GLOBAL_TARGETS ucxx
+-    BUILD_EXPORT_SET ${HOLOSCAN_PACKAGE_NAME}-exports
+-    CPM_ARGS
+-
+-    GITHUB_REPOSITORY rapidsai/ucxx
+-    GIT_TAG v0.44.00
+-    GIT_SHALLOW TRUE
+-    SOURCE_SUBDIR cpp
+-    DOWNLOAD_ONLY TRUE
+-)
+-
+-if(ucxx_ADDED)
+-
+-    set(UCXX_CXX_FLAGS -Wall -Wattributes -Werror -Wextra -Wsign-conversion
+-                       -Wno-missing-field-initializers -Wno-unused-parameter
+-    )
+-    set(UCXX_CXX_DEFINITIONS "")
+-    # Set RMM logging level
+-    set(RMM_LOGGING_LEVEL
+-        "INFO"
+-        CACHE STRING "Choose the logging level."
+-    )
+-    set_property(
+-        CACHE RMM_LOGGING_LEVEL PROPERTY STRINGS "TRACE" "DEBUG" "INFO" "WARN" "ERROR" "CRITICAL" "OFF"
+-    )
+-    message(VERBOSE "UCXX: RMM_LOGGING_LEVEL = '${RMM_LOGGING_LEVEL}'.")
+-
+-    if(NOT TARGET holoscan::ucp)
+-        find_package(ucx QUIET)
+-
+-        # Create an alias for ucx::ucp to support downstream holoscan::ucxx export set
+-        if(NOT TARGET ucx::ucp)
+-            message(FATAL_ERROR "Failed to import required ucx::ucp target for holoscan::ucxx!")
+-        endif()
+-        get_target_property(UCP_IMPORTED_LOCATION ucx::ucp IMPORTED_LOCATION)
+-        if(NOT UCP_IMPORTED_LOCATION)
+-            get_target_property(UCP_IMPORTED_LOCATION ucx::ucp IMPORTED_LOCATION_${CMAKE_BUILD_TYPE})
+-        endif()
+-        get_target_property(UCP_INTERFACE_INCLUDE_DIRS ucx::ucp INTERFACE_INCLUDE_DIRECTORIES)
+-
+-        add_library(holoscan::ucp SHARED IMPORTED)
+-        set_target_properties(holoscan::ucp PROPERTIES
+-            INTERFACE_INCLUDE_DIRECTORIES "${UCP_INTERFACE_INCLUDE_DIRS}"
+-            IMPORTED_LOCATION "${UCP_IMPORTED_LOCATION}"
+-            IMPORTED_SONAME "libucp.so"
+-        )
+-
+-    endif()
+-
+-    if(NOT TARGET Threads::Threads)
+-        find_package(Threads REQUIRED)
+-    endif()
+-
+-    # Build main library
+-    add_library(
+-        ucxx
+-        ${ucxx_SOURCE_DIR}/cpp/src/address.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/buffer.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/component.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/config.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/context.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/delayed_submission.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/endpoint.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/header.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/inflight_requests.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/internal/request_am.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/listener.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/log.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/memory_handle.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/remote_key.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/request.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/request_am.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/request_data.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/request_endpoint_close.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/request_flush.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/request_helper.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/request_mem.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/request_stream.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/request_tag.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/request_tag_multi.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/worker.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/worker_progress_thread.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/utils/callback_notifier.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/utils/file_descriptor.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/utils/python.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/utils/sockaddr.cpp
+-        ${ucxx_SOURCE_DIR}/cpp/src/utils/ucx.cpp
+-    )
+-
+-    set_target_properties(
+-        ucxx
+-        PROPERTIES BUILD_RPATH "\$ORIGIN:${CMAKE_BINARY_DIR}/lib:${CMAKE_BINARY_DIR}/lib/gxf_extensions"
+-                   INSTALL_RPATH "\$ORIGIN:\$ORIGIN/gxf_extensions"
+-             # set target compile options
+-             CXX_STANDARD 17
+-             CXX_STANDARD_REQUIRED ON
+-             POSITION_INDEPENDENT_CODE ON
+-             INTERFACE_POSITION_INDEPENDENT_CODE ON
+-    )
+-
+-    target_compile_options(ucxx PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${UCXX_CXX_FLAGS}>")
+-
+-    # Specify include paths for the current target and dependents
+-    target_include_directories(
+-      ucxx
+-      PUBLIC "$<BUILD_INTERFACE:${ucxx_SOURCE_DIR}/cpp/include>"
+-      PRIVATE "$<BUILD_INTERFACE:${ucxx_SOURCE_DIR}/cpp/src>"
+-      INTERFACE "$<INSTALL_INTERFACE:include/3rdparty/ucxx>"
+-    )
+-
+-    target_link_libraries(ucxx PUBLIC GXF::rmm)
+-    # Define spdlog level
+-    target_compile_definitions(
+-        ucxx PUBLIC UCXX_ENABLE_RMM "RMM_LOG_ACTIVE_LEVEL=RAPIDS_LOGGER_LEVEL_${RMM_LOGGING_LEVEL}"
+-    )
+-
+-    # Specify the target module library dependencies
+-    target_link_libraries(ucxx PUBLIC holoscan::ucp)
+-
+-    add_library(ucxx::ucxx ALIAS ucxx)
+-
+-    # Install the headers needed for development with the SDK
+-    install(DIRECTORY ${ucxx_SOURCE_DIR}/cpp/include/ucxx
+-        DESTINATION include/3rdparty/ucxx
+-        COMPONENT "holoscan-dependencies"
+-        )
+-endif()
++find_package(ucxx 0.44.0 REQUIRED)
 diff --git a/cmake/deps/yaml-cpp_rapids.cmake b/cmake/deps/yaml-cpp_rapids.cmake
 index f13166f..3e49726 100644
 --- a/cmake/deps/yaml-cpp_rapids.cmake
@@ -1996,13 +2418,33 @@ index 9f8c10a..8b4df5b 100644
 -    REQUIRED_VARS ONNXRuntime_LIBRARY ONNXRuntime_INCLUDE_DIR
 -)
 diff --git a/cmake/modules/SetupCUDA.cmake b/cmake/modules/SetupCUDA.cmake
-index ebdb9c7..e4b6897 100644
+index ac575df..781faf8 100644
 --- a/cmake/modules/SetupCUDA.cmake
 +++ b/cmake/modules/SetupCUDA.cmake
-@@ -25,29 +25,3 @@ endif()
- enable_language(CUDA)
+@@ -15,49 +15,5 @@
  
- message(STATUS "Requested CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
+ message(STATUS "Configuring CUDA Architectures")
+ 
+-# Default, needed before enable_language(CUDA)
+-if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+-    message(STATUS "CMAKE_CUDA_ARCHITECTURES not defined, setting it to `native`")
+-    set(CMAKE_CUDA_ARCHITECTURES "native")
+-else()
+-    message(STATUS "Requested CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
+-endif()
+-
+ # Enable CUDA language (needed for CMAKE_CUDA_COMPILER)
+ enable_language(CUDA)
+-if(HOLOSCAN_CUDA_MAJOR_VERSION)
+-    string(REGEX MATCH "^${HOLOSCAN_CUDA_MAJOR_VERSION}" CUDA_VERSION_MATCH "${CMAKE_CUDA_COMPILER_VERSION}")
+-    if(CUDA_VERSION_MATCH)
+-        message(STATUS "Found CUDA compiler: ${CMAKE_CUDA_COMPILER} (found suitable version \"${CMAKE_CUDA_COMPILER_VERSION}\", requested version \"${HOLOSCAN_CUDA_MAJOR_VERSION}\")")
+-    else()
+-        message(FATAL_ERROR "Found CUDA compiler at ${CMAKE_CUDA_COMPILER} but version ${CMAKE_CUDA_COMPILER_VERSION} does not match requested version ${HOLOSCAN_CUDA_MAJOR_VERSION}")
+-    endif()
+-else()
+-    message(STATUS "Found CUDA compiler: ${CMAKE_CUDA_COMPILER} (version \"${CMAKE_CUDA_COMPILER_VERSION}\")")
+-endif()
 -
 -# If using "native", nothing else to do. Otherwise, use script to process the request.
 -if(CMAKE_CUDA_ARCHITECTURES STREQUAL "native")
@@ -2044,45 +2486,53 @@ index 640443e..6ef500f 100644
      configure_ccache(HOLOSCAN_CACHE_DIR)
  endif()
 diff --git a/cmake/modules/SetupRapidsCMake.cmake b/cmake/modules/SetupRapidsCMake.cmake
-index 6104099..5d777b7 100644
+index 3cf88df..68f5af6 100644
 --- a/cmake/modules/SetupRapidsCMake.cmake
 +++ b/cmake/modules/SetupRapidsCMake.cmake
-@@ -13,13 +13,16 @@
- # See the License for the specific language governing permissions and
- # limitations under the License.
+@@ -16,13 +16,13 @@
+ # Note: The MatX library requires rapids-cmake version 24.12, which has a minimum CMake version
+ # requirement of 3.26.4 (see https://github.com/rapidsai/rapids-cmake/pull/627).
  
 -# https://github.com/rapidsai/rapids-cmake#installation
--file(DOWNLOAD https://gitlab.com/nvidia/rapidsai/rapids-cmake/-/raw/branch-24.04/RAPIDS.cmake
+-file(DOWNLOAD https://gitlab.com/nvidia/rapidsai/rapids-cmake/-/raw/branch-24.12/RAPIDS.cmake
 -    ${CMAKE_BINARY_DIR}/RAPIDS.cmake
 -)
+-
 -include(${CMAKE_BINARY_DIR}/RAPIDS.cmake)
-+set(CPM_DOWNLOAD_VERSION 0.38.5)
++set(CPM_DOWNLOAD_VERSION 0.40.0)
 +set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
 +message(STATUS "CPM download location: ${CPM_DOWNLOAD_LOCATION}")
-+
+ 
 +list(APPEND CMAKE_MODULE_PATH "${RAPIDS_CMAKE_DIR}/rapids-cmake")
 +set(rapids-cmake-dir "${RAPIDS_CMAKE_DIR}/rapids-cmake")
 +include("${RAPIDS_CMAKE_DIR}/RAPIDS.cmake")
  include(rapids-cmake)
  include(rapids-cpm)
  include(rapids-cuda)
- include(rapids-export)
- include(rapids-find)
-+
 diff --git a/cmake/setup_dependencies.cmake b/cmake/setup_dependencies.cmake
-index 2fec057..7fb4321 100644
+index d57544c..c6563fe 100644
 --- a/cmake/setup_dependencies.cmake
 +++ b/cmake/setup_dependencies.cmake
-@@ -48,7 +48,6 @@ superbuild_depend(ucx)
+@@ -37,9 +37,6 @@ rapids_cpm_init(OVERRIDE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/deps/rapids-cmake-pa
+ 
+ # Define packages to override the default ones.
+ 
+-# CCCL is a dependency of matx.
+-include(${rapids-cmake-dir}/cpm/cccl.cmake)
+-rapids_cpm_cccl()
+ # fmt must be populated before rmm and spdlog to ensure fmt headers are installed in the package
+ superbuild_depend(fmt_rapids)
+ # rmm is fetched by spdlog but need to call this first because a patch needs to be applied to rmm
+@@ -63,7 +60,6 @@ superbuild_depend(ucx)
  superbuild_depend(v4l2)
  superbuild_depend(yaml-cpp_rapids)
  superbuild_depend(gxf)
 -superbuild_depend(nvtx3)
- 
- # Testing dependencies
- if(HOLOSCAN_BUILD_TESTS)
+ superbuild_depend(eigen3_urm)
+ superbuild_depend(ucxx_rapids)
+ superbuild_depend(matx)
 diff --git a/examples/execution_control/operator_status_tracking/cpp/operator_status_tracking.cpp b/examples/execution_control/operator_status_tracking/cpp/operator_status_tracking.cpp
-index 7700a81..7a2607b 100644
+index d931057..f1e7e30 100644
 --- a/examples/execution_control/operator_status_tracking/cpp/operator_status_tracking.cpp
 +++ b/examples/execution_control/operator_status_tracking/cpp/operator_status_tracking.cpp
 @@ -22,7 +22,7 @@
@@ -2094,41 +2544,94 @@ index 7700a81..7a2607b 100644
  
  // A simple operator that processes a fixed number of times and then completes
  class FiniteSourceOp : public holoscan::Operator {
-diff --git a/include/holoscan/logger/logger.hpp b/include/holoscan/logger/logger.hpp
-index 4713b74..9cea17f 100644
---- a/include/holoscan/logger/logger.hpp
-+++ b/include/holoscan/logger/logger.hpp
-@@ -161,18 +161,27 @@ class Logger {
-   template <typename FormatT, typename... ArgsT>
-   static void log(const char* file, int line, const char* function_name, LogLevel level,
-                   const FormatT& format, ArgsT&&... args) {
-+// Version number of the fmt library represented as (major * 10000 + minor * 100 + patch)
-+#if FMT_VERSION >= 110000
-+    log_message(
-+        file, line, function_name, level, format, fmt::make_format_args(args...));
-+#else
-     log_message(file,
-                 line,
-                 function_name,
-                 level,
-                 format,
-                 fmt::make_format_args<fmt::buffer_context<fmt::char_t<FormatT>>>(args...));
-+#endif
-   }
--
-   template <typename FormatT, typename... ArgsT>
-   static void log(LogLevel level, const FormatT& format, ArgsT&&... args) {
-+#if FMT_VERSION >= 110000
-+    log_message(level, format, fmt::make_format_args(args...));
-+#else
-     log_message(
-         level, format, fmt::make_format_args<fmt::buffer_context<fmt::char_t<FormatT>>>(args...));
-+#endif
-   }
+diff --git a/examples/matx/matx_basic/cpp/CMakeLists.min.txt b/examples/matx/matx_basic/cpp/CMakeLists.min.txt
+index 25c8d0b..8888422 100644
+--- a/examples/matx/matx_basic/cpp/CMakeLists.min.txt
++++ b/examples/matx/matx_basic/cpp/CMakeLists.min.txt
+@@ -31,20 +31,11 @@ find_package(holoscan REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
  
-   /**
+ # Fetch CCCL if not already found (for standalone builds)
+-find_package(CCCL 2.8 QUIET)
+-if(NOT CCCL_FOUND)
+-  message(STATUS "MatX requires CCCL > 2.8.0. Fetching version 2.8.0 since no suitable version found.")
+-  include(FetchContent)
+-  FetchContent_Declare(
+-    CCCL
+-    GIT_REPOSITORY https://github.com/NVIDIA/cccl.git
+-    GIT_TAG 6d02e11  # corresponds to version 2.8.0, matching MatX requirement
+-    GIT_SHALLOW ON
+-  )
+-  set(CCCL_TOPLEVEL_PROJECT OFF)
+-  set(CCCL_ENABLE_INSTALL_RULES ON)
+-  FetchContent_MakeAvailable(CCCL)
+-endif()
++find_package(CCCL REQUIRED)
++find_package(CUB REQUIRED)
++find_package(libcudacxx REQUIRED)
++find_package(Thrust REQUIRED)
++find_package(matx 0.9.1 REQUIRED)
+ 
+ add_executable(matx_basic
+   matx_basic.cu
+@@ -53,7 +44,7 @@ add_executable(matx_basic
+ target_link_libraries(matx_basic
+   PRIVATE
+   holoscan::core
+-  holoscan::matx
++  matx::matx
+ )
+ 
+ # Testing
+diff --git a/examples/pose_tree/distributed_pose_tree/cpp/CMakeLists.txt b/examples/pose_tree/distributed_pose_tree/cpp/CMakeLists.txt
+index 7588cae..8fdaf3a 100644
+--- a/examples/pose_tree/distributed_pose_tree/cpp/CMakeLists.txt
++++ b/examples/pose_tree/distributed_pose_tree/cpp/CMakeLists.txt
+@@ -19,8 +19,10 @@ add_executable(distributed_pose_tree
+ )
+ target_link_libraries(distributed_pose_tree
+   PUBLIC
+-  holoscan::core
+-  holoscan::pose_tree
++    holoscan::core
++    holoscan::pose_tree
++  PRIVATE
++    ucxx::ucxx
+ )
+ 
+ # Copy config file
+diff --git a/examples/pose_tree/pose_tree_basic/cpp/CMakeLists.txt b/examples/pose_tree/pose_tree_basic/cpp/CMakeLists.txt
+index ae533f1..0842e08 100644
+--- a/examples/pose_tree/pose_tree_basic/cpp/CMakeLists.txt
++++ b/examples/pose_tree/pose_tree_basic/cpp/CMakeLists.txt
+@@ -19,8 +19,10 @@ add_executable(pose_tree_basic
+ )
+ target_link_libraries(pose_tree_basic
+   PUBLIC
+-  holoscan::core
+-  holoscan::pose_tree
++    holoscan::core
++    holoscan::pose_tree
++  PRIVATE
++    ucxx::ucxx
+ )
+ 
+ # Copy config file
+diff --git a/include/holoscan/core/resources/async_data_logger.hpp b/include/holoscan/core/resources/async_data_logger.hpp
+index 170f97f..5045794 100644
+--- a/include/holoscan/core/resources/async_data_logger.hpp
++++ b/include/holoscan/core/resources/async_data_logger.hpp
+@@ -31,7 +31,7 @@
+ 
+ #include "yaml-cpp/yaml.h"
+ 
+-#include "concurrentqueue.h"
++#include "concurrentqueue/moodycamel/concurrentqueue.h"
+ #include "holoscan/core/arg.hpp"
+ #include "holoscan/core/component_spec.hpp"
+ #include "holoscan/core/domain/tensor.hpp"
 diff --git a/include/holoscan/profiler/nvtx3.hpp b/include/holoscan/profiler/nvtx3.hpp
-index 52e6c09..c975dfa 100644
+index 047d384..58f6146 100644
 --- a/include/holoscan/profiler/nvtx3.hpp
 +++ b/include/holoscan/profiler/nvtx3.hpp
 @@ -18,7 +18,7 @@
@@ -2141,25 +2644,26 @@ index 52e6c09..c975dfa 100644
  // Copy of nvtx3::v1::scoped_range_in which checks whether tracing is enabled or not
  namespace nvtx3::v1 {
 diff --git a/modules/holoinfer/src/CMakeLists.txt b/modules/holoinfer/src/CMakeLists.txt
-index 3d1b55a..789058a 100644
+index 5b24be4..8a47d0b 100644
 --- a/modules/holoinfer/src/CMakeLists.txt
 +++ b/modules/holoinfer/src/CMakeLists.txt
-@@ -20,7 +20,14 @@ project(holoinfer VERSION ${HOLOSCAN_BUILD_VERSION} LANGUAGES CXX CUDA)
+@@ -19,6 +19,15 @@ project(holoinfer VERSION ${HOLOSCAN_BUILD_VERSION} LANGUAGES CXX CUDA)
+ 
  add_subdirectory(infer)
  
- find_package(CUDAToolkit REQUIRED)
++find_package(CUDAToolkit REQUIRED)
 +find_package(dlpack 1.0 REQUIRED)
 +find_package(tl-expected 1.1.0 REQUIRED)
 +find_package(CLI11 2.3.2 REQUIRED)
 +find_package(magic_enum 0.9.7 REQUIRED)
- 
 +get_target_property(DLPACK_INCLUDE_DIRS dlpack::dlpack INTERFACE_INCLUDE_DIRECTORIES)
 +get_target_property(TL_EXPECTED_INCLUDE_DIRS tl::expected INTERFACE_INCLUDE_DIRECTORIES)
 +get_target_property(MAGIC_ENUM_INCLUDE_DIRS magic_enum::magic_enum INTERFACE_INCLUDE_DIRECTORIES)
++
  set(holoinfer_src
      infer/trt/core.cpp
      infer/trt/utils.cpp
-@@ -42,10 +49,10 @@ target_include_directories(${PROJECT_NAME}
+@@ -40,10 +49,10 @@ target_include_directories(${PROJECT_NAME}
      PRIVATE
          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
      PUBLIC
@@ -2206,18 +2710,18 @@ index 115721e..aeb93ba 100644
          $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}>
      )
 diff --git a/modules/holoinfer/src/infer/torch/CMakeLists.txt b/modules/holoinfer/src/infer/torch/CMakeLists.txt
-index 231647b..c617088 100644
+index 57635b6..a8524bc 100644
 --- a/modules/holoinfer/src/infer/torch/CMakeLists.txt
 +++ b/modules/holoinfer/src/infer/torch/CMakeLists.txt
-@@ -52,6 +52,7 @@ message(STATUS "TORCH_CUDA_ARCH_LIST: ${TORCH_CUDA_ARCH_LIST}")
+@@ -51,6 +51,7 @@ message(STATUS "TORCH_CUDA_ARCH_LIST: ${TORCH_CUDA_ARCH_LIST}")
+ 
  # Find dependencies
  find_package(Torch REQUIRED)
- find_package(TorchVision REQUIRED)
 +find_package(dlpack 1.0 REQUIRED)
  
  # Create the holoinfer torch backend library
  add_library(holoinfer_torch SHARED core.cpp)
-@@ -77,6 +78,6 @@ target_include_directories(holoinfer_torch
+@@ -75,6 +76,6 @@ target_include_directories(holoinfer_torch
          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../..>
      PUBLIC
          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include>
@@ -2322,21 +2826,23 @@ index c52e451..769fa81 100644
  
  target_link_libraries(${PROJECT_NAME}
 diff --git a/modules/holoviz/thirdparty/imgui/CMakeLists.txt b/modules/holoviz/thirdparty/imgui/CMakeLists.txt
-index cfab674..2344633 100644
+index 3facf71..8d880dc 100644
 --- a/modules/holoviz/thirdparty/imgui/CMakeLists.txt
 +++ b/modules/holoviz/thirdparty/imgui/CMakeLists.txt
-@@ -18,27 +18,17 @@ include(GNUInstallDirs)
+@@ -18,29 +18,17 @@ include(GNUInstallDirs)
  
  find_package(Vulkan REQUIRED)
  
+-set(imgui_TAG "f3373780668fba1f9bd64c208d05c20b781c9a39")
 -FetchContent_Declare(
 -  imgui
 -  GIT_REPOSITORY https://github.com/ocornut/imgui.git
--  GIT_TAG f3373780668fba1f9bd64c208d05c20b781c9a39
+-  GIT_TAG "${imgui_TAG}"
 -  GIT_PROGRESS TRUE
 -  PATCH_COMMAND git apply "${CMAKE_CURRENT_SOURCE_DIR}/imgui.patch" || true
 -  )
 -
+-message(STATUS "Fetching imgui@${imgui_TAG}")
 -FetchContent_MakeAvailable(imgui)
 -
  add_library(imgui_backend STATIC)
@@ -2356,7 +2862,7 @@ index cfab674..2344633 100644
    )
  
  target_compile_definitions(imgui_backend
-@@ -60,16 +50,16 @@ add_library(holoscan::viz::imgui ALIAS holoviz_imgui)
+@@ -62,16 +50,16 @@ add_library(holoscan::viz::imgui ALIAS holoviz_imgui)
  
  target_sources(holoviz_imgui
    PRIVATE
@@ -2379,6 +2885,34 @@ index cfab674..2344633 100644
      $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>/holoviz/imgui
    )
  
+@@ -82,19 +70,19 @@ set_target_properties(holoviz_imgui
+ 
+ install(
+   FILES
+-    ${imgui_SOURCE_DIR}/imconfig.h
+-    ${imgui_SOURCE_DIR}/imgui_internal.h
+-    ${imgui_SOURCE_DIR}/imgui.h
+-    ${imgui_SOURCE_DIR}/imstb_rectpack.h
+-    ${imgui_SOURCE_DIR}/imstb_textedit.h
+-    ${imgui_SOURCE_DIR}/imstb_truetype.h
++    ${IMGUI_SOURCE_DIR}/imconfig.h
++    ${IMGUI_SOURCE_DIR}/imgui_internal.h
++    ${IMGUI_SOURCE_DIR}/imgui.h
++    ${IMGUI_SOURCE_DIR}/imstb_rectpack.h
++    ${IMGUI_SOURCE_DIR}/imstb_textedit.h
++    ${IMGUI_SOURCE_DIR}/imstb_truetype.h
+   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/holoviz/imgui
+   COMPONENT "holoscan-dependencies"
+   )
+ 
+ install(
+   FILES
+-    ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.h
++    ${IMGUI_SOURCE_DIR}/misc/cpp/imgui_stdlib.h
+   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/holoviz/imgui/misc/cpp
+   COMPONENT "holoscan-dependencies"
+   )
+\ No newline at end of file
 diff --git a/python/holoscan/operators/holoviz/CMakeLists.txt b/python/holoscan/operators/holoviz/CMakeLists.txt
 index e9c5987..f0414b4 100644
 --- a/python/holoscan/operators/holoviz/CMakeLists.txt
@@ -2401,7 +2935,7 @@ index e9c5987..f0414b4 100644
 +        ${MAGIC_ENUM_INCLUDE_DIRS}
  )
 diff --git a/python/holoscan/operators/holoviz/holoviz.cpp b/python/holoscan/operators/holoviz/holoviz.cpp
-index eaa0cc1..f213ed2 100644
+index 980fd28..a78b128 100644
 --- a/python/holoscan/operators/holoviz/holoviz.cpp
 +++ b/python/holoscan/operators/holoviz/holoviz.cpp
 @@ -30,7 +30,7 @@
@@ -2414,10 +2948,10 @@ index eaa0cc1..f213ed2 100644
  #include "../operator_util.hpp"
  #include "./pydoc.hpp"
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index eb343db..af8e52d 100644
+index f78d966..66f71eb 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -97,20 +97,26 @@ endif()
+@@ -127,14 +127,10 @@ target_link_libraries(holoscan_matx
  # ##############################################################################
  add_holoscan_library(profiler
      profiler/profiler.cpp)
@@ -2431,6 +2965,22 @@ index eb343db..af8e52d 100644
 -      $<BUILD_INTERFACE:${nvtx3_SOURCE_DIR}/include>
 -      $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/3rdparty>
 +      ${NVTX3_INCLUDEDIR}
+ )
+ 
+ # ##############################################################################
+@@ -148,19 +144,29 @@ add_holoscan_library(pose_tree
+     pose_tree/pose_tree_ucx_server.cpp
+ )
+ 
+-# Note: holoscan::pose_tree depends on holoscan::core and holoscan::eigen3,
++# Note: holoscan::pose_tree depends on holoscan::core and Eigen3::Eigen,
+ # but we can separate the core pose tree module (which doesn't depend on the Holoscan SDK)
+ # into `holoscan::pose_tree_core` later if needed.
+ target_link_libraries(pose_tree
+     PUBLIC
+         holoscan::core
+-        holoscan::eigen3
++        Eigen3::Eigen
  )
  
  # ##############################################################################
@@ -2448,18 +2998,23 @@ index eb343db..af8e52d 100644
 +get_target_property(MAGIC_ENUM_INCLUDE_DIRS magic_enum::magic_enum INTERFACE_INCLUDE_DIRECTORIES)
 +
  set(CORE_PROTO_FILES
-     core/services/proto/app_driver.proto
-     core/services/proto/app_worker.proto
-@@ -258,7 +264,7 @@ target_link_libraries(core
+     core/distributed/proto/app_driver.proto
+     core/distributed/proto/app_worker.proto
+@@ -320,11 +326,9 @@ target_link_libraries(core
+         GXF::std
          GXF::ucx
          yaml-cpp
+-        holoscan::eigen3
+-    INTERFACE
+-        ucxx::ucxx
++        Eigen3::Eigen
      PRIVATE
 -        hwloc
 +        PkgConfig::hwloc
          gRPC::grpc++
          gRPC::grpc++_reflection
          protobuf::libprotobuf
-@@ -266,11 +272,10 @@ target_link_libraries(core
+@@ -333,13 +337,10 @@ target_link_libraries(core
  
  target_include_directories(core
      PUBLIC
@@ -2467,6 +3022,8 @@ index eb343db..af8e52d 100644
 -      $<BUILD_INTERFACE:${dlpack_SOURCE_DIR}/include>
 -      $<BUILD_INTERFACE:${cli11_SOURCE_DIR}/include>
 -      $<BUILD_INTERFACE:${magic_enum_SOURCE_DIR}/include>
+-      $<BUILD_INTERFACE:${nlohmann_json_SOURCE_DIR}/single_include>
+-      $<BUILD_INTERFACE:${concurrent_queue_SOURCE_DIR}>
 -      $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/3rdparty>
 +      ${TL_EXPECTED_INCLUDE_DIRS}
 +      ${DLPACK_INCLUDE_DIRS}
@@ -2475,8 +3032,60 @@ index eb343db..af8e52d 100644
  )
  
  # ##############################################################################
+diff --git a/src/core/conditions/gxf/asynchronous.cpp b/src/core/conditions/gxf/asynchronous.cpp
+index 6485a4f..7c9d70c 100644
+--- a/src/core/conditions/gxf/asynchronous.cpp
++++ b/src/core/conditions/gxf/asynchronous.cpp
+@@ -19,7 +19,7 @@
+ 
+ #include <string>
+ 
+-#include <magic_enum.hpp>
++#include <magic_enum/magic_enum.hpp>
+ #include "holoscan/core/component_spec.hpp"
+ 
+ namespace holoscan {
+diff --git a/src/core/gxf/gxf_utils.cpp b/src/core/gxf/gxf_utils.cpp
+index c5abb79..ec06c7a 100644
+--- a/src/core/gxf/gxf_utils.cpp
++++ b/src/core/gxf/gxf_utils.cpp
+@@ -25,7 +25,7 @@
+ #include <common/fixed_vector.hpp>
+ #include <gxf/core/entity.hpp>
+ #include <gxf/std/resources.hpp>  // GPUDevice
+-#include <magic_enum.hpp>
++#include <magic_enum/magic_enum.hpp>
+ 
+ #include "holoscan/core/gxf/gxf_utils.hpp"
+ #include "holoscan/logger/logger.hpp"
+diff --git a/src/core/resources/async_data_logger.cpp b/src/core/resources/async_data_logger.cpp
+index 4465d8c..1d9d7be 100644
+--- a/src/core/resources/async_data_logger.cpp
++++ b/src/core/resources/async_data_logger.cpp
+@@ -26,7 +26,7 @@
+ #include <string>
+ #include <utility>
+ 
+-#include "magic_enum.hpp"
++#include "magic_enum/magic_enum.hpp"
+ 
+ #include "holoscan/core/component_spec.hpp"
+ #include "holoscan/core/domain/tensor.hpp"
+diff --git a/src/data_loggers/basic_console_logger/simple_text_serializer.cpp b/src/data_loggers/basic_console_logger/simple_text_serializer.cpp
+index fba7bb8..fc15572 100644
+--- a/src/data_loggers/basic_console_logger/simple_text_serializer.cpp
++++ b/src/data_loggers/basic_console_logger/simple_text_serializer.cpp
+@@ -28,7 +28,7 @@
+ #include <string>
+ #include <vector>
+ 
+-#include <magic_enum.hpp>
++#include <magic_enum/magic_enum.hpp>
+ #include "gxf/core/entity.hpp"
+ #include "gxf/core/handle.hpp"
+ #include "gxf/multimedia/video.hpp"
 diff --git a/src/operators/holoviz/holoviz.cpp b/src/operators/holoviz/holoviz.cpp
-index 826d65f..d62cfeb 100644
+index 6ef3118..48a45d3 100644
 --- a/src/operators/holoviz/holoviz.cpp
 +++ b/src/operators/holoviz/holoviz.cpp
 @@ -26,7 +26,7 @@
@@ -2487,9 +3096,9 @@ index 826d65f..d62cfeb 100644
 +#include <magic_enum/magic_enum.hpp>
  
  #include "holoscan/core/application.hpp"
- #include "holoscan/core/codecs.hpp"
+ #include "holoscan/core/condition.hpp"
 diff --git a/src/operators/v4l2_video_capture/v4l2_video_capture.cpp b/src/operators/v4l2_video_capture/v4l2_video_capture.cpp
-index 235fcb9..60e49af 100644
+index 6c4860f..4d52aef 100644
 --- a/src/operators/v4l2_video_capture/v4l2_video_capture.cpp
 +++ b/src/operators/v4l2_video_capture/v4l2_video_capture.cpp
 @@ -35,7 +35,7 @@
@@ -2501,6 +3110,116 @@ index 235fcb9..60e49af 100644
  
  #include "holoscan/core/execution_context.hpp"
  #include "holoscan/core/resources/gxf/allocator.hpp"
+diff --git a/tests/system/distributed/receive_tensor_gxf.hpp b/tests/system/distributed/receive_tensor_gxf.hpp
+deleted file mode 120000
+index 39adee0..0000000
+--- a/tests/system/distributed/receive_tensor_gxf.hpp
++++ /dev/null
+@@ -1 +0,0 @@
+-../../../examples/import_gxf_components/cpp/receive_tensor_gxf.hpp
+\ No newline at end of file
+diff --git a/tests/system/distributed/receive_tensor_gxf.hpp b/tests/system/distributed/receive_tensor_gxf.hpp
+new file mode 100644
+index 0000000..e487492
+--- /dev/null
++++ b/tests/system/distributed/receive_tensor_gxf.hpp
+@@ -0,0 +1,96 @@
++/*
++ * SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * SPDX-License-Identifier: Apache-2.0
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef IMPORT_GXF_COMPONENTS_CPP_RECEIVE_TENSOR_GXF_HPP
++#define IMPORT_GXF_COMPONENTS_CPP_RECEIVE_TENSOR_GXF_HPP
++
++#include <cuda_runtime.h>
++
++#include <cstdint>
++#include <iostream>
++#include <vector>
++
++#include "gxf/std/allocator.hpp"
++#include "gxf/std/codelet.hpp"
++#include "gxf/core/parameter_parser_std.hpp"
++#include "gxf/std/receiver.hpp"
++#include "gxf/std/tensor.hpp"
++
++#ifndef CUDA_TRY
++#define CUDA_TRY(stmt)                                                                     \
++  ({                                                                                       \
++    cudaError_t _holoscan_cuda_err = stmt;                                                 \
++    if (cudaSuccess != _holoscan_cuda_err) {                                               \
++      GXF_LOG_ERROR("CUDA Runtime call %s in line %d of file %s failed with '%s' (%d).\n", \
++                    #stmt,                                                                 \
++                    __LINE__,                                                              \
++                    __FILE__,                                                              \
++                    cudaGetErrorString(_holoscan_cuda_err),                                \
++                    _holoscan_cuda_err);                                                   \
++    }                                                                                      \
++    _holoscan_cuda_err;                                                                    \
++  })
++#endif
++
++namespace nvidia {
++namespace gxf {
++namespace test {
++
++class ReceiveTensor : public Codelet {
++ public:
++  gxf_result_t registerInterface(Registrar* registrar) override {
++    gxf::Expected<void> result;
++    result &= registrar->parameter(signal_, "signal");
++    return gxf::ToResultCode(result);
++  }
++  gxf_result_t start() override { return GXF_SUCCESS; }
++  gxf_result_t tick() override {
++    const auto in_message = signal_->receive();
++    if (!in_message || in_message.value().is_null()) {
++      return GXF_CONTRACT_MESSAGE_NOT_AVAILABLE;
++    }
++
++    const auto maybe_in_tensor = in_message.value().get<gxf::Tensor>("tensor");
++    if (!maybe_in_tensor) {
++      GXF_LOG_ERROR("Failed to access in tensor with name `tensor`");
++      return gxf::ToResultCode(maybe_in_tensor);
++    }
++    void* in_data_ptr = maybe_in_tensor.value()->pointer();
++
++    size_t data_size = maybe_in_tensor->get()->bytes_size();
++    std::vector<uint8_t> in_data(data_size);
++
++    CUDA_TRY(cudaMemcpy(in_data.data(), in_data_ptr, data_size, cudaMemcpyDeviceToHost));
++
++    for (size_t i = 0; i < data_size; i++) {
++      std::cout << static_cast<int>(in_data[i]) << " ";
++    }
++    std::cout << std::endl;
++
++    return GXF_SUCCESS;
++  }
++  gxf_result_t stop() override { return GXF_SUCCESS; }
++
++ private:
++  gxf::Parameter<gxf::Handle<gxf::Receiver>> signal_;
++};
++
++}  // namespace test
++}  // namespace gxf
++}  // namespace nvidia
++
++#endif /* IMPORT_GXF_COMPONENTS_CPP_RECEIVE_TENSOR_GXF_HPP */
 -- 
 2.34.1
 

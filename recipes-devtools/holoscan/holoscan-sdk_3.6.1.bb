@@ -3,8 +3,8 @@ HOMEPAGE = "https://developer.nvidia.com/holoscan-sdk"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE.txt;md5=3b83ef96387f14655fc854ddc3c6bd57"
 
-SRC_URI = "git://github.com/nvidia-holoscan/holoscan-sdk.git;protocol=https;branch=main;tag=v${PV}"
-SRCREV = "c5ef83de6188d625735b93aa8c96619b65a329d0"
+SRC_URI = "git://github.com/nvidia-holoscan/holoscan-sdk.git;protocol=https;nobranch=1;tag=v${PV}"
+SRCREV = "30d9d30ca8b35eafe05885a44ea10014b763de55"
 
 SRC_URI += " \
     file://desktop-icons \
@@ -39,6 +39,7 @@ EXTRA_OECMAKE:append = " \
     -Dyaml-cpp_DIR=${RECIPE_SYSROOT}${datadir}/cmake/yaml-cpp \
     -Dglfw3_DIR=${RECIPE_SYSROOT}${libdir}/cmake/glfw3 \
     -DPYTHON_EXECUTABLE=${HOSTTOOLS_DIR}/python3 \
+    -DTENSORRT_ROOT=${RECIPE_SYSROOT}${includedir} \
 "
 
 # Disable unused Holoscan build steps and components.
@@ -70,6 +71,7 @@ DEPENDS += " \
     tensorrt-plugins \
     torchvision \
     ucx \
+    ucxx \
     v4l-utils \
     vulkan-headers \
     vulkan-loader \
@@ -79,7 +81,7 @@ DEPENDS += " \
     imgui \
     fmt \
     spdlog \
-    cccl \
+    cuda-cccl \
     hwloc \
     cli11 \
     dlpack \
@@ -91,6 +93,9 @@ DEPENDS += " \
     python3-pybind11 \
     cpm-cmake \
     rapids-cmake \
+    libeigen \
+    concurrentqueue \
+    matx \
 "
 
 RDEPENDS:${PN} = " \

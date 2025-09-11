@@ -1,6 +1,6 @@
-From 956d5d11f68500b20e89515e2916ecdc7197fcde Mon Sep 17 00:00:00 2001
+From 3621b4f36df45fe1d0930a44cec2f184f66f883c Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 24 Jun 2025 10:53:55 +0100
+Date: Thu, 11 Sep 2025 18:31:18 +0100
 Subject: [PATCH 1/7] Fix GXF TypenameAsString error
 
 Upstream-Status: Inappropriate [OE-specific]
@@ -34,23 +34,23 @@ index 657f442..c98976c 100644
      gxf_uid_t cid;
      HOLOSCAN_GXF_CALL_FATAL(GxfComponentAdd(context(), eid(), tid, name, &cid));
 diff --git a/include/holoscan/core/gxf/gxf_utils.hpp b/include/holoscan/core/gxf/gxf_utils.hpp
-index 6283cf1..c2ca7dd 100644
+index d3fbd1c..0cc2a4b 100644
 --- a/include/holoscan/core/gxf/gxf_utils.hpp
 +++ b/include/holoscan/core/gxf/gxf_utils.hpp
-@@ -228,7 +228,7 @@ inline gxf_uid_t find_component_handle(gxf_context_t context, gxf_uid_t componen
+@@ -240,7 +240,7 @@ inline gxf_uid_t find_component_handle(gxf_context_t context, gxf_uid_t componen
  
    // Get the type id of the component we are are looking for.
    gxf_tid_t tid;
 -  const gxf_result_t result_2 = GxfComponentTypeId(context, ::nvidia::TypenameAsString<S>(), &tid);
 +  const gxf_result_t result_2 = GxfComponentTypeId(context, TypenameAsString<S>(), &tid);
-   if (result_2 != GXF_SUCCESS) { return 0; }
- 
-   // Find the component in the indicated entity
+   if (result_2 != GXF_SUCCESS) {
+     return 0;
+   }
 diff --git a/src/core/gxf/entity.cpp b/src/core/gxf/entity.cpp
-index e6d1cf8..841fb32 100644
+index 8f50fdd..3c38f37 100644
 --- a/src/core/gxf/entity.cpp
 +++ b/src/core/gxf/entity.cpp
-@@ -47,7 +47,7 @@ nvidia::gxf::Handle<nvidia::gxf::VideoBuffer> get_videobuffer(Entity entity, con
+@@ -49,7 +49,7 @@ nvidia::gxf::Handle<nvidia::gxf::VideoBuffer> get_videobuffer(Entity entity, con
  
    gxf_tid_t tid;
    auto tid_result = GxfComponentTypeId(

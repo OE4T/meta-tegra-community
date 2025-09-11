@@ -1,137 +1,36 @@
-From 9880b62011cf5bb9aa9c1de70877a4400c74d6a4 Mon Sep 17 00:00:00 2001
+From a55f7a0899ca153e0e8d3fde11c7ad5cba85e122 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 24 Jun 2025 11:03:35 +0100
+Date: Thu, 11 Sep 2025 18:49:31 +0100
 Subject: [PATCH 7/7] Updates for OE cross builds
 
 Upstream-Status: Inappropriate [OE-specific]
-Signed-off-by: Gregory Lee <grelee@nvidia.com>
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- Dockerfile                                   | 12 +++----
- include/holoscan/core/fragment_scheduler.hpp |  3 +-
- include/holoscan/core/system/cpu_info.hpp    |  5 +--
- include/holoscan/core/system/gpu_info.hpp    |  5 +--
- modules/holoviz/src/glfw_window.cpp          |  2 +-
- modules/holoviz/src/vulkan/vulkan_app.cpp    | 14 ++++----
- python/holoscan/core/application.cpp         | 23 ++++++++++++-
- python/holoscan/core/operator.cpp            | 31 +++++++++++++++---
- python/tests/system/test_multiple_run.py     | 34 ++++++++++++++------
- python/tests/system/test_pytracing.py        |  2 ++
- src/utils/holoinfer_utils.cpp                |  4 +--
- 11 files changed, 100 insertions(+), 35 deletions(-)
+ modules/holoinfer/src/CMakeLists.txt      |  4 ++++
+ modules/holoviz/src/glfw_window.cpp       |  2 +-
+ modules/holoviz/src/vulkan/vulkan_app.cpp | 14 +++++++-------
+ 3 files changed, 12 insertions(+), 8 deletions(-)
 
-diff --git a/Dockerfile b/Dockerfile
-index 0a0d832..75f8c20 100644
---- a/Dockerfile
-+++ b/Dockerfile
-@@ -312,23 +312,23 @@ RUN apt-get update \
-         libjpeg-turbo8-dev="2.1.2-*" \
-     && rm -rf /var/lib/apt/lists/*
+diff --git a/modules/holoinfer/src/CMakeLists.txt b/modules/holoinfer/src/CMakeLists.txt
+index 57587e1..7decb8e 100644
+--- a/modules/holoinfer/src/CMakeLists.txt
++++ b/modules/holoinfer/src/CMakeLists.txt
+@@ -74,6 +74,10 @@ target_link_libraries(${PROJECT_NAME}
+         yaml-cpp
+ )
  
--# Install Python 3.12 and replace Python 3.10
-+# Install Python 3.13 and replace Python 3.10
- RUN apt-get update \
-     && apt-get install --no-install-recommends -y \
-         software-properties-common \
-     && add-apt-repository ppa:deadsnakes/ppa \
-     && apt-get update \
-     && apt-get install --no-install-recommends -y \
--        python3.12 \
--        python3.12-dev \
-+        python3.13 \
-+        python3.13-dev \
-     && apt purge -y \
-         python3-pip \
-         software-properties-common \
-     && apt-get autoremove --purge -y \
-     && rm -rf /var/lib/apt/lists/*
--RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
--RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
--RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1
-+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.13
-+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1
-+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1
- 
- # PIP INSTALLS
- #  mkl - dependency for libtorch plugin on x86_64 (match pytorch container version)
-diff --git a/include/holoscan/core/fragment_scheduler.hpp b/include/holoscan/core/fragment_scheduler.hpp
-index cf228b1..3e841c5 100644
---- a/include/holoscan/core/fragment_scheduler.hpp
-+++ b/include/holoscan/core/fragment_scheduler.hpp
-@@ -1,5 +1,5 @@
- /*
-- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-  * SPDX-License-Identifier: Apache-2.0
-  *
-  * Licensed under the Apache License, Version 2.0 (the "License");
-@@ -18,6 +18,7 @@
- #ifndef HOLOSCAN_CORE_FRAGMENT_SCHEDULER_HPP
- #define HOLOSCAN_CORE_FRAGMENT_SCHEDULER_HPP
- 
-+#include <cstdint>
- #include <memory>
- #include <string>
- #include <unordered_map>
-diff --git a/include/holoscan/core/system/cpu_info.hpp b/include/holoscan/core/system/cpu_info.hpp
-index 67898f9..890046a 100644
---- a/include/holoscan/core/system/cpu_info.hpp
-+++ b/include/holoscan/core/system/cpu_info.hpp
-@@ -1,5 +1,5 @@
- /*
-- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-  * SPDX-License-Identifier: Apache-2.0
-  *
-  * Licensed under the Apache License, Version 2.0 (the "License");
-@@ -18,12 +18,13 @@
- #ifndef HOLOSCAN_CORE_SYSTEM_CPU_INFO_HPP
- #define HOLOSCAN_CORE_SYSTEM_CPU_INFO_HPP
- 
-+#include <cstdint>
- #include <memory>
- 
- namespace holoscan {
- 
- namespace CPUMetricFlag {
--enum : uint64_t {
-+enum CPUMetricEnum: uint64_t {
-   DEFAULT = 0x00,
-   CORE_COUNT = 0x01,
-   CPU_COUNT = 0x02,
-diff --git a/include/holoscan/core/system/gpu_info.hpp b/include/holoscan/core/system/gpu_info.hpp
-index eb1b101..f69d78f 100644
---- a/include/holoscan/core/system/gpu_info.hpp
-+++ b/include/holoscan/core/system/gpu_info.hpp
-@@ -1,5 +1,5 @@
- /*
-- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-  * SPDX-License-Identifier: Apache-2.0
-  *
-  * Licensed under the Apache License, Version 2.0 (the "License");
-@@ -18,6 +18,7 @@
- #ifndef HOLOSCAN_CORE_SYSTEM_GPU_INFO_HPP
- #define HOLOSCAN_CORE_SYSTEM_GPU_INFO_HPP
- 
-+#include <cstdint>
- #include <memory>
- 
- #include "nvml_wrapper.h"
-@@ -25,7 +26,7 @@
- namespace holoscan {
- 
- namespace GPUMetricFlag {
--enum : uint64_t {
-+enum GPUMetricEnum: uint64_t {
-   DEFAULT = 0x00,
-   GPU_DEVICE_ID = 0x01,
-   GPU_UTILIZATION = 0x02,
++target_compile_options(${PROJECT_NAME} PRIVATE
++    $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-Wno-error=deprecated-declarations>
++)
++
+ if(HOLOSCAN_BUILD_LIBTORCH)
+     # no target_link_libraries to holoinfer_torch: we dlopen it as a plugin
+     target_compile_definitions(${PROJECT_NAME} PUBLIC "HOLOINFER_TORCH_ENABLED")
 diff --git a/modules/holoviz/src/glfw_window.cpp b/modules/holoviz/src/glfw_window.cpp
-index 7f263f9..bed49d6 100644
+index a3a780d..0c9acdb 100644
 --- a/modules/holoviz/src/glfw_window.cpp
 +++ b/modules/holoviz/src/glfw_window.cpp
-@@ -534,7 +534,7 @@ vk::SurfaceKHR GLFWWindow::create_surface(vk::PhysicalDevice physical_device,
+@@ -590,7 +590,7 @@ vk::SurfaceKHR GLFWWindow::create_surface(vk::PhysicalDevice physical_device,
    VkSurfaceKHR surface;
    const vk::Result result =
        vk::Result(glfwCreateWindowSurface(instance, impl_->window_, nullptr, &surface));
@@ -141,10 +40,10 @@ index 7f263f9..bed49d6 100644
  }
  
 diff --git a/modules/holoviz/src/vulkan/vulkan_app.cpp b/modules/holoviz/src/vulkan/vulkan_app.cpp
-index af8d0ca..5baebcf 100644
+index d9838d8..fcbc706 100644
 --- a/modules/holoviz/src/vulkan/vulkan_app.cpp
 +++ b/modules/holoviz/src/vulkan/vulkan_app.cpp
-@@ -764,7 +764,7 @@ void Vulkan::Impl::end_transfer_pass() {
+@@ -797,7 +797,7 @@ void Vulkan::Impl::end_transfer_pass() {
    // submit staged transfers
    const vk::Result result =
        vk::Result(nvvk_.transfer_batch_submission_.execute(transfer_job.fence_.get(), 0b0000'0001));
@@ -153,7 +52,7 @@ index af8d0ca..5baebcf 100644
  
    // next graphics submission must wait for transfer completion
    nvvk_.batch_submission_.enqueueWait(transfer_job.semaphore_.get(),
-@@ -833,7 +833,7 @@ void Vulkan::Impl::cleanup_transfer_jobs() {
+@@ -866,7 +866,7 @@ void Vulkan::Impl::cleanup_transfer_jobs() {
  
          it->fence_triggered_ = true;
        } else if (result != vk::Result::eNotReady) {
@@ -162,7 +61,7 @@ index af8d0ca..5baebcf 100644
        }
      }
  
-@@ -851,7 +851,7 @@ void Vulkan::Impl::cleanup_transfer_jobs() {
+@@ -884,7 +884,7 @@ void Vulkan::Impl::cleanup_transfer_jobs() {
            it = next;
            continue;
          } else if (result != vk::Result::eNotReady) {
@@ -171,7 +70,7 @@ index af8d0ca..5baebcf 100644
          }
        } else {
          // this is a stale transfer buffer (no end_transfer_pass()?), remove it
-@@ -882,7 +882,7 @@ void Vulkan::Impl::prepare_frame() {
+@@ -917,7 +917,7 @@ void Vulkan::Impl::prepare_frame() {
    if (result != vk::Result::eSuccess) {
      // This allows Aftermath to do things and exit below
      usleep(1000);
@@ -180,7 +79,7 @@ index af8d0ca..5baebcf 100644
      exit(-1);
    }
  
-@@ -914,7 +914,7 @@ void Vulkan::Impl::submit_frame() {
+@@ -949,7 +949,7 @@ void Vulkan::Impl::submit_frame() {
  
    const vk::Result result =
        vk::Result(nvvk_.batch_submission_.execute(wait_fences_[image_index].get(), 0b0000'0001));
@@ -189,7 +88,7 @@ index af8d0ca..5baebcf 100644
  
    // Presenting frame
    fb_sequence_->present(queue_gct_);
-@@ -2156,7 +2156,7 @@ void Vulkan::Impl::read_framebuffer(Vulkan* vulkan, ImageFormat fmt, uint32_t wi
+@@ -2222,7 +2222,7 @@ void Vulkan::Impl::read_framebuffer(Vulkan* vulkan, ImageFormat fmt, uint32_t wi
      if (result != vk::Result::eSuccess) {
        // This allows Aftermath to do things and exit below
        usleep(1000);
@@ -198,7 +97,7 @@ index af8d0ca..5baebcf 100644
        exit(-1);
      }
  
-@@ -2211,7 +2211,7 @@ void Vulkan::Impl::read_framebuffer(Vulkan* vulkan, ImageFormat fmt, uint32_t wi
+@@ -2279,7 +2279,7 @@ void Vulkan::Impl::read_framebuffer(Vulkan* vulkan, ImageFormat fmt, uint32_t wi
    // submit the command buffer
    const vk::Result result =
        vk::Result(nvvk_.batch_submission_.execute(read_job.fence_.get(), 0b0000'0001));
@@ -207,240 +106,6 @@ index af8d0ca..5baebcf 100644
  
    // copy the buffer to CUDA memory
    {
-diff --git a/python/holoscan/core/application.cpp b/python/holoscan/core/application.cpp
-index 71d05cf..ae508b8 100644
---- a/python/holoscan/core/application.cpp
-+++ b/python/holoscan/core/application.cpp
-@@ -282,13 +282,34 @@ void PyApplication::run() {
-     py_profile_func_ = sys_module.attr("getprofile")();
-     py_trace_func_ = sys_module.attr("gettrace")();
- 
-+#if PY_VERSION_HEX >= 0x030D0000  // >= Python 3.13.0
-+    // public API available in Python 3.13
-+    auto* py_thread_state = PyThreadState_GetUnchecked();
-+#else
-     auto* py_thread_state = _PyThreadState_UncheckedGet();
-+#endif
-+    // Warning: these PyThreadState fields are part of CPython's private C API
-     c_profilefunc_ = py_thread_state->c_profilefunc;
-     c_profileobj_ = py_thread_state->c_profileobj;
-     c_tracefunc_ = py_thread_state->c_tracefunc;
-     c_traceobj_ = py_thread_state->c_traceobj;
- 
--#if PY_VERSION_HEX >= 0x030b0000  // >= Python 3.11.0
-+#if PY_VERSION_HEX >= 0x030D0000  // >= Python 3.13.0
-+    // Note:
-+    // Python 3.12 implemented PEP-669: Low Impact Monitoring for CPython
-+    //   https://peps.python.org/pep-0669/
-+    // as sys.monitoring:
-+    //   https://docs.python.org/3/library/sys.monitoring.html#module-sys.monitoring)
-+    // Python 3.13 introduced a corresponding C-API:
-+    //   https://docs.python.org/3/c-api/monitoring.html
-+
-+    // PyThreadState_GetFrame returns a strong reference so a Py_DECREF will be needed
-+    // py_last_frame_ = PyThreadState_GetFrame(py_thread_state);
-+
-+    // PyEval_GetFrame returns a borrowed reference so Py_DECREF is not needed
-+    // The PyFrameObject* corresponds to the current thread.
-+    py_last_frame_ = PyEval_GetFrame();
-+#elif PY_VERSION_HEX >= 0x030B0000  // >= Python 3.11.0
-     // _PyInterpreterFrame*
-     py_last_frame_ = py_thread_state->cframe->current_frame;
- #else
-diff --git a/python/holoscan/core/operator.cpp b/python/holoscan/core/operator.cpp
-index 2ccaef7..685a6f9 100644
---- a/python/holoscan/core/operator.cpp
-+++ b/python/holoscan/core/operator.cpp
-@@ -651,8 +651,12 @@ void PyOperator::set_py_tracing() {
-     // If tracing is not enabled, do nothing and return
-     if (!tracing_data.in_tracing) { return; }
- 
-+#if PY_VERSION_HEX >= 0x030D0000  // >= Python 3.13.0
-+    // Python 3.13 increased enforcement of thread safety
-+    auto* py_thread_state = PyThreadState_Get();
-+#else
-     auto* py_thread_state = _PyThreadState_UncheckedGet();
--
-+#endif
-     // If tracing_data.is_func_set is false, cache the current trace/profile functions for
-     // the current thread.
-     if (!tracing_data.is_func_set) {
-@@ -714,7 +718,10 @@ void PyOperator::set_py_tracing() {
-     // Depending on the Python version, the way to set the trace/profile functions is different.
- 
-     // Set current frame to the last valid Python frame
--#if PY_VERSION_HEX >= 0x030B0000  // >= Python 3.11.0
-+#if PY_VERSION_HEX >= 0x030D0000  // >= Python 3.13.0
-+    // _PyThreadState_SetFrame is removed in Python 3.13 and there does not seem to
-+    // be any equivalent avilable.
-+#elif PY_VERSION_HEX >= 0x030B0000  // >= Python 3.11.0
-     // https://github.com/python/cpython/blob/c184c6750e40ca4ffa4f62a5d145b892cbd066bc
-     //   /Doc/whatsnew/3.11.rst#L2301
-     // - tstate->frame is removed.
-@@ -726,7 +733,16 @@ void PyOperator::set_py_tracing() {
-     py_thread_state->frame = reinterpret_cast<PyFrameObject*>(tracing_data.py_last_frame);
- #endif
- 
--#if PY_VERSION_HEX >= 0x030B0000  // >= Python 3.11.0
-+#if PY_VERSION_HEX >= 0x030D0000  // >= Python 3.13.0
-+    // set profile and tracing for the current thread using public API
-+    // (this API also exists even back in Python 3.9)
-+    PyEval_SetProfile(tracing_data.c_profilefunc, tracing_data.c_profileobj.ptr());
-+    PyEval_SetTrace(tracing_data.c_tracefunc, tracing_data.c_traceobj.ptr());
-+
-+    // Python 3.12+ also has AllThreads variants of these
-+    // PyEval_SetProfileAllThreads(tracing_data.c_profilefunc, tracing_data.c_profileobj.ptr());
-+    // PyEval_SetTraceAllThreads(tracing_data.c_tracefunc, tracing_data.c_traceobj.ptr());
-+#elif PY_VERSION_HEX >= 0x030B0000  // >= Python 3.11.0
-     // Recommended way to set the trace/profile functions in Python 3.11
-     // (see
-     // https://discuss.python.org/t/python-3-11-frame-structure-and-various-changes/17895/19)
-@@ -743,7 +759,6 @@ void PyOperator::set_py_tracing() {
-     Py_XINCREF(tracing_data.c_traceobj.ptr());
-     Py_XDECREF(py_thread_state->c_traceobj);
-     py_thread_state->c_traceobj = tracing_data.c_traceobj.ptr();
--
- #if PY_VERSION_HEX >= 0x030A00B1  // >= Python 3.10.0 b1
-     py_thread_state->cframe->use_tracing = 1;
- #else                             // < Python 3.10.0 b1
-@@ -774,7 +789,9 @@ void PyOperator::initialize() {
-   // `super().__init__(fragment, *args, **kwargs)`.
-   Operator::initialize();
- 
-+#if PY_VERSION_HEX < 0x030C0000  // < 3.12
-   set_py_tracing();
-+#endif
- 
-   auto* context = fragment_->executor().context();
- 
-@@ -804,7 +821,9 @@ void PyOperator::start() {
-   // Get the start method of the Python Operator class and call it
-   py::gil_scoped_acquire scope_guard;
- 
-+#if PY_VERSION_HEX < 0x030C0000  // < 3.12
-   set_py_tracing();
-+#endif
- 
-   py_start_.operator()();
- }
-@@ -813,7 +832,9 @@ void PyOperator::stop() {
-   // Get the stop method of the Python Operator class and call it
-   py::gil_scoped_acquire scope_guard;
- 
-+#if PY_VERSION_HEX < 0x030C0000  // < 3.12
-   set_py_tracing();
-+#endif
- 
-   py_stop_.operator()();
- }
-@@ -825,7 +846,9 @@ void PyOperator::compute(InputContext& op_input, OutputContext& op_output,
- 
-   py_context_->clear_received_streams();
- 
-+#if PY_VERSION_HEX < 0x030C0000  // < 3.12
-   set_py_tracing();
-+#endif
- 
-   py_compute_.operator()(py::cast(py_op_input_), py::cast(py_op_output_), py::cast(py_context_));
- }
-diff --git a/python/tests/system/test_multiple_run.py b/python/tests/system/test_multiple_run.py
-index 538430f..9fd3966 100644
---- a/python/tests/system/test_multiple_run.py
-+++ b/python/tests/system/test_multiple_run.py
-@@ -15,10 +15,14 @@ See the License for the specific language governing permissions and
- limitations under the License.
- """  # noqa: E501
- 
-+import sys
-+
- from holoscan.conditions import CountCondition
- from holoscan.core import Application, Operator, OperatorSpec
- from holoscan.operators import PingRxOp
- 
-+from .env_wrapper import env_var_context
-+
- # Number of times the application will be run in the test
- GLOBAL_RUN_COUNT = 2000
- # The statistics count limit is based on experimental observations.
-@@ -60,10 +64,15 @@ def test_multiple_run():
- 
-     tracemalloc.start()
- 
--    app = MyPingApp()
--    for _ in range(GLOBAL_RUN_COUNT):
--        app.run()
--        gc.collect()
-+    # log at warning level to make logs less verbose on failure
-+    env_var_settings = {
-+        ("HOLOSCAN_LOG_LEVEL", "WARN"),
-+    }
-+    with env_var_context(env_var_settings):
-+        app = MyPingApp()
-+        for _ in range(GLOBAL_RUN_COUNT):
-+            app.run()
-+            gc.collect()
- 
-     snapshot = tracemalloc.take_snapshot()
-     top_stats = snapshot.statistics("lineno")
-@@ -85,11 +94,18 @@ def test_multiple_run_async():
-     import gc
-     import tracemalloc
- 
--    app = MyPingApp()
--    for _ in range(GLOBAL_RUN_COUNT):
--        future = app.run_async()
--        future.result()
--        gc.collect()
-+    tracemalloc.start()
-+
-+    # log at warning level to make logs less verbose on failure
-+    env_var_settings = {
-+        ("HOLOSCAN_LOG_LEVEL", "WARN"),
-+    }
-+    with env_var_context(env_var_settings):
-+        app = MyPingApp()
-+        for _ in range(GLOBAL_RUN_COUNT):
-+            future = app.run_async()
-+            future.result()
-+            gc.collect()
- 
-     snapshot = tracemalloc.take_snapshot()
-     top_stats = snapshot.statistics("lineno")
-diff --git a/python/tests/system/test_pytracing.py b/python/tests/system/test_pytracing.py
-index a76124d..8f76298 100644
---- a/python/tests/system/test_pytracing.py
-+++ b/python/tests/system/test_pytracing.py
-@@ -189,6 +189,8 @@ def verify_ncalls(pstats, func_name, expected_ncalls, func_count=1):
-             # Lib/pstats.py#L202 to understand the structure of the tuple
-             # (pcalls, ncalls, ...)
-             assert pstats.stats[key][1] == expected_ncalls
-+    if count != func_count:
-+        print(f"{count=} and {func_count=}, but expected these to be equal")
-     assert count == func_count
- 
- 
-diff --git a/src/utils/holoinfer_utils.cpp b/src/utils/holoinfer_utils.cpp
-index d28ac29..13ab9a9 100644
---- a/src/utils/holoinfer_utils.cpp
-+++ b/src/utils/holoinfer_utils.cpp
-@@ -133,7 +133,7 @@ gxf_result_t get_data_per_model(InputContext& op_input, const std::vector<std::s
-       HOLOSCAN_LOG_DEBUG("Extracting data from tensor {}", in_tensors[i]);
-       nvidia::gxf::Expected<nvidia::gxf::Handle<nvidia::gxf::Tensor>> maybe_in_tensor =
-           nvidia::gxf::Unexpected{GXF_UNINITIALIZED_VALUE};
--      size_t message_index;
-+      size_t message_index = 0;
-       for (unsigned int j = 0; j < messages.size(); ++j) {
-         maybe_in_tensor =
-             messages[j].nvidia::gxf::Entity::get<nvidia::gxf::Tensor>(in_tensors[i].c_str());
-@@ -266,7 +266,7 @@ gxf_result_t get_data_per_model(InputContext& op_input, const std::vector<std::s
-       HOLOSCAN_LOG_DEBUG("Extracting data from tensor {}", in_tensors[i]);
-       nvidia::gxf::Expected<nvidia::gxf::Handle<nvidia::gxf::Tensor>> maybe_in_tensor =
-           nvidia::gxf::Unexpected{GXF_UNINITIALIZED_VALUE};
--      size_t message_index;
-+      size_t message_index = 0;
-       for (unsigned int j = 0; j < messages.size(); ++j) {
-         maybe_in_tensor =
-             messages[j].nvidia::gxf::Entity::get<nvidia::gxf::Tensor>(in_tensors[i].c_str());
 -- 
 2.34.1
 

@@ -1,16 +1,17 @@
-From bd0a5e1da718cce4c37b1fbaaaecc07bcfa71f9e Mon Sep 17 00:00:00 2001
+From dfc62b08df6725392fa4ab97f740afc148bfdb48 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 24 Jun 2025 11:02:49 +0100
+Date: Thu, 11 Sep 2025 18:39:24 +0100
 Subject: [PATCH 5/7] Disable various warnings as errors
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
 ---
- CMakeLists.txt | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ CMakeLists.txt                       | 12 ++++++++++++
+ modules/holoinfer/src/CMakeLists.txt |  4 ++++
+ 2 files changed, 16 insertions(+)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d0f3c65..1cee9b1 100644
+index 63351fb..870868c 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -106,6 +106,18 @@ set(CMAKE_CXX_EXTENSIONS NO)
@@ -32,6 +33,21 @@ index d0f3c65..1cee9b1 100644
  # ##############################################################################
  # # RAPIDS CMAKE configurations
  # # (https://docs.rapids.ai/api/rapids-cmake/stable/api.html)
+diff --git a/modules/holoinfer/src/CMakeLists.txt b/modules/holoinfer/src/CMakeLists.txt
+index 8a47d0b..57587e1 100644
+--- a/modules/holoinfer/src/CMakeLists.txt
++++ b/modules/holoinfer/src/CMakeLists.txt
+@@ -45,6 +45,10 @@ set(holoinfer_src
+ add_library(${PROJECT_NAME} SHARED ${holoinfer_src})
+ add_library(holoscan::infer ALIAS ${PROJECT_NAME})
+ 
++target_compile_options(${PROJECT_NAME} PRIVATE
++    $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-Wno-deprecated-declarations>
++)
++
+ target_include_directories(${PROJECT_NAME}
+     PRIVATE
+         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 -- 
 2.34.1
 
