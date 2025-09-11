@@ -1,7 +1,7 @@
-From 3732ab0bd9e6dc00336d647bf0eb34756709cb48 Mon Sep 17 00:00:00 2001
+From 78ea4da4e327413460eec99af38c9d7f76d6c281 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Wed, 11 Jun 2025 13:47:56 +0100
-Subject: [PATCH] Use external library dependencies
+Date: Thu, 11 Sep 2025 15:03:42 +0100
+Subject: [PATCH 2/2] Use external library dependencies
 
 This changes the dependencies on the following libraries so
 that they are provided at build time instead of being
@@ -30,10 +30,10 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  10 files changed, 7 insertions(+), 55 deletions(-)
 
 diff --git a/cmake/CMakeLists.txt b/cmake/CMakeLists.txt
-index 2714e6f59d..203318888d 100644
+index adf0fc0261..fde11b22e9 100644
 --- a/cmake/CMakeLists.txt
 +++ b/cmake/CMakeLists.txt
-@@ -758,7 +758,6 @@ else()
+@@ -763,7 +763,6 @@ else()
    check_cxx_compiler_flag(-Wparentheses HAS_PARENTHESES)
    check_cxx_compiler_flag(-Wshorten-64-to-32 HAS_SHORTEN_64_TO_32)
    check_cxx_compiler_flag(-Wstrict-aliasing HAS_STRICT_ALIASING)
@@ -54,19 +54,19 @@ index 65b0d61270..f202372e18 100644
  
  FetchContent_GetProperties(cutlass)
 diff --git a/cmake/external/onnxruntime_external_deps.cmake b/cmake/external/onnxruntime_external_deps.cmake
-index ebf20ab21b..a8283c6d8f 100644
+index 0e0083af9e..88c92216ac 100644
 --- a/cmake/external/onnxruntime_external_deps.cmake
 +++ b/cmake/external/onnxruntime_external_deps.cmake
-@@ -302,7 +302,7 @@ if(NOT TARGET Boost::mp11)
+@@ -285,7 +285,7 @@ if(NOT TARGET Boost::mp11)
       mp11
       URL ${DEP_URL_mp11}
       EXCLUDE_FROM_ALL
 -     FIND_PACKAGE_ARGS NAMES Boost
 +     FIND_PACKAGE_ARGS 1.88.0 NAMES Boost
      )
-     onnxruntime_fetchcontent_makeavailable(mp11)    
+     onnxruntime_fetchcontent_makeavailable(mp11)
      if(NOT TARGET Boost::mp11)
-@@ -409,7 +409,7 @@ if(onnxruntime_USE_CUDA)
+@@ -392,7 +392,7 @@ if(onnxruntime_USE_CUDA)
      URL_HASH SHA1=${DEP_SHA1_microsoft_gsl}
      PATCH_COMMAND ${Patch_EXECUTABLE} --binary --ignore-whitespace -p1 < ${PROJECT_SOURCE_DIR}/patches/gsl/1064.patch
      EXCLUDE_FROM_ALL
@@ -75,7 +75,7 @@ index ebf20ab21b..a8283c6d8f 100644
    )
  else()
    onnxruntime_fetchcontent_declare(
-@@ -417,7 +417,7 @@ else()
+@@ -400,7 +400,7 @@ else()
      URL ${DEP_URL_microsoft_gsl}
      URL_HASH SHA1=${DEP_SHA1_microsoft_gsl}
      EXCLUDE_FROM_ALL
@@ -84,7 +84,7 @@ index ebf20ab21b..a8283c6d8f 100644
    )
  endif()
  set(GSL_TARGET "Microsoft.GSL::GSL")
-@@ -463,7 +463,7 @@ onnxruntime_fetchcontent_declare(
+@@ -449,7 +449,7 @@ onnxruntime_fetchcontent_declare(
      URL_HASH SHA1=${DEP_SHA1_flatbuffers}
      PATCH_COMMAND ${ONNXRUNTIME_FLATBUFFERS_PATCH_COMMAND}
      EXCLUDE_FROM_ALL
@@ -93,7 +93,7 @@ index ebf20ab21b..a8283c6d8f 100644
  )
  
  onnxruntime_fetchcontent_makeavailable(flatbuffers)
-@@ -527,7 +527,7 @@ onnxruntime_fetchcontent_declare(
+@@ -514,7 +514,7 @@ onnxruntime_fetchcontent_declare(
    URL_HASH SHA1=${DEP_SHA1_onnx}
    PATCH_COMMAND ${ONNXRUNTIME_ONNX_PATCH_COMMAND}
    EXCLUDE_FROM_ALL
@@ -102,7 +102,7 @@ index ebf20ab21b..a8283c6d8f 100644
  )
  if (NOT onnxruntime_MINIMAL_BUILD)
    onnxruntime_fetchcontent_makeavailable(onnx)
-@@ -591,13 +591,6 @@ set(onnxruntime_EXTERNAL_LIBRARIES ${onnxruntime_EXTERNAL_LIBRARIES_XNNPACK} ${W
+@@ -578,13 +578,6 @@ set(onnxruntime_EXTERNAL_LIBRARIES ${onnxruntime_EXTERNAL_LIBRARIES_XNNPACK} ${W
  # The other libs do not have the problem. All the sources are already there. We can compile them in any order.
  set(onnxruntime_EXTERNAL_DEPENDENCIES onnx_proto flatbuffers::flatbuffers)
  

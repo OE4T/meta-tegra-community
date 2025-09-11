@@ -5,17 +5,18 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=0f7e3b1308cb5c00b372a6e78835732d"
 
 SRC_URI = " \
     git://github.com/microsoft/onnxruntime.git;protocol=https;nobranch=1;tag=v${PV} \
-    git://gitlab.com/libeigen/eigen.git;protocol=https;nobranch=1;name=libeigen;destsuffix=${BPN}-${PV}/_deps/eigen-src \
+    git://github.com/eigen-mirror/eigen.git;protocol=https;nobranch=1;name=libeigen;destsuffix=${BPN}-${PV}/_deps/eigen3-src \
     git://github.com/NVIDIA/cudnn-frontend.git;protocol=https;nobranch=1;name=cudnn_frontend;destsuffix=${BPN}-${PV}/_deps/cudnn_frontend-src \
 "
-SRCREV = "e0b66cad282043d4377cea5269083f17771b6dfc"
+SRCREV = "5630b081cd25e4eccc7516a652ff956e51676794"
 SRCREV_libeigen = "1d8b82b0740839c0de7f1242a3585e3390ff5f33"
 SRCREV_cudnn_frontend = "de355c7094af70467f2b264f531ab5c5f4401c42"
 
 SRCREV_FORMAT = "onnxruntime_libeigen_cudnn_frontend"
 
 SRC_URI += " \
-    file://0001-Use-external-library-dependencies.patch \
+    file://0001-Fixups-for-cross-building-in-OE-with-CUDA-13.0.patch \
+    file://0002-Use-external-library-dependencies.patch \
 "
 
 COMPATIBLE_MACHINE = "(cuda)"
@@ -73,7 +74,13 @@ OECMAKE_SOURCEPATH = "${S}/cmake"
 
 SOLIBS = ".so"
 FILES_SOLIBSDEV = ""
-FILES:${PN} += "${libdir}/libonnxruntime.so* ${libdir}/libonnxruntime_providers*so"
+
+FILES:${PN} += "${libdir}/libonnxruntime*.so*"
+FILES:${PN}-dev = " \
+    ${includedir}/onnxruntime \
+    ${libdir}/pkgconfig \
+    ${libdir}/cmake \
+"
 
 PACKAGECONFIG ?= "python"
 PACKAGECONFIG[python] = ",,python3-numpy-native,python3-coloredlogs python3-flatbuffers python3-numpy python3-protobuf python3-sympy"
@@ -97,5 +104,5 @@ do_install() {
 }
 
 INSANE_SKIP:${PN} = "buildpaths dev-so"
-INSANE_SKIP:${PN}-dev = "dev-elf buildpaths"
+INSANE_SKIP:${PN}-dev = "buildpaths"
 INSANE_SKIP:${PN}-dbg = "buildpaths"
