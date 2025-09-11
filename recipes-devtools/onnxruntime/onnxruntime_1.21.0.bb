@@ -20,7 +20,7 @@ SRC_URI += " \
 
 COMPATIBLE_MACHINE = "(cuda)"
 
-inherit cmake cuda
+inherit cmake cuda setuptools3
 
 B = "${S}"
 
@@ -65,6 +65,7 @@ EXTRA_OECMAKE = " \
     -Donnxruntime_USE_PREINSTALLED_EIGEN=OFF \
     -DCMAKE_SKIP_RPATH=ON \
     -DCMAKE_CXX_STANDARD=17 \
+    ${@bb.utils.contains('PACKAGECONFIG', 'python', '-Donnxruntime_ENABLE_PYTHON=ON', '', d)} \
 "
 
 OECMAKE_CXX_FLAGS:append = " -Wno-array-bounds -Wno-deprecated-declarations -Wno-unused-variable -Wno-template-id-cdtor -Wno-range-loop-construct -Wno-maybe-uninitialized -Wno-error=cpp"
@@ -73,6 +74,27 @@ OECMAKE_SOURCEPATH = "${S}/cmake"
 SOLIBS = ".so"
 FILES_SOLIBSDEV = ""
 FILES:${PN} += "${libdir}/libonnxruntime.so* ${libdir}/libonnxruntime_providers*so"
+
+PACKAGECONFIG ?= "python"
+PACKAGECONFIG[python] = ",,python3-numpy-native,python3-coloredlogs python3-flatbuffers python3-numpy python3-protobuf python3-sympy"
+
+do_configure() {
+    cmake_do_configure
+}
+
+do_compile() {
+    cmake_do_compile
+    if "${@bb.utils.contains('PACKAGECONFIG', 'python', 'true', 'false', d)}"; then
+        setuptools3_do_compile
+    fi
+}
+
+do_install() {
+    cmake_do_install
+    if "${@bb.utils.contains('PACKAGECONFIG', 'python', 'true', 'false', d)}"; then
+        setuptools3_do_install
+    fi
+}
 
 INSANE_SKIP:${PN} = "buildpaths dev-so"
 INSANE_SKIP:${PN}-dev = "dev-elf buildpaths"
