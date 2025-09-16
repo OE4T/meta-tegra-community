@@ -13,6 +13,7 @@ fetched, built, and installed by CMake:
  - date
  - cutlass
  - flatbuffers
+ - Python
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
@@ -20,6 +21,7 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  cmake/CMakeLists.txt                            |  1 -
  cmake/external/cutlass.cmake                    |  1 +
  cmake/external/onnxruntime_external_deps.cmake  | 17 +++++------------
+ cmake/onnxruntime_python.cmake                  |  9 ---------
  onnxruntime/core/flatbuffers/schema/ort.fbs.h   |  7 -------
  .../schema/ort_training_checkpoint.fbs.h        |  7 -------
  .../transpose_optimization/optimizer_api.h      |  1 +
@@ -27,7 +29,7 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  .../OperatorFieldTypes_generated.h              |  7 -------
  .../lora/adapter_format/adapter_schema.fbs.h    |  7 -------
  .../flatbuffers/flatbuffers_utils_test.fbs.h    |  7 -------
- 10 files changed, 7 insertions(+), 55 deletions(-)
+ 11 files changed, 7 insertions(+), 64 deletions(-)
 
 diff --git a/cmake/CMakeLists.txt b/cmake/CMakeLists.txt
 index 2714e6f59d..203318888d 100644
@@ -116,6 +118,26 @@ index ebf20ab21b..a8283c6d8f 100644
  if (onnxruntime_RUN_ONNX_TESTS)
    add_definitions(-DORT_RUN_EXTERNAL_ONNX_TESTS)
  endif()
+diff --git a/cmake/onnxruntime_python.cmake b/cmake/onnxruntime_python.cmake
+index 67c80bfb49..70ba8f1d10 100644
+--- a/cmake/onnxruntime_python.cmake
++++ b/cmake/onnxruntime_python.cmake
+@@ -704,15 +704,6 @@ add_custom_command(
+       $<TARGET_FILE_DIR:${build_output_target}>
+ )
+ 
+-if (onnxruntime_BUILD_SHARED_LIB)
+-  add_custom_command(
+-    TARGET onnxruntime_pybind11_state POST_BUILD
+-    COMMAND ${CMAKE_COMMAND} -E copy
+-        $<TARGET_FILE:onnxruntime>
+-        $<TARGET_FILE_DIR:${build_output_target}>/onnxruntime/capi/
+-  )
+-endif()
+-
+ if (onnxruntime_USE_OPENVINO)
+   add_custom_command(
+     TARGET onnxruntime_pybind11_state POST_BUILD
 diff --git a/onnxruntime/core/flatbuffers/schema/ort.fbs.h b/onnxruntime/core/flatbuffers/schema/ort.fbs.h
 index 50fc1db862..bf5ab15886 100644
 --- a/onnxruntime/core/flatbuffers/schema/ort.fbs.h

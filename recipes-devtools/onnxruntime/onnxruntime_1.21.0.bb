@@ -71,9 +71,39 @@ EXTRA_OECMAKE = " \
 OECMAKE_CXX_FLAGS:append = " -Wno-array-bounds -Wno-deprecated-declarations -Wno-unused-variable -Wno-template-id-cdtor -Wno-range-loop-construct -Wno-maybe-uninitialized -Wno-error=cpp"
 OECMAKE_SOURCEPATH = "${S}/cmake"
 
+PACKAGECONFIG ?= "python"
+PACKAGECONFIG[python] = ",,python3-numpy-native,python3-coloredlogs python3-flatbuffers python3-numpy python3-protobuf python3-sympy"
+
+do_configure() {
+    cmake_do_configure
+}
+
+do_compile() {
+    cmake_do_compile
+    if "${@bb.utils.contains('PACKAGECONFIG', 'python', 'true', 'false', d)}"; then
+        setuptools3_do_compile
+    fi
+}
+
+do_install() {
+    cmake_do_install
+    if "${@bb.utils.contains('PACKAGECONFIG', 'python', 'true', 'false', d)}"; then
+        setuptools3_do_install
+    fi
+}
+
 SOLIBS = ".so"
 FILES_SOLIBSDEV = ""
-FILES:${PN} += "${libdir}/libonnxruntime.so* ${libdir}/libonnxruntime_providers*so"
+
+PACKAGES += "python3-${PN}"
+FILES:${PN} = "${bindir} ${libdir}/libonnxruntime*.so* ${libdir}/libonnxruntime_providers*so"
+FILES:${PN}-dev = " \
+    ${includedir}/onnxruntime \
+    ${libdir}/pkgconfig \
+    ${libdir}/cmake \
+"
+FILES:python3-${PN} = "${PYTHON_SITEPACKAGES_DIR}"
+RDEPENDS:python3-${PN} = "${PN}"
 
 PACKAGECONFIG ?= "python"
 PACKAGECONFIG[python] = ",,python3-numpy-native,python3-coloredlogs python3-flatbuffers python3-numpy python3-protobuf python3-sympy"
@@ -97,5 +127,6 @@ do_install() {
 }
 
 INSANE_SKIP:${PN} = "buildpaths dev-so"
+INSANE_SKIP:python3-${PN} = "buildpaths"
 INSANE_SKIP:${PN}-dev = "dev-elf buildpaths"
 INSANE_SKIP:${PN}-dbg = "buildpaths"
