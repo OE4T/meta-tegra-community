@@ -1,0 +1,77 @@
+From e33eedc8a3cda6fdfc42d374b7ad77f1128b5ae0 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Fri, 12 Sep 2025 17:14:50 +0100
+Subject: [PATCH] OE cross build fixups
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ aksetup_helper.py  |  2 +-
+ pycuda/compiler.py | 10 +++++-----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/aksetup_helper.py b/aksetup_helper.py
+index 32f80cd..5823654 100644
+--- a/aksetup_helper.py
++++ b/aksetup_helper.py
+@@ -555,7 +555,7 @@ class BoostLibraries(Libraries):
+     def __init__(self, lib_base_name, default_lib_name=None):
+         if default_lib_name is None:
+             if lib_base_name == "python":
+-                default_lib_name = "boost_python-py%d%d" % sys.version_info[:2]
++                default_lib_name = "boost_python%d%d" % sys.version_info[:2]
+             else:
+                 default_lib_name = "boost_%s" % lib_base_name
+ 
+diff --git a/pycuda/compiler.py b/pycuda/compiler.py
+index d4edd65..1607aa8 100644
+--- a/pycuda/compiler.py
++++ b/pycuda/compiler.py
+@@ -218,7 +218,7 @@ DEFAULT_NVCC_FLAGS = [
+ 
+ def compile(
+     source,
+-    nvcc="nvcc",
++    nvcc="/usr/local/cuda-13.0/bin/nvcc",
+     options=None,
+     keep=False,
+     no_extern_c=False,
+@@ -332,7 +332,7 @@ class SourceModule(CudaModule):
+     def __init__(
+         self,
+         source,
+-        nvcc="nvcc",
++        nvcc="/usr/local/cuda-13.0/bin/nvcc",
+         options=None,
+         keep=False,
+         no_extern_c=False,
+@@ -382,7 +382,7 @@ def _search_on_path(filenames):
+ 
+ @memoize
+ def _find_nvcc_on_path():
+-    return _search_on_path(["nvcc", "nvcc.exe"])
++    return _search_on_path(["/usr/local/cuda-13.0/bin/nvcc", "nvcc.exe"])
+ 
+ 
+ class DynamicModule(CudaModule):
+@@ -393,7 +393,7 @@ class DynamicModule(CudaModule):
+ 
+     def __init__(
+         self,
+-        nvcc="nvcc",
++        nvcc="/usr/local/cuda-13.0/bin/nvcc",
+         link_options=None,
+         keep=False,
+         no_extern_c=False,
+@@ -558,7 +558,7 @@ class DynamicSourceModule(DynamicModule):
+     def __init__(
+         self,
+         source,
+-        nvcc="nvcc",
++        nvcc="/usr/local/cuda-13.0/bin/nvcc",
+         options=None,
+         keep=False,
+         no_extern_c=False,
+-- 
+2.34.1
+
