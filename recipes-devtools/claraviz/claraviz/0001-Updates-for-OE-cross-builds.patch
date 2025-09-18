@@ -1,0 +1,480 @@
+From 72e2ecab68d6644d55ad31c4e7c2aa06838a5e82 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Thu, 18 Sep 2025 13:00:52 +0100
+Subject: [PATCH] Updates for OE cross builds
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ian Stewart <istewart@nvidia.com>
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ CMakeLists.txt                               |  44 ++------
+ cmake/Project.cmake                          |  28 -----
+ cmake/clara_viz_renderer-targets.cmake       | 111 +++++++++++++++++++
+ src/claraviz/CMakeLists.txt                  |  60 ++++++++--
+ src/claraviz/claraviz-config.cmake.in        |   7 ++
+ src/claraviz/image/JpegEncoder.h             |   1 +
+ src/claraviz/interface/DataInterface.cpp     |   1 +
+ src/claraviz/interface/DataViewInterface.cpp |   2 +
+ src/claraviz/interface/VideoInterface.cpp    |   2 +
+ src/claraviz/interface/ViewInterface.cpp     |   1 +
+ src/claraviz/video/Mp4Wrapper.h              |   1 +
+ src/claraviz/video/VideoEncoder.h            |   1 +
+ thirdparty/CMakeLists.txt                    |   3 +-
+ 13 files changed, 190 insertions(+), 72 deletions(-)
+ create mode 100644 cmake/clara_viz_renderer-targets.cmake
+ create mode 100644 src/claraviz/claraviz-config.cmake.in
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a09d811..dabf339 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -29,12 +29,19 @@ project(ClaraViz
+     LANGUAGES CXX
+ )
+ 
+-set(CMAKE_INSTALL_PREFIX "${PROJECT_SOURCE_DIR}")
+ set(CLARA_VIZ_PUBLIC_CMAKE_TOOLS_DIR "${PROJECT_SOURCE_DIR}/cmake")
+ 
+ include("${CLARA_VIZ_PUBLIC_CMAKE_TOOLS_DIR}/Project.cmake")
+ setup_project()
+ 
++set(NVJPEG_PATH "${CUDA_TOOLKIT_TARGET_DIR}")
++message(STATUS "NVJPEG_PATH: ${NVJPEG_PATH}")
++find_library(NVJPEG_LIB NAMES nvjpeg_static PATHS "${NVJPEG_PATH}/lib64")
++find_path(NVJPEG_INC nvjpeg.h PATHS "${NVJPEG_PATH}/include")
++
++message(STATUS "NVJPEG_LIB: ${NVJPEG_LIB}")
++message(STATUS "NVJPEG_INC: ${NVJPEG_INC}")
++
+ # Build the thirdparty dependencies
+ add_subdirectory(thirdparty)
+ 
+@@ -46,37 +53,4 @@ if (CLARA_VIZ_WITH_GRPC)
+     set(_DEPENDENCIES ${_DEPENDENCIES} gRPC grpc-web)
+ endif()
+ 
+-# Build the ClaraViz project
+-# This is done with an external project. Thirdparty projects are also
+-# external projects and the only way to for CMake to correctly handle
+-# the dependencies is that our source is also build as an external
+-# project.
+-ExternalProject_Add(ClaraViz
+-    PREFIX claraviz
+-    DOWNLOAD_COMMAND ""
+-    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src"
+-    INSTALL_DIR ${CMAKE_INSTALL_PREFIX}
+-    BUILD_ALWAYS ON
+-    CMAKE_ARGS
+-        -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
+-        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+-    CMAKE_CACHE_ARGS
+-        -DgRPC_DIR:PATH=${gRPC_DIR}
+-        -Dprotobuf-javascript_SOURCE_DIR:PATH=${protobuf-javascript_SOURCE_DIR}
+-        -Dabsl_DIR:PATH=${absl_DIR}
+-        -DZLIB_ROOT:PATH=${ZLIB_ROOT}
+-        -DProtobuf_DIR:PATH=${Protobuf_DIR}
+-        -DOPENSSL_ROOT_DIR:PATH=${OPENSSL_ROOT_DIR}
+-        -Dgrpc-web_DIR:PATH=${grpc-web_DIR}
+-        -DCudaHelper_DIR:PATH=${CudaHelper_DIR}
+-        -DOpenH264_DIR:PATH=${OpenH264_DIR}
+-        -Dnlohmann_json_SOURCE_DIR:PATH=${nlohmann_json_SOURCE_DIR}
+-        -Dnlohmann_json_BINARY_DIR:PATH=${nlohmann_json_BINARY_DIR}
+-        -DCLARA_VIZ_PUBLIC_CMAKE_TOOLS_DIR:PATH=${CLARA_VIZ_PUBLIC_CMAKE_TOOLS_DIR}
+-        -DCLARA_VIZ_CUDA_PROFILING:BOOL=${CLARA_VIZ_CUDA_PROFILING}
+-        -DCLARA_VIZ_CUDA_DEBUG:BOOL=${CLARA_VIZ_CUDA_DEBUG}
+-        -DCLARA_VIZ_WITH_GRPC:BOOL=${CLARA_VIZ_WITH_GRPC}
+-        -DCLARA_VIZ_WITH_OPENH264:BOOL=${CLARA_VIZ_WITH_OPENH264}
+-        -DCLARA_VIZ_WITH_EXAMPLES:BOOL=${CLARA_VIZ_WITH_EXAMPLES}
+-    DEPENDS ${_DEPENDENCIES}
+-)
++add_subdirectory(src)
+diff --git a/cmake/Project.cmake b/cmake/Project.cmake
+index f8e0cd8..109da5f 100644
+--- a/cmake/Project.cmake
++++ b/cmake/Project.cmake
+@@ -21,34 +21,6 @@ macro(setup_project)
+         set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel." FORCE)
+     endif()
+ 
+-    # CUDA settings
+-
+-    # use the stub libs instead of real binaries, with that building in docker without using the nvidia runtime works
+-    set(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} /usr/local/cuda/lib64/stubs)
+-
+-    # Compile for all supported major real architectures, and the highest major virtual architecture.
+-    set(CMAKE_CUDA_ARCHITECTURES "all-major")
+-    # Suppress deprecated GPU targets warnings
+-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Wno-deprecated-gpu-targets")
+-
+-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math")
+-    # allow calling constexpr host function from device code and vice versa, used to call std::numeric_limits functions from device
+-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
+-
+-
+-    if (CLARA_VIZ_CUDA_DEBUG)
+-        # enable for device debugging in debug mode
+-        set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} --device-debug")
+-    endif()
+-
+-    if (CLARA_VIZ_CUDA_PROFILING)
+-        # enable for profiling
+-        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --generate-line-info")
+-    endif()
+-
+-    # statically link the runtime
+-    set(CMAKE_CUDA_RUNTIME_LIBRARY "Static")
+-
+     # enable c++17
+     set(CMAKE_CXX_STANDARD 17)
+     if(NOT DEFINED CMAKE_CUDA_STANDARD)
+diff --git a/cmake/clara_viz_renderer-targets.cmake b/cmake/clara_viz_renderer-targets.cmake
+new file mode 100644
+index 0000000..c1325f0
+--- /dev/null
++++ b/cmake/clara_viz_renderer-targets.cmake
+@@ -0,0 +1,111 @@
++# Generated by CMake
++
++if("${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}" LESS 2.6)
++   message(FATAL_ERROR "CMake >= 2.6.0 required")
++endif()
++cmake_policy(PUSH)
++cmake_policy(VERSION 2.6...3.20)
++#----------------------------------------------------------------
++# Generated CMake target import file.
++#----------------------------------------------------------------
++
++# Commands may need to know the format version.
++set(CMAKE_IMPORT_FILE_VERSION 1)
++
++# Protect against multiple inclusion, which would fail when already imported targets are added once more.
++set(_targetsDefined)
++set(_targetsNotDefined)
++set(_expectedTargets)
++foreach(_expectedTarget clara::viz::renderer)
++  list(APPEND _expectedTargets ${_expectedTarget})
++  if(NOT TARGET ${_expectedTarget})
++    list(APPEND _targetsNotDefined ${_expectedTarget})
++  endif()
++  if(TARGET ${_expectedTarget})
++    list(APPEND _targetsDefined ${_expectedTarget})
++  endif()
++endforeach()
++if("${_targetsDefined}" STREQUAL "${_expectedTargets}")
++  unset(_targetsDefined)
++  unset(_targetsNotDefined)
++  unset(_expectedTargets)
++  set(CMAKE_IMPORT_FILE_VERSION)
++  cmake_policy(POP)
++  return()
++endif()
++if(NOT "${_targetsDefined}" STREQUAL "")
++  message(FATAL_ERROR "Some (but not all) targets in this export set were already defined.\nTargets Defined: ${_targetsDefined}\nTargets not yet defined: ${_targetsNotDefined}\n")
++endif()
++unset(_targetsDefined)
++unset(_targetsNotDefined)
++unset(_expectedTargets)
++
++
++# Compute the installation prefix relative to this file.
++get_filename_component(_IMPORT_PREFIX "${CMAKE_CURRENT_LIST_FILE}" PATH)
++# Use original install prefix when loaded through a
++# cross-prefix symbolic link such as /lib -> /usr/lib.
++get_filename_component(_realCurr "${_IMPORT_PREFIX}" REALPATH)
++get_filename_component(_realOrig "/usr/lib/cmake/claraviz" REALPATH)
++if(_realCurr STREQUAL _realOrig)
++  set(_IMPORT_PREFIX "/usr/lib/cmake/claraviz")
++endif()
++unset(_realOrig)
++unset(_realCurr)
++get_filename_component(_IMPORT_PREFIX "${_IMPORT_PREFIX}" PATH)
++get_filename_component(_IMPORT_PREFIX "${_IMPORT_PREFIX}" PATH)
++get_filename_component(_IMPORT_PREFIX "${_IMPORT_PREFIX}" PATH)
++if(_IMPORT_PREFIX STREQUAL "/")
++  set(_IMPORT_PREFIX "")
++endif()
++
++# Create imported target clara::viz::renderer
++add_library(clara::viz::renderer SHARED IMPORTED)
++
++set_target_properties(clara::viz::renderer PROPERTIES
++  INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include/claraviz"
++  INTERFACE_LINK_LIBRARIES CUDA::cudart
++)
++
++if(CMAKE_VERSION VERSION_LESS 2.8.12)
++  message(FATAL_ERROR "This file relies on consumers using CMake 2.8.12 or greater.")
++endif()
++
++# Import target "clara::viz::renderer" for configuration "Release"
++set_property(TARGET clara::viz::renderer APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
++set_target_properties(clara::viz::renderer PROPERTIES
++  IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/lib/libclara_viz_renderer.so.0.4.2"
++  IMPORTED_SONAME_RELEASE "libclara_viz_renderer.so.0"
++  )
++
++list(APPEND _IMPORT_CHECK_TARGETS clara::viz::renderer )
++list(APPEND _IMPORT_CHECK_FILES_FOR_clara::viz::renderer "${_IMPORT_PREFIX}/lib/libclara_viz_renderer.so.0.4.2" )
++
++# Cleanup temporary variables.
++set(_IMPORT_PREFIX)
++
++# Loop over all imported files and verify that they actually exist
++foreach(target ${_IMPORT_CHECK_TARGETS} )
++  foreach(file ${_IMPORT_CHECK_FILES_FOR_${target}} )
++    if(NOT EXISTS "${file}" )
++      message(FATAL_ERROR "The imported target \"${target}\" references the file
++   \"${file}\"
++but this file does not exist.  Possible reasons include:
++* The file was deleted, renamed, or moved to another location.
++* An install or uninstall procedure did not complete successfully.
++* The installation package was faulty and contained
++   \"${CMAKE_CURRENT_LIST_FILE}\"
++but not all the files it references.
++")
++    endif()
++  endforeach()
++  unset(_IMPORT_CHECK_FILES_FOR_${target})
++endforeach()
++unset(_IMPORT_CHECK_TARGETS)
++
++# This file does not depend on other imported targets which have
++# been exported from the same project but in a separate export set.
++
++# Commands beyond this point should not need to know the version.
++set(CMAKE_IMPORT_FILE_VERSION)
++cmake_policy(POP)
+diff --git a/src/claraviz/CMakeLists.txt b/src/claraviz/CMakeLists.txt
+index 04710fc..dc12bd3 100644
+--- a/src/claraviz/CMakeLists.txt
++++ b/src/claraviz/CMakeLists.txt
+@@ -12,6 +12,9 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
++set(CLARA_VIZ_CMAKE_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/claraviz)
++set(CLARA_VIZ_INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/claraviz)
++
+ ######################
+ # core
+ ######################
+@@ -22,10 +25,7 @@ add_library(clara::viz::core ALIAS ${PROJECT_NAME})
+ 
+ find_package(CUDAToolkit REQUIRED)
+ find_package(OpenH264 CONFIG)
+-
+-if (NOT TARGET nlohmann_json)
+-    add_subdirectory(${nlohmann_json_SOURCE_DIR} ${nlohmann_json_BINARY_DIR} EXCLUDE_FROM_ALL)
+-endif()
++find_package(nlohmann_json REQUIRED)
+ 
+ target_code_coverage(${PROJECT_NAME})
+ 
+@@ -64,7 +64,7 @@ target_sources(${PROJECT_NAME}
+ target_include_directories(${PROJECT_NAME}
+     PUBLIC
+         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
+-        $<INSTALL_INTERFACE:src>
++        $<INSTALL_INTERFACE:include/claraviz>
+         ${CUDAToolkit_INCLUDE_DIRS}
+     )
+ 
+@@ -88,6 +88,15 @@ if(OpenH264_FOUND)
+         )
+ endif()
+ 
++install(TARGETS ${PROJECT_NAME}
++    EXPORT clara_viz_core_targets
++    DESTINATION ${CMAKE_INSTALL_LIBDIR}
++    PUBLIC_HEADER DESTINATION ${CLARA_VIZ_INCLUDE_INSTALL_DIR})
++
++install(EXPORT clara_viz_core_targets
++    FILE clara_viz_core-targets.cmake
++    DESTINATION ${CLARA_VIZ_CMAKE_INSTALL_DIR})
++
+ ######################
+ # core hw
+ ######################
+@@ -168,9 +177,13 @@ if(nvjpeg_FOUND)
+         PRIVATE
+             CLARA_VIZ_WITH_NVJPEG
+         )
++    target_include_directories(${PROJECT_NAME}
++        PRIVATE
++            ${NVJPEG_INC}
++        )
+     target_link_libraries(${PROJECT_NAME}
+         PUBLIC
+-            ${nvjpeg_LIB}
++            ${NVJPEG_LIB}
+         )
+ endif()
+ 
+@@ -181,6 +194,15 @@ target_link_libraries(${PROJECT_NAME}
+         CUDA::cudart_static
+     )
+ 
++install(TARGETS ${PROJECT_NAME}
++    EXPORT clara_viz_core_hw_targets
++    DESTINATION ${CMAKE_INSTALL_LIBDIR}
++    PUBLIC_HEADER DESTINATION ${CLARA_VIZ_INCLUDE_INSTALL_DIR})
++
++install(EXPORT clara_viz_core_hw_targets
++    FILE clara_viz_core_hw-targets.cmake
++    DESTINATION ${CLARA_VIZ_CMAKE_INSTALL_DIR})
++
+ if (CLARA_VIZ_WITH_GRPC)
+     ######################
+     # core grpc
+@@ -256,4 +278,28 @@ if (CLARA_VIZ_WITH_GRPC)
+             clara::viz::proto
+             clara::viz::core::hw
+         )
+-endif()
+\ No newline at end of file
++endif()
++
++######################
++# Headers
++######################
++install(FILES "../../include/ClaraVizRenderer.h"
++    DESTINATION "${CLARA_VIZ_INCLUDE_INSTALL_DIR}")
++install(DIRECTORY "."
++    DESTINATION "${CLARA_VIZ_INCLUDE_INSTALL_DIR}"
++    FILES_MATCHING PATTERN "*.h")
++
++######################
++# CMake package files
++######################
++configure_package_config_file(claraviz-config.cmake.in
++    ${CMAKE_CURRENT_BINARY_DIR}/claraviz-config.cmake
++    INSTALL_DESTINATION ${CLARA_VIZ_CMAKE_INSTALL_DIR})
++write_basic_package_version_file(
++    ${CMAKE_CURRENT_BINARY_DIR}/claraviz-config-version.cmake
++    VERSION 0.4.2
++    COMPATIBILITY SameMajorVersion)
++install(FILES
++    ${CMAKE_CURRENT_BINARY_DIR}/claraviz-config.cmake
++    ${CMAKE_CURRENT_BINARY_DIR}/claraviz-config-version.cmake
++    DESTINATION ${CLARA_VIZ_CMAKE_INSTALL_DIR})
+diff --git a/src/claraviz/claraviz-config.cmake.in b/src/claraviz/claraviz-config.cmake.in
+new file mode 100644
+index 0000000..27eeb95
+--- /dev/null
++++ b/src/claraviz/claraviz-config.cmake.in
+@@ -0,0 +1,7 @@
++set(CLARAVIZ_VERSION x.y.z)
++
++@PACKAGE_INIT@
++
++include(${CMAKE_CURRENT_LIST_DIR}/clara_viz_core-targets.cmake)
++include(${CMAKE_CURRENT_LIST_DIR}/clara_viz_core_hw-targets.cmake)
++include(${CMAKE_CURRENT_LIST_DIR}/clara_viz_renderer-targets.cmake)
+diff --git a/src/claraviz/image/JpegEncoder.h b/src/claraviz/image/JpegEncoder.h
+index 861cc69..76cc1a4 100644
+--- a/src/claraviz/image/JpegEncoder.h
++++ b/src/claraviz/image/JpegEncoder.h
+@@ -16,6 +16,7 @@
+ 
+ #pragma once
+ 
++#include <cstdint>
+ #include <memory>
+ #include <vector>
+ 
+diff --git a/src/claraviz/interface/DataInterface.cpp b/src/claraviz/interface/DataInterface.cpp
+index 86f2a95..fa5ff77 100644
+--- a/src/claraviz/interface/DataInterface.cpp
++++ b/src/claraviz/interface/DataInterface.cpp
+@@ -16,6 +16,7 @@
+ 
+ #include "claraviz/interface/DataInterface.h"
+ 
++#include <algorithm>
+ #include <set>
+ #include <type_traits>
+ 
+diff --git a/src/claraviz/interface/DataViewInterface.cpp b/src/claraviz/interface/DataViewInterface.cpp
+index 5b61e31..e7f7760 100644
+--- a/src/claraviz/interface/DataViewInterface.cpp
++++ b/src/claraviz/interface/DataViewInterface.cpp
+@@ -16,6 +16,8 @@
+ 
+ #include "claraviz/interface/DataViewInterface.h"
+ 
++#include <algorithm>
++
+ #include <claraviz/util/Validator.h>
+ 
+ namespace clara::viz
+diff --git a/src/claraviz/interface/VideoInterface.cpp b/src/claraviz/interface/VideoInterface.cpp
+index a0619e7..d178a1a 100644
+--- a/src/claraviz/interface/VideoInterface.cpp
++++ b/src/claraviz/interface/VideoInterface.cpp
+@@ -16,6 +16,8 @@
+ 
+ #include "claraviz/interface/VideoInterface.h"
+ 
++#include <algorithm>
++
+ #include "claraviz/util/Validator.h"
+ #include "claraviz/video/VideoEncoder.h"
+ 
+diff --git a/src/claraviz/interface/ViewInterface.cpp b/src/claraviz/interface/ViewInterface.cpp
+index 7b66171..2dd194a 100644
+--- a/src/claraviz/interface/ViewInterface.cpp
++++ b/src/claraviz/interface/ViewInterface.cpp
+@@ -15,6 +15,7 @@
+  */
+ #include "claraviz/interface/ViewInterface.h"
+ 
++#include <algorithm>
+ #include <type_traits>
+ 
+ #include <claraviz/util/Validator.h>
+diff --git a/src/claraviz/video/Mp4Wrapper.h b/src/claraviz/video/Mp4Wrapper.h
+index 49b7ffd..4220ba9 100644
+--- a/src/claraviz/video/Mp4Wrapper.h
++++ b/src/claraviz/video/Mp4Wrapper.h
+@@ -16,6 +16,7 @@
+ 
+ #pragma once
+ 
++#include <cstdint>
+ #include <memory>
+ #include <vector>
+ 
+diff --git a/src/claraviz/video/VideoEncoder.h b/src/claraviz/video/VideoEncoder.h
+index 491e32b..cc0714e 100644
+--- a/src/claraviz/video/VideoEncoder.h
++++ b/src/claraviz/video/VideoEncoder.h
+@@ -16,6 +16,7 @@
+ 
+ #pragma once
+ 
++#include <cstdint>
+ #include <memory>
+ #include <ostream>
+ 
+diff --git a/thirdparty/CMakeLists.txt b/thirdparty/CMakeLists.txt
+index 32ee53b..4a3aec9 100644
+--- a/thirdparty/CMakeLists.txt
++++ b/thirdparty/CMakeLists.txt
+@@ -13,7 +13,6 @@
+ # limitations under the License.
+ 
+ add_subdirectory(cuda_helper)
+-add_subdirectory(nlohmann_json)
+ if (CLARA_VIZ_WITH_OPENH264)
+     add_subdirectory(openh264)
+ endif()
+@@ -22,4 +21,4 @@ if (CLARA_VIZ_WITH_GRPC)
+     add_subdirectory(openssl)
+     add_subdirectory(grpc)
+     add_subdirectory(grpc-web)
+-endif()
+\ No newline at end of file
++endif()
+-- 
+2.34.1
+
