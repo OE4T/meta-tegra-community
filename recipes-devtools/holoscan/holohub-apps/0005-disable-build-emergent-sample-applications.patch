@@ -1,0 +1,73 @@
+From aacf00228ee0d8ba3188665d0d9b58a43a4a7722 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Thu, 18 Sep 2025 12:28:15 +0100
+Subject: [PATCH 05/10] disable build emergent sample applications
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ian Stewart <istewart@nvidia.com>
+---
+ CMakeLists.txt                                | 1 +
+ applications/CMakeLists.txt                   | 2 ++
+ gxf_extensions/emergent_source/CMakeLists.txt | 8 ++++++--
+ 3 files changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index c9c447d8..aedf656c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -47,6 +47,7 @@ include(CTest)
+ # Options
+ option(HOLOHUB_DOWNLOAD_DATASETS "Download datasets" ON)
+ option(HOLOHUB_BUILD_PYTHON "Build support for Python" ON)
++option(HOLOHUB_ENABLE_EMERGENT "Build Emergent-based sample applications" OFF)
+ 
+ # Enable flow benchmarking
+ option(FLOW_BENCHMARKING "Enable Flow Benchmarking" OFF)
+diff --git a/applications/CMakeLists.txt b/applications/CMakeLists.txt
+index a2db3e24..92ced8f1 100644
+--- a/applications/CMakeLists.txt
++++ b/applications/CMakeLists.txt
+@@ -59,8 +59,10 @@ add_subdirectory(h264)
+ 
+ add_holohub_application(isaac_sim_holoscan_bridge)
+ 
++if(HOLOHUB_ENABLE_EMERGENT)
+ add_holohub_application(high_speed_endoscopy DEPENDS
+                         OPERATORS emergent_source)
++endif()
+ 
+ add_subdirectory(holoscan_ros2)
+ 
+diff --git a/gxf_extensions/emergent_source/CMakeLists.txt b/gxf_extensions/emergent_source/CMakeLists.txt
+index fc3fa6b4..11f8103e 100644
+--- a/gxf_extensions/emergent_source/CMakeLists.txt
++++ b/gxf_extensions/emergent_source/CMakeLists.txt
+@@ -17,6 +17,10 @@ project(gxf_emergent_source)
+ 
+ find_package(holoscan 0.5 REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
++
++# Set the default Emergent SDK path
++set(EMERGENT_ROOT_DIR "/opt/EVT/eSDK" CACHE PATH "Emergent SDK directory")
++
+ # Create library
+ add_library(gxf_emergent_source_lib SHARED
+   emergent_source.cpp
+@@ -36,12 +40,12 @@ target_include_directories(gxf_emergent_source_lib
+   SYSTEM
+   BEFORE
+   PUBLIC
+-  "/opt/EVT/eSDK/include"
++  "${EMERGENT_ROOT_DIR}/include"
+ )
+ target_link_directories(gxf_emergent_source_lib
+   BEFORE
+   PUBLIC
+-  "/opt/EVT/eSDK/lib/"
++  "${EMERGENT_ROOT_DIR}/lib/"
+ )
+ 
+ # Create extension
+-- 
+2.34.1
+
