@@ -20,7 +20,7 @@ S = "${UNPACKDIR}/${PN}-v${PV}"
 
 COMPATIBLE_MACHINE = "(cuda)"
 
-inherit cmake cuda
+inherit cmake cuda python3native
 
 EXTRA_OECMAKE += " \
     -DGLIBCXX_USE_CXX11_ABI=1 \
@@ -97,6 +97,8 @@ DEPENDS += " \
     cudnn \
     protobuf \
     protobuf-native \
+    python3-pyyaml-native \
+    python3-typing-extensions-native \
 "
 
 FILES:${PN} += " \
