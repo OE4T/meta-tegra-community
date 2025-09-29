@@ -2,16 +2,16 @@ DESCRIPTION = "NVIDIA Deepstream SDK"
 HOMEPAGE = "https://developer.nvidia.com/deepstream-sdk"
 LICENSE = "Proprietary"
 LIC_FILES_CHKSUM = " \
-    file://usr/share/doc/deepstream-7.1/copyright;md5=9be828ca67cebbca30ff5d0580233ccb \
-    file://opt/nvidia/deepstream/deepstream-7.1/LICENSE.txt;md5=23fdb7b78fafef50c1ed5dc073862c6d \
-    file://opt/nvidia/deepstream/deepstream-7.1/doc/nvidia-tegra/LICENSE.iothub_client;md5=4f8c6347a759d246b5f96281726b8611 \
-    file://opt/nvidia/deepstream/deepstream-7.1/doc/nvidia-tegra/LICENSE.nvds_amqp_protocol_adaptor;md5=8b4b651fa4090272b2e08e208140a658 \
+    file://usr/share/doc/deepstream-8.0/copyright;md5=02bfaa859dba1e59dd1b4348a730ee00 \
+    file://opt/nvidia/deepstream/deepstream-8.0/LICENSE.txt;md5=ecccc0f1b797f19a3e80c11a3204d2b4 \
+    file://opt/nvidia/deepstream/deepstream-8.0/doc/nvidia-tegra/LICENSE.iothub_client;md5=4f8c6347a759d246b5f96281726b8611 \
+    file://opt/nvidia/deepstream/deepstream-8.0/doc/nvidia-tegra/LICENSE.nvds_amqp_protocol_adaptor;md5=8b4b651fa4090272b2e08e208140a658 \
 "
 
 inherit l4t_deb_pkgfeed
 
 SRC_COMMON_DEBS = "${BPN}_${PV}_arm64.deb;subdir=${BPN}"
-SRC_URI[sha256sum] = "8cc657e4784108c1a17da9bb8fbf736bc2ae4017065bb493486548c274465ca4"
+SRC_URI[sha256sum] = "1eb5ad4550d43416a561a318f53c5c2a4a166f828b9dcc8e50c321d6e6055c31"
 
 COMPATIBLE_MACHINE = "(tegra)"
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"
@@ -32,8 +32,8 @@ PACKAGECONFIG[rivermax] = ""
 PACKAGECONFIG[realsense] = ""
 
 DEPENDS = "glib-2.0 gstreamer1.0 gstreamer1.0-plugins-base gstreamer1.0-rtsp-server \
-    tensorrt-core tensorrt-plugins libnvvpi3 libcufft libcublas libnpp json-glib \
-    openssl111 tegra-libraries-multimedia-ds tegra-libraries-multimedia yaml-cpp-070 \
+    tensorrt-core tensorrt-plugins libnvvpi4 libcufft libcublas libnpp json-glib \
+    tegra-libraries-multimedia-ds tegra-libraries-multimedia yaml-cpp \
     grpc protobuf tegra-libraries-nvdsseimeta libgstnvcustomhelper mosquitto jsoncpp cuda-nvrtc \
 "
 # XXX--- see hack in do_install
@@ -44,8 +44,8 @@ S = "${UNPACKDIR}/${BPN}"
 B = "${WORKDIR}/build"
 
 DEEPSTREAM_BASEDIR = "/opt/nvidia/deepstream"
-DEEPSTREAM_PATH = "${DEEPSTREAM_BASEDIR}/deepstream-7.1"
-SYSROOT_DIRS += "${DEEPSTREAM_PATH}/lib/ ${DEEPSTREAM_PATH}/sources/includes/"
+DEEPSTREAM_PATH = "${DEEPSTREAM_BASEDIR}/deepstream-8.0"
+SYSROOT_DIRS += "${DEEPSTREAM_PATH}/lib/ ${DEEPSTREAM_PATH}/sources/includes/ ${DEEPSTREAM_PATH}/sources/gst-plugins/"
 
 do_configure() {
     for feature in azure amqp kafka nmos redis triton rivermax realsense; do
@@ -104,24 +104,37 @@ do_install() {
     # in its DT_NEEDED ELF header, so we have to rewrite it to prevent
     # a broken runtime dependency.
     grpc_soname=$(${OBJDUMP} -p ${STAGING_LIBDIR}/libgrpc.so | grep SONAME | awk '{print $2}')
+    grpcpp_soname=$(${OBJDUMP} -p ${STAGING_LIBDIR}/libgrpc++.so | grep SONAME | awk '{print $2}')
     protobuf_soname=$(${OBJDUMP} -p ${STAGING_LIBDIR}/libprotobuf.so | grep SONAME | awk '{print $2}')
-    patchelf --replace-needed libcufft.so libcufft.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
-    patchelf --replace-needed libcublas.so libcublas.so.12 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
-    patchelf --replace-needed libcufft.so libcufft.so.11 ${D}${DEEPSTREAM_PATH}/lib/libnvds_audiotransform.so
-    bbnote "Patching libgrpc++ NEEDED to $grpc_soname"
-    patchelf --replace-needed libgrpc++.so.1.48 $grpc_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
-    patchelf --replace-needed libgrpc++.so.1.48 $grpc_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
+    libprotobuf_lite_soname=$(${OBJDUMP} -p ${STAGING_LIBDIR}/libprotobuf-lite.so | grep SONAME | awk '{print $2}')
+    patchelf --replace-needed libcufft.so libcufft.so.12 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
+    patchelf --replace-needed libcublas.so libcublas.so.13 ${D}${DEEPSTREAM_PATH}/lib/libnvds_nvmultiobjecttracker.so
+    patchelf --replace-needed libcufft.so libcufft.so.12 ${D}${DEEPSTREAM_PATH}/lib/libnvds_audiotransform.so
+    bbnote "Patching libgrpc NEEDED to $grpc_soname"
+    patchelf --replace-needed libgrpc.so.31 $grpc_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
+    patchelf --replace-needed libgrpc.so.31 $grpc_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
+    bbnote "Patching libgrpc++ NEEDED to $grpcpp_soname"
+    patchelf --replace-needed libgrpc++.so.1.54 $grpcpp_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
+    patchelf --replace-needed libgrpc++.so.1.54 $grpcpp_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
     bbnote "Patching libprotobuf NEEDED to $protobuf_soname"
-    patchelf --replace-needed libprotobuf.so.3.19.4.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
-    patchelf --replace-needed libprotobuf.so.3.19.4.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
-    patchelf --replace-needed libprotobuf.so.3.19.4.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_audio_proto.so
-    patchelf --replace-needed libnppial.so libnppial.so.12 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
-    patchelf --replace-needed libnppist.so libnppist.so.12 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
+    patchelf --replace-needed libprotobuf.so.3.21.12.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
+    patchelf --replace-needed libprotobuf.so.3.21.12.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
+    patchelf --replace-needed libprotobuf.so.3.21.12.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_audio_proto.so
+    bbnote "Patching libprotobuf-lite NEEDED to $libprotobuf_lite_soname"
+    patchelf --replace-needed libprotobuf-lite.so.3.21.12.0 $libprotobuf_lite_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
+    patchelf --replace-needed libprotobuf-lite.so.3.21.12.0 $libprotobuf_lite_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
+    patchelf --replace-needed libnppial.so libnppial.so.13 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
+    patchelf --replace-needed libnppist.so libnppist.so.13 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
     patchelf --replace-needed libjsoncpp.so.25 libjsoncpp.so.26 ${D}${DEEPSTREAM_PATH}/lib/libnvds_rest_server.so
     patchelf --replace-needed libjsoncpp.so.25 libjsoncpp.so.26 ${D}${libdir}/gstreamer-1.0/deepstream/libnvdsgst_nvmultiurisrcbin.so
+    patchelf --replace-needed libgpr.so.31 libgpr.so.46 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
+    patchelf --replace-needed libgpr.so.31 libgpr.so.46 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
+    patchelf --replace-needed libabsl_synchronization.so.2301.0.0 libabsl_synchronization.so.2505.0.0 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_asr_grpc.so
+    patchelf --replace-needed libabsl_synchronization.so.2301.0.0 libabsl_synchronization.so.2505.0.0 ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_tts.so
+    rm -f ${D}${DEEPSTREAM_PATH}/lib/libnvds_opticalflow_orin.so
     # ---XXX
     cd ${D}${DEEPSTREAM_BASEDIR}
-    ln -s deepstream-7.1 deepstream
+    ln -s deepstream-8.0 deepstream
     cd -
 }
 
