@@ -3,6 +3,8 @@ HOMEPAGE = "https://github.com/NVIDIA/MatX"
 LICENSE = "BSD-3-Clause"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=80968939478234f1ff00154a17eda6ed"
 
+COMPATIBLE_MACHINE = "(cuda)"
+
 inherit cmake cuda
 
 SRC_URI = " \
