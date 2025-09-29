@@ -1,7 +1,7 @@
-From a9b9ad49e7c4ed3f05b6cfebbd62cb139e5159e1 Mon Sep 17 00:00:00 2001
+From 1b3a4abe917302468544774f3face4c03b3bfc45 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Mon, 13 May 2024 16:06:28 +0100
-Subject: [PATCH] Allow apps to be run from other working directories
+Date: Mon, 29 Sep 2025 15:40:47 +0100
+Subject: [PATCH 2/2] Allow apps to be run from other working directories
 
 Upstream-Status: Pending
 Signed-off-by: Matt Madison <matt@madison.systems>
@@ -38,7 +38,7 @@ index f0e9e17..de91166 100644
  def long_to_uint64(l):
      value = ctypes.c_uint64(l & 0xffffffffffffffff).value
 diff --git a/apps/deepstream-imagedata-multistream-redaction/deepstream_imagedata-multistream_redaction.py b/apps/deepstream-imagedata-multistream-redaction/deepstream_imagedata-multistream_redaction.py
-index 04662ee..5fed6d1 100644
+index 76237f3..aac6f60 100644
 --- a/apps/deepstream-imagedata-multistream-redaction/deepstream_imagedata-multistream_redaction.py
 +++ b/apps/deepstream-imagedata-multistream-redaction/deepstream_imagedata-multistream_redaction.py
 @@ -18,9 +18,9 @@
@@ -54,7 +54,7 @@ index 04662ee..5fed6d1 100644
  import gi
  import configparser
  
-@@ -388,7 +388,7 @@ def main(uri_inputs,codec,bitrate ):
+@@ -357,7 +357,7 @@ def main(uri_inputs):
      streammux.set_property('height', 1080)
      streammux.set_property('batch-size', number_sources)
      streammux.set_property('batched-push-timeout', MUXER_BATCH_TIMEOUT_USEC)
@@ -90,7 +90,7 @@ index bb314b2..24f51f2 100755
      if (pgie_batch_size != number_sources):
          print("WARNING: Overriding infer-config batch-size", pgie_batch_size, " with number of sources ",
 diff --git a/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py b/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py
-index dfca5c2..4ec95ca 100755
+index eb79202..32b7d41 100755
 --- a/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py
 +++ b/apps/deepstream-nvdsanalytics/deepstream_nvdsanalytics.py
 @@ -17,8 +17,9 @@
@@ -175,7 +175,7 @@ index 51379aa..41bc40d 100755
  
      pgie_batch_size = pgie.get_property("batch-size")
 diff --git a/apps/deepstream-segmentation/deepstream_segmentation.py b/apps/deepstream-segmentation/deepstream_segmentation.py
-index 7d27c48..ccfe4c2 100755
+index ec38b1c..62a0812 100755
 --- a/apps/deepstream-segmentation/deepstream_segmentation.py
 +++ b/apps/deepstream-segmentation/deepstream_segmentation.py
 @@ -17,9 +17,9 @@
@@ -430,3 +430,6 @@ index cde259d..3c37601 100644
  
  CONFIG_GPU_ID = "gpu-id"
  CONFIG_GROUP_TRACKER = "tracker"
+-- 
+2.34.1
+

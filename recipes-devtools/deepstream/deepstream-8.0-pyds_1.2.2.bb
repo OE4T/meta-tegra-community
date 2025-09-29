@@ -3,19 +3,18 @@ HOMEPAGE = "https://github.com/NVIDIA-AI-IOT/deepstream_python_apps"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=7a01a47514ea2d404b8db41b6cfe6db0"
 
-SRC_REPO = "github.com/NVIDIA-AI-IOT/deepstream_python_apps.git;protocol=https"
+SRC_REPO = "github.com/NVIDIA-AI-IOT/deepstream_python_apps.git;protocol=https;tag=v${PV}"
 SRCBRANCH = "master"
 SRC_URI = "git://${SRC_REPO};branch=${SRCBRANCH} \
            file://0001-OE-cross-build-fixups.patch \
            file://0002-Allow-apps-to-be-run-from-other-working-directories.patch \
            "
-# v1.2.0 tag
-SRCREV = "cb7fd9c8aa012178527e0cb84f91d1f5a0ad37ff"
+SRCREV = "6fdeefb7128435873f7794d2242ed48a1471ad7e"
 
 COMPATIBLE_MACHINE = "(tegra)"
 
-DEPENDS = "deepstream-7.1 python3-pybind11 gstreamer1.0-python gstreamer1.0 glib-2.0"
-DS_PATH = "/opt/nvidia/deepstream/deepstream-7.1"
+DEPENDS = "deepstream-8.0 python3-pybind11 gstreamer1.0-python gstreamer1.0 glib-2.0"
+DS_PATH = "/opt/nvidia/deepstream/deepstream-8.0"
 
 inherit cmake python_setuptools_build_meta pkgconfig ptest
 
@@ -49,5 +48,5 @@ do_install() {
 PACKAGES += "${PN}-samples"
 RDEPENDS:${PN} = "python3-pygobject gstreamer1.0-python python3-cuda"
 FILES:${PN}-samples = "${DS_PATH}/sources/deepstream_python_apps"
-RDEPENDS:${PN}-samples = "${PN} deepstream-7.1-samples-data python3-opencv python3-numpy gobject-introspection"
+RDEPENDS:${PN}-samples = "${PN} deepstream-8.0-samples-data python3-opencv python3-numpy gobject-introspection"
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"
