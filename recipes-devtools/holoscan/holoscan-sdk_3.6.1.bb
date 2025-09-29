@@ -36,7 +36,6 @@ EXTRA_OECMAKE:append = " \
     -Dstb_INCLUDE_DIRS=${RECIPE_SYSROOT}${includedir}/stb \
     -DCPM_SOURCE_CACHE=${RECIPE_SYSROOT}${datadir} \
     -DRAPIDS_CMAKE_DIR=${RECIPE_SYSROOT}/opt/nvidia/rapids-cmake \
-    -Dyaml-cpp_DIR=${RECIPE_SYSROOT}${datadir}/cmake/yaml-cpp \
     -Dglfw3_DIR=${RECIPE_SYSROOT}${libdir}/cmake/glfw3 \
     -DPYTHON_EXECUTABLE=${HOSTTOOLS_DIR}/python3 \
     -DTENSORRT_ROOT=${RECIPE_SYSROOT}${includedir} \
@@ -75,7 +74,7 @@ DEPENDS += " \
     v4l-utils \
     vulkan-headers \
     vulkan-loader \
-    yaml-cpp-070 \
+    yaml-cpp \
     curl-native \
     stb \
     imgui \

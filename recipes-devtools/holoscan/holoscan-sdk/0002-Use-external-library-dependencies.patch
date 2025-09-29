@@ -2362,7 +2362,7 @@ index f13166f..3e49726 100644
 -        )
 -
 -endif()
-+rapids_find_package(yaml-cpp 0.7.0 REQUIRED)
++rapids_find_package(yaml-cpp 0.8.0 REQUIRED)
 diff --git a/cmake/modules/FindONNXRuntime.cmake b/cmake/modules/FindONNXRuntime.cmake
 index 9f8c10a..8b4df5b 100644
 --- a/cmake/modules/FindONNXRuntime.cmake
