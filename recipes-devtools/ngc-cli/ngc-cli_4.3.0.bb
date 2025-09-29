@@ -10,11 +10,15 @@ def ngc_pkg_arch(d):
     return 'arm64' if arch == 'aarch64' else 'linux'
 
 SRC_URI = "https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/${PV}/files/ngccli_${@ngc_pkg_arch(d)}.zip"
-SHA256SUM:aarch64 = "0ab022b37d35010145815af473f6ef4fdfde0836e776b3433b36367eb27f903d"
-SHA256SUM:x86-64 = "5e527b4514185c2d7794fee5f652545cff77a00d7530fd9142df0a3b9bb8501f"
+SHA256SUM:aarch64 = "d2aae067b82f95cacb5bf514155cc0eea4c2bfba3b951089963ab3ceef625c05"
+SHA256SUM:x86-64 = "5f01eff85a66c895002f3c87db2933c462f3b86e461e60d515370f647b4ffc21"
 SRC_URI[sha256sum] = "${SHA256SUM}"
 
 S = "${UNPACKDIR}/${BPN}"
+
+do_patch[noexec] = "1"
+do_configure[noexec] = "1"
+do_compile[noexec] = "1"
 
 INSTALL_PATH = "${base_prefix}/opt/nvidia"
 
@@ -38,9 +42,7 @@ RDEPENDS:${PN}:aarch64 = " \
     glibc \
 "
 
-do_patch[noexec] = "1"
-do_configure[noexec] = "1"
-do_compile[noexec] = "1"
-
 EXCLUDE_FROM_SHLIBS = "1"
-INSANE_SKIP:${PN} += "ldflags already-stripped debug-files"
+INHIBIT_PACKAGE_DEBUG_SPLIT = "1"
+
+INSANE_SKIP:${PN} += "ldflags already-stripped"
