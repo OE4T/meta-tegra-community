@@ -17,9 +17,9 @@ do_install() {
 
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"
 RDEPENDS:${PN} = " \
-    deepstream-7.1 \
-    deepstream-7.1-samples \
-    deepstream-7.1-pyds \
-    deepstream-7.1-pyds-samples \
+    deepstream-8.0 \
+    deepstream-8.0-samples \
+    deepstream-8.0-pyds \
+    deepstream-8.0-pyds-samples \
     tegra-tools-jetson-clocks \
 "
