@@ -1,7 +1,7 @@
-From 1c3cb46e8e31f0d705e7a4a8845567017aaeb927 Mon Sep 17 00:00:00 2001
+From 3d6e7d3c08ee7dc482eb85e9773cbc1e42ed4150 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 18 Sep 2025 12:25:34 +0100
-Subject: [PATCH 04/10] Build python libs with install RPATH and add find
+Date: Mon, 13 Oct 2025 10:22:25 +0100
+Subject: [PATCH 3/9] Build python libs with install RPATH and add find
  pybind11 package
 
 Upstream-Status: Inappropriate [OE-specific]
