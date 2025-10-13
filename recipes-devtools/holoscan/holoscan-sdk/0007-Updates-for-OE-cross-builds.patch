@@ -1,6 +1,6 @@
-From a55f7a0899ca153e0e8d3fde11c7ad5cba85e122 Mon Sep 17 00:00:00 2001
+From 04cd040ec80588ccdc338d4afbf9ffc08dfc1db4 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 11 Sep 2025 18:49:31 +0100
+Date: Mon, 13 Oct 2025 10:04:43 +0100
 Subject: [PATCH 7/7] Updates for OE cross builds
 
 Upstream-Status: Inappropriate [OE-specific]
@@ -12,12 +12,12 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  3 files changed, 12 insertions(+), 8 deletions(-)
 
 diff --git a/modules/holoinfer/src/CMakeLists.txt b/modules/holoinfer/src/CMakeLists.txt
-index 57587e1..7decb8e 100644
+index cc1e1ac..09dd40a 100644
 --- a/modules/holoinfer/src/CMakeLists.txt
 +++ b/modules/holoinfer/src/CMakeLists.txt
-@@ -74,6 +74,10 @@ target_link_libraries(${PROJECT_NAME}
-         yaml-cpp
- )
+@@ -121,6 +121,10 @@ target_link_libraries(${PROJECT_NAME}
+ #     get rid of the holoscan::infer_utils target which could be merged back in holoinfer. The point
+ #     of this comment was to highlight the current architecture which can appear confusing otherwise.
  
 +target_compile_options(${PROJECT_NAME} PRIVATE
 +    $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-Wno-error=deprecated-declarations>
@@ -27,10 +27,10 @@ index 57587e1..7decb8e 100644
      # no target_link_libraries to holoinfer_torch: we dlopen it as a plugin
      target_compile_definitions(${PROJECT_NAME} PUBLIC "HOLOINFER_TORCH_ENABLED")
 diff --git a/modules/holoviz/src/glfw_window.cpp b/modules/holoviz/src/glfw_window.cpp
-index a3a780d..0c9acdb 100644
+index d979417..f0a48e7 100644
 --- a/modules/holoviz/src/glfw_window.cpp
 +++ b/modules/holoviz/src/glfw_window.cpp
-@@ -590,7 +590,7 @@ vk::SurfaceKHR GLFWWindow::create_surface(vk::PhysicalDevice physical_device,
+@@ -592,7 +592,7 @@ vk::SurfaceKHR GLFWWindow::create_surface(vk::PhysicalDevice physical_device,
    VkSurfaceKHR surface;
    const vk::Result result =
        vk::Result(glfwCreateWindowSurface(instance, impl_->window_, nullptr, &surface));
