@@ -1,6 +1,6 @@
-From def41f64d6ae4b6039235c1a3364e6a64cbaefb4 Mon Sep 17 00:00:00 2001
+From 011317c3b2b95af6947efae682fb22e12a4588bb Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 11 Sep 2025 18:37:42 +0100
+Date: Mon, 13 Oct 2025 09:59:03 +0100
 Subject: [PATCH 2/7] Use external library dependencies
 
 This changes the dependencies on the following libraries so
@@ -68,7 +68,7 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  cmake/modules/SetupRapidsCMake.cmake          |  12 +-
  cmake/setup_dependencies.cmake                |   4 -
  .../cpp/operator_status_tracking.cpp          |   2 +-
- .../matx/matx_basic/cpp/CMakeLists.min.txt    |  21 +-
+ .../matx/matx_basic/cpp/CMakeLists.min.txt    |  33 +-
  .../distributed_pose_tree/cpp/CMakeLists.txt  |   6 +-
  .../pose_tree_basic/cpp/CMakeLists.txt        |   6 +-
  .../core/resources/async_data_logger.hpp      |   2 +-
@@ -89,19 +89,17 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  .../simple_text_serializer.cpp                |   2 +-
  src/operators/holoviz/holoviz.cpp             |   2 +-
  .../v4l2_video_capture/v4l2_video_capture.cpp |   2 +-
- .../system/distributed/receive_tensor_gxf.hpp |  97 +-
- 51 files changed, 223 insertions(+), 2235 deletions(-)
+ 50 files changed, 127 insertions(+), 2246 deletions(-)
  delete mode 100644 cmake/deps/hwloc.config.h.in
  delete mode 100644 cmake/deps/hwloc.private.config.h.in
  delete mode 100644 cmake/deps/hwloc.static-components.h.in
  delete mode 100644 cmake/deps/nvtx3.cmake
- mode change 120000 => 100644 tests/system/distributed/receive_tensor_gxf.hpp
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index a3bef36..63351fb 100644
+index f5a6fc1..995fcb8 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -246,16 +246,11 @@ endif()
+@@ -269,17 +269,12 @@ endif()
  # List targets to export/install
  list(APPEND HOLOSCAN_INSTALL_TARGETS
      core
@@ -109,6 +107,7 @@ index a3bef36..63351fb 100644
      holoviz
      holoviz_imgui
      holoinfer
+     holoinfer_utils
      infer_utils
      logger
 -    matx
@@ -118,7 +117,7 @@ index a3bef36..63351fb 100644
      data_loggers_async_console_logger
      data_loggers_basic_console_logger
      op_async_ping_rx
-@@ -278,7 +273,6 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS
+@@ -302,7 +297,6 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS
      pose_tree
      profiler
      spdlog_logger
@@ -126,8 +125,8 @@ index a3bef36..63351fb 100644
  )
  if(HOLOSCAN_BUILD_LIBTORCH)
    list(APPEND HOLOSCAN_INSTALL_TARGETS holoinfer_torch)
-@@ -291,8 +285,7 @@ if(HOLOSCAN_BUILD_PYTHON)
- endif()
+@@ -313,8 +307,7 @@ endif()
+ list(APPEND HOLOSCAN_INSTALL_TARGETS pybind11_abi_config)
  
  # Copy library files
 -# Note: ucxx is handled separately since it's only available in build targets, not install targets
@@ -136,7 +135,7 @@ index a3bef36..63351fb 100644
      DESTINATION ${HOLOSCAN_INSTALL_LIB_DIR}
      EXPORT ${HOLOSCAN_PACKAGE_NAME}-exports
      COMPONENT holoscan-core
-@@ -304,36 +297,6 @@ install(DIRECTORY include/holoscan/
+@@ -326,36 +319,6 @@ install(DIRECTORY include/holoscan/
      COMPONENT holoscan-core
  )
  
@@ -173,9 +172,9 @@ index a3bef36..63351fb 100644
  # Copy version file
  install(FILES ${${HOLOSCAN_PACKAGE_NAME}_BINARY_DIR}/include/holoscan/version_config.hpp
      DESTINATION include/holoscan
-@@ -443,52 +406,6 @@ foreach(gxf_component IN LISTS _GXF_components)
-   endif()
- endforeach()
+@@ -509,52 +472,6 @@ endforeach()
+ 
+ @HOLOSCAN_GXF_INSTALL_HOOK@
  
 -if(TARGET GXF::ucx)
 -    # GXF UCX classes publicly depend on UCX headers.
@@ -2305,7 +2304,7 @@ index bf0f43b..cc4d34f 100644
 -endif()
 +find_package(ucxx 0.44.0 REQUIRED)
 diff --git a/cmake/deps/yaml-cpp_rapids.cmake b/cmake/deps/yaml-cpp_rapids.cmake
-index f13166f..3e49726 100644
+index f13166f..541077f 100644
 --- a/cmake/deps/yaml-cpp_rapids.cmake
 +++ b/cmake/deps/yaml-cpp_rapids.cmake
 @@ -13,53 +13,4 @@
@@ -2545,26 +2544,38 @@ index d931057..f1e7e30 100644
  // A simple operator that processes a fixed number of times and then completes
  class FiniteSourceOp : public holoscan::Operator {
 diff --git a/examples/matx/matx_basic/cpp/CMakeLists.min.txt b/examples/matx/matx_basic/cpp/CMakeLists.min.txt
-index 25c8d0b..8888422 100644
+index 3aa2cb1..1202629 100644
 --- a/examples/matx/matx_basic/cpp/CMakeLists.min.txt
 +++ b/examples/matx/matx_basic/cpp/CMakeLists.min.txt
-@@ -31,20 +31,11 @@ find_package(holoscan REQUIRED CONFIG
-              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
+@@ -26,32 +26,11 @@ elseif(CMAKE_CUDA_ARCHITECTURES LESS 70)
+   set(CMAKE_CUDA_ARCHITECTURES "70")
+ endif()
  
- # Fetch CCCL if not already found (for standalone builds)
--find_package(CCCL 2.8 QUIET)
+-find_package(CUDAToolkit QUIET)
+-if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 13.0)
+-  set(MATX_CCCL_MIN_VERSION 3.0)
+-else()
+-  set(MATX_CCCL_MIN_VERSION 2.8)
+-endif()
+-
+-# Holoscan SDK core features depend on CCCL >= 2.5 while the optional holoscan::matx feature
+-# depends on CCCL >= 2.8. Skip this example if no compatible CCCL is found.
+-if(MATX_CCCL_MIN_VERSION VERSION_GREATER_EQUAL 3.0)
+-  find_package(CCCL ${MATX_CCCL_MIN_VERSION} PATHS /usr/local/cuda/lib64/cmake/cccl)
+-else()
+-  # Allow compatibility across CCCL major versions
+-  find_package(CCCL 3.0 PATHS /usr/local/cuda/lib64/cmake/cccl QUIET)
+-  if(NOT CCCL_FOUND)
+-    find_package(CCCL ${MATX_CCCL_MIN_VERSION} PATHS /usr/local/cuda/lib64/cmake/cccl QUIET)
+-  endif()
+-endif()
+-
 -if(NOT CCCL_FOUND)
--  message(STATUS "MatX requires CCCL > 2.8.0. Fetching version 2.8.0 since no suitable version found.")
--  include(FetchContent)
--  FetchContent_Declare(
--    CCCL
--    GIT_REPOSITORY https://github.com/NVIDIA/cccl.git
--    GIT_TAG 6d02e11  # corresponds to version 2.8.0, matching MatX requirement
--    GIT_SHALLOW ON
--  )
--  set(CCCL_TOPLEVEL_PROJECT OFF)
--  set(CCCL_ENABLE_INSTALL_RULES ON)
--  FetchContent_MakeAvailable(CCCL)
+-  message(WARNING "Found CCCL ${CCCL_VERSION} but need at least CCCL ${MATX_CCCL_MIN_VERSION} for MatX.
+-Please install a compatible CCCL version from https://github.com/NVIDIA/cccl.git
+-and re-configure the project with -DCCCL_ROOT=path/to/cccl to resolve the issue.
+-Skipping the matx_basic example...")
+-  return()
 -endif()
 +find_package(CCCL REQUIRED)
 +find_package(CUB REQUIRED)
@@ -2572,9 +2583,9 @@ index 25c8d0b..8888422 100644
 +find_package(Thrust REQUIRED)
 +find_package(matx 0.9.1 REQUIRED)
  
- add_executable(matx_basic
-   matx_basic.cu
-@@ -53,7 +44,7 @@ add_executable(matx_basic
+ # Finds the package holoscan
+ find_package(holoscan REQUIRED CONFIG
+@@ -64,7 +43,7 @@ add_executable(matx_basic
  target_link_libraries(matx_basic
    PRIVATE
    holoscan::core
@@ -2644,12 +2655,12 @@ index 047d384..58f6146 100644
  // Copy of nvtx3::v1::scoped_range_in which checks whether tracing is enabled or not
  namespace nvtx3::v1 {
 diff --git a/modules/holoinfer/src/CMakeLists.txt b/modules/holoinfer/src/CMakeLists.txt
-index 5b24be4..8a47d0b 100644
+index fee47cd..1b57d7a 100644
 --- a/modules/holoinfer/src/CMakeLists.txt
 +++ b/modules/holoinfer/src/CMakeLists.txt
-@@ -19,6 +19,15 @@ project(holoinfer VERSION ${HOLOSCAN_BUILD_VERSION} LANGUAGES CXX CUDA)
- 
- add_subdirectory(infer)
+@@ -49,6 +49,15 @@ set_target_properties(holoinfer_utils PROPERTIES
+     VERSION ${PROJECT_VERSION}
+ )
  
 +find_package(CUDAToolkit REQUIRED)
 +find_package(dlpack 1.0 REQUIRED)
@@ -2663,22 +2674,21 @@ index 5b24be4..8a47d0b 100644
  set(holoinfer_src
      infer/trt/core.cpp
      infer/trt/utils.cpp
-@@ -40,10 +49,10 @@ target_include_directories(${PROJECT_NAME}
+@@ -67,9 +76,9 @@ target_include_directories(${PROJECT_NAME}
      PRIVATE
          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
      PUBLIC
 -        $<BUILD_INTERFACE:${tl-expected_SOURCE_DIR}/include>
-         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 -        $<BUILD_INTERFACE:${dlpack_SOURCE_DIR}/include>
 -        $<BUILD_INTERFACE:${magic_enum_SOURCE_DIR}/include>
 +        ${TL_EXPECTED_INCLUDE_DIRS}
 +        ${DLPACK_INCLUDE_DIRS}
 +        ${MAGIC_ENUM_INCLUDE_DIRS}
-         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}>
  )
  
+ target_link_libraries(${PROJECT_NAME}
 diff --git a/modules/holoinfer/src/infer/onnx/CMakeLists.txt b/modules/holoinfer/src/infer/onnx/CMakeLists.txt
-index 115721e..aeb93ba 100644
+index 903f006..a944c2c 100644
 --- a/modules/holoinfer/src/infer/onnx/CMakeLists.txt
 +++ b/modules/holoinfer/src/infer/onnx/CMakeLists.txt
 @@ -15,7 +15,9 @@
@@ -2700,7 +2710,7 @@ index 115721e..aeb93ba 100644
 +        PkgConfig::libonnxruntime
          CUDA::cudart
          holoscan::logger
-         holoscan::infer
+         holoscan::holoinfer_utils
 @@ -39,6 +41,6 @@ target_include_directories(holoinfer_ort
          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../..>
      PUBLIC
@@ -2710,7 +2720,7 @@ index 115721e..aeb93ba 100644
          $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}>
      )
 diff --git a/modules/holoinfer/src/infer/torch/CMakeLists.txt b/modules/holoinfer/src/infer/torch/CMakeLists.txt
-index 57635b6..a8524bc 100644
+index faadf2b..92ee017 100644
 --- a/modules/holoinfer/src/infer/torch/CMakeLists.txt
 +++ b/modules/holoinfer/src/infer/torch/CMakeLists.txt
 @@ -51,6 +51,7 @@ message(STATUS "TORCH_CUDA_ARCH_LIST: ${TORCH_CUDA_ARCH_LIST}")
@@ -2721,7 +2731,7 @@ index 57635b6..a8524bc 100644
  
  # Create the holoinfer torch backend library
  add_library(holoinfer_torch SHARED core.cpp)
-@@ -75,6 +76,6 @@ target_include_directories(holoinfer_torch
+@@ -76,6 +77,6 @@ target_include_directories(holoinfer_torch
          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../..>
      PUBLIC
          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include>
@@ -2948,7 +2958,7 @@ index 980fd28..a78b128 100644
  #include "../operator_util.hpp"
  #include "./pydoc.hpp"
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index f78d966..66f71eb 100644
+index cf3165b..f5cd337 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
 @@ -127,14 +127,10 @@ target_link_libraries(holoscan_matx
@@ -3000,7 +3010,7 @@ index f78d966..66f71eb 100644
  set(CORE_PROTO_FILES
      core/distributed/proto/app_driver.proto
      core/distributed/proto/app_worker.proto
-@@ -320,11 +326,9 @@ target_link_libraries(core
+@@ -321,11 +327,9 @@ target_link_libraries(core
          GXF::std
          GXF::ucx
          yaml-cpp
@@ -3014,7 +3024,7 @@ index f78d966..66f71eb 100644
          gRPC::grpc++
          gRPC::grpc++_reflection
          protobuf::libprotobuf
-@@ -333,13 +337,10 @@ target_link_libraries(core
+@@ -334,13 +338,10 @@ target_link_libraries(core
  
  target_include_directories(core
      PUBLIC
@@ -3072,7 +3082,7 @@ index 4465d8c..1d9d7be 100644
  #include "holoscan/core/component_spec.hpp"
  #include "holoscan/core/domain/tensor.hpp"
 diff --git a/src/data_loggers/basic_console_logger/simple_text_serializer.cpp b/src/data_loggers/basic_console_logger/simple_text_serializer.cpp
-index fba7bb8..fc15572 100644
+index 6300cdc..ddded05 100644
 --- a/src/data_loggers/basic_console_logger/simple_text_serializer.cpp
 +++ b/src/data_loggers/basic_console_logger/simple_text_serializer.cpp
 @@ -28,7 +28,7 @@
@@ -3085,7 +3095,7 @@ index fba7bb8..fc15572 100644
  #include "gxf/core/handle.hpp"
  #include "gxf/multimedia/video.hpp"
 diff --git a/src/operators/holoviz/holoviz.cpp b/src/operators/holoviz/holoviz.cpp
-index 6ef3118..48a45d3 100644
+index eee843c..f16f64d 100644
 --- a/src/operators/holoviz/holoviz.cpp
 +++ b/src/operators/holoviz/holoviz.cpp
 @@ -26,7 +26,7 @@
@@ -3098,7 +3108,7 @@ index 6ef3118..48a45d3 100644
  #include "holoscan/core/application.hpp"
  #include "holoscan/core/condition.hpp"
 diff --git a/src/operators/v4l2_video_capture/v4l2_video_capture.cpp b/src/operators/v4l2_video_capture/v4l2_video_capture.cpp
-index 6c4860f..4d52aef 100644
+index de63b59..9b07ae4 100644
 --- a/src/operators/v4l2_video_capture/v4l2_video_capture.cpp
 +++ b/src/operators/v4l2_video_capture/v4l2_video_capture.cpp
 @@ -35,7 +35,7 @@
@@ -3110,116 +3120,6 @@ index 6c4860f..4d52aef 100644
  
  #include "holoscan/core/execution_context.hpp"
  #include "holoscan/core/resources/gxf/allocator.hpp"
-diff --git a/tests/system/distributed/receive_tensor_gxf.hpp b/tests/system/distributed/receive_tensor_gxf.hpp
-deleted file mode 120000
-index 39adee0..0000000
---- a/tests/system/distributed/receive_tensor_gxf.hpp
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../examples/import_gxf_components/cpp/receive_tensor_gxf.hpp
-\ No newline at end of file
-diff --git a/tests/system/distributed/receive_tensor_gxf.hpp b/tests/system/distributed/receive_tensor_gxf.hpp
-new file mode 100644
-index 0000000..e487492
---- /dev/null
-+++ b/tests/system/distributed/receive_tensor_gxf.hpp
-@@ -0,0 +1,96 @@
-+/*
-+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-+ * SPDX-License-Identifier: Apache-2.0
-+ *
-+ * Licensed under the Apache License, Version 2.0 (the "License");
-+ * you may not use this file except in compliance with the License.
-+ * You may obtain a copy of the License at
-+ *
-+ * http://www.apache.org/licenses/LICENSE-2.0
-+ *
-+ * Unless required by applicable law or agreed to in writing, software
-+ * distributed under the License is distributed on an "AS IS" BASIS,
-+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-+ * See the License for the specific language governing permissions and
-+ * limitations under the License.
-+ */
-+
-+#ifndef IMPORT_GXF_COMPONENTS_CPP_RECEIVE_TENSOR_GXF_HPP
-+#define IMPORT_GXF_COMPONENTS_CPP_RECEIVE_TENSOR_GXF_HPP
-+
-+#include <cuda_runtime.h>
-+
-+#include <cstdint>
-+#include <iostream>
-+#include <vector>
-+
-+#include "gxf/std/allocator.hpp"
-+#include "gxf/std/codelet.hpp"
-+#include "gxf/core/parameter_parser_std.hpp"
-+#include "gxf/std/receiver.hpp"
-+#include "gxf/std/tensor.hpp"
-+
-+#ifndef CUDA_TRY
-+#define CUDA_TRY(stmt)                                                                     \
-+  ({                                                                                       \
-+    cudaError_t _holoscan_cuda_err = stmt;                                                 \
-+    if (cudaSuccess != _holoscan_cuda_err) {                                               \
-+      GXF_LOG_ERROR("CUDA Runtime call %s in line %d of file %s failed with '%s' (%d).\n", \
-+                    #stmt,                                                                 \
-+                    __LINE__,                                                              \
-+                    __FILE__,                                                              \
-+                    cudaGetErrorString(_holoscan_cuda_err),                                \
-+                    _holoscan_cuda_err);                                                   \
-+    }                                                                                      \
-+    _holoscan_cuda_err;                                                                    \
-+  })
-+#endif
-+
-+namespace nvidia {
-+namespace gxf {
-+namespace test {
-+
-+class ReceiveTensor : public Codelet {
-+ public:
-+  gxf_result_t registerInterface(Registrar* registrar) override {
-+    gxf::Expected<void> result;
-+    result &= registrar->parameter(signal_, "signal");
-+    return gxf::ToResultCode(result);
-+  }
-+  gxf_result_t start() override { return GXF_SUCCESS; }
-+  gxf_result_t tick() override {
-+    const auto in_message = signal_->receive();
-+    if (!in_message || in_message.value().is_null()) {
-+      return GXF_CONTRACT_MESSAGE_NOT_AVAILABLE;
-+    }
-+
-+    const auto maybe_in_tensor = in_message.value().get<gxf::Tensor>("tensor");
-+    if (!maybe_in_tensor) {
-+      GXF_LOG_ERROR("Failed to access in tensor with name `tensor`");
-+      return gxf::ToResultCode(maybe_in_tensor);
-+    }
-+    void* in_data_ptr = maybe_in_tensor.value()->pointer();
-+
-+    size_t data_size = maybe_in_tensor->get()->bytes_size();
-+    std::vector<uint8_t> in_data(data_size);
-+
-+    CUDA_TRY(cudaMemcpy(in_data.data(), in_data_ptr, data_size, cudaMemcpyDeviceToHost));
-+
-+    for (size_t i = 0; i < data_size; i++) {
-+      std::cout << static_cast<int>(in_data[i]) << " ";
-+    }
-+    std::cout << std::endl;
-+
-+    return GXF_SUCCESS;
-+  }
-+  gxf_result_t stop() override { return GXF_SUCCESS; }
-+
-+ private:
-+  gxf::Parameter<gxf::Handle<gxf::Receiver>> signal_;
-+};
-+
-+}  // namespace test
-+}  // namespace gxf
-+}  // namespace nvidia
-+
-+#endif /* IMPORT_GXF_COMPONENTS_CPP_RECEIVE_TENSOR_GXF_HPP */
 -- 
 2.34.1
 
