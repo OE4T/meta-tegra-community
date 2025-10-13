@@ -1,7 +1,7 @@
-From fec1efe6f4e0a6f6e75094c1757ffff981fb8623 Mon Sep 17 00:00:00 2001
+From e780a4cd4c9645703d2a73008c3e8df820864565 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 18 Sep 2025 12:30:24 +0100
-Subject: [PATCH 06/10] Fix default data paths in python apps
+Date: Mon, 13 Oct 2025 10:24:09 +0100
+Subject: [PATCH 5/9] Fix default data paths in python apps
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
@@ -13,7 +13,7 @@ Signed-off-by: Ian Stewart <istewart@nvidia.com>
  4 files changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/applications/colonoscopy_segmentation/colonoscopy_segmentation.py b/applications/colonoscopy_segmentation/colonoscopy_segmentation.py
-index 851f2f4a..8a624da0 100644
+index 8441def7..85362c0f 100644
 --- a/applications/colonoscopy_segmentation/colonoscopy_segmentation.py
 +++ b/applications/colonoscopy_segmentation/colonoscopy_segmentation.py
 @@ -94,7 +94,7 @@ class ColonoscopyApp(Application):
@@ -26,7 +26,7 @@ index 851f2f4a..8a624da0 100644
          self.sample_data_path = data
  
 diff --git a/applications/endoscopy_tool_tracking/python/endoscopy_tool_tracking.py b/applications/endoscopy_tool_tracking/python/endoscopy_tool_tracking.py
-index ad7dd369..47bad3f5 100644
+index 112b5873..e9074e9b 100644
 --- a/applications/endoscopy_tool_tracking/python/endoscopy_tool_tracking.py
 +++ b/applications/endoscopy_tool_tracking/python/endoscopy_tool_tracking.py
 @@ -93,7 +93,7 @@ class EndoscopyApp(Application):
@@ -39,7 +39,7 @@ index ad7dd369..47bad3f5 100644
          self.sample_data_path = data
  
 diff --git a/applications/multiai_ultrasound/python/multiai_ultrasound.py b/applications/multiai_ultrasound/python/multiai_ultrasound.py
-index f376e0b6..e28b6c03 100644
+index 4e59c4c3..a7af3699 100644
 --- a/applications/multiai_ultrasound/python/multiai_ultrasound.py
 +++ b/applications/multiai_ultrasound/python/multiai_ultrasound.py
 @@ -37,7 +37,7 @@ class MultiAIICardio(Application):
@@ -52,7 +52,7 @@ index f376e0b6..e28b6c03 100644
          # set name
          self.name = "Ultrasound App"
 diff --git a/applications/ultrasound_segmentation/python/ultrasound_segmentation.py b/applications/ultrasound_segmentation/python/ultrasound_segmentation.py
-index 01fa4c5e..5a63f983 100644
+index 4a7c9641..c787e409 100644
 --- a/applications/ultrasound_segmentation/python/ultrasound_segmentation.py
 +++ b/applications/ultrasound_segmentation/python/ultrasound_segmentation.py
 @@ -48,7 +48,7 @@ class UltrasoundApp(Application):

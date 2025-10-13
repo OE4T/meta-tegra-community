@@ -1,7 +1,7 @@
-From ece04a6b528498386c132101a58f3b564ac9e0a2 Mon Sep 17 00:00:00 2001
+From bec75c5a1bd2fcd6bbeb4ab90ed7255b0cbb2ca6 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 18 Sep 2025 12:33:04 +0100
-Subject: [PATCH 10/10] Updates for OE cross builds
+Date: Mon, 13 Oct 2025 10:26:02 +0100
+Subject: [PATCH 9/9] Updates for OE cross builds
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
@@ -50,7 +50,7 @@ index 270b6c33..7ea4b432 100644
               PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
  
 diff --git a/applications/multiai_endoscopy/cpp/post-proc-cpu/CMakeLists.txt b/applications/multiai_endoscopy/cpp/post-proc-cpu/CMakeLists.txt
-index 92d48e8b..01b7f6f7 100644
+index 2b54bfa4..d95700a3 100644
 --- a/applications/multiai_endoscopy/cpp/post-proc-cpu/CMakeLists.txt
 +++ b/applications/multiai_endoscopy/cpp/post-proc-cpu/CMakeLists.txt
 @@ -16,6 +16,7 @@
@@ -62,7 +62,7 @@ index 92d48e8b..01b7f6f7 100644
  find_package(holoscan 0.6 REQUIRED CONFIG
               PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
 diff --git a/applications/multiai_ultrasound/cpp/CMakeLists.txt b/applications/multiai_ultrasound/cpp/CMakeLists.txt
-index a76398c9..02c15856 100644
+index 09877bc8..e8166481 100644
 --- a/applications/multiai_ultrasound/cpp/CMakeLists.txt
 +++ b/applications/multiai_ultrasound/cpp/CMakeLists.txt
 @@ -16,6 +16,7 @@
@@ -74,7 +74,7 @@ index a76398c9..02c15856 100644
               PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
  
 diff --git a/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt b/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt
-index 01817d23..cf2e2fc9 100644
+index 98a8f30e..7acab74a 100644
 --- a/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt
 +++ b/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt
 @@ -15,6 +15,7 @@
@@ -86,7 +86,7 @@ index 01817d23..cf2e2fc9 100644
               PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
  
 diff --git a/applications/object_detection_torch/CMakeLists.txt b/applications/object_detection_torch/CMakeLists.txt
-index d33cb1fb..c53277cb 100644
+index e4bdf129..3f06f00d 100644
 --- a/applications/object_detection_torch/CMakeLists.txt
 +++ b/applications/object_detection_torch/CMakeLists.txt
 @@ -16,6 +16,7 @@
@@ -98,7 +98,7 @@ index d33cb1fb..c53277cb 100644
               PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
  
 diff --git a/applications/ultrasound_segmentation/cpp/CMakeLists.txt b/applications/ultrasound_segmentation/cpp/CMakeLists.txt
-index 56e4731e..7a796ce6 100644
+index 78ce3d7a..948f8911 100644
 --- a/applications/ultrasound_segmentation/cpp/CMakeLists.txt
 +++ b/applications/ultrasound_segmentation/cpp/CMakeLists.txt
 @@ -16,6 +16,7 @@
@@ -134,7 +134,7 @@ index 6175810c..68edcc89 100644
               PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
  
 diff --git a/operators/aja_source/CMakeLists.txt b/operators/aja_source/CMakeLists.txt
-index b17b3c40..65f5e41b 100644
+index 6bdb1baf..7c869704 100644
 --- a/operators/aja_source/CMakeLists.txt
 +++ b/operators/aja_source/CMakeLists.txt
 @@ -15,6 +15,7 @@

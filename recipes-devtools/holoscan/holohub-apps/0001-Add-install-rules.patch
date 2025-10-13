@@ -1,7 +1,7 @@
-From 3e596d17180b7a59bfd3513ab413be22795fa81b Mon Sep 17 00:00:00 2001
+From 3d6e0597ea07a9f458234a1a2f2063824308e1c7 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 18 Sep 2025 11:55:01 +0100
-Subject: [PATCH 01/10] Add install rules
+Date: Mon, 13 Oct 2025 10:17:10 +0100
+Subject: [PATCH 1/9] Add install rules
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
@@ -55,7 +55,7 @@ index 2c4a9b4a..4a609c9e 100644
  if(BUILD_TESTING)
  
 diff --git a/applications/endoscopy_out_of_body_detection/cpp/CMakeLists.txt b/applications/endoscopy_out_of_body_detection/cpp/CMakeLists.txt
-index 40abe32c..ac94d004 100644
+index 7f32762f..bb3dbe7f 100644
 --- a/applications/endoscopy_out_of_body_detection/cpp/CMakeLists.txt
 +++ b/applications/endoscopy_out_of_body_detection/cpp/CMakeLists.txt
 @@ -42,6 +42,15 @@ add_custom_target(endoscopy_out_of_body_detection_yaml
@@ -114,7 +114,7 @@ index 23d863d5..7a8c3e88 100644
  if(BUILD_TESTING)
    # To get the environment path
 diff --git a/applications/h264/h264_endoscopy_tool_tracking/cpp/CMakeLists.txt b/applications/h264/h264_endoscopy_tool_tracking/cpp/CMakeLists.txt
-index afb1ceee..e781f7f4 100644
+index 0d278384..76b6c769 100644
 --- a/applications/h264/h264_endoscopy_tool_tracking/cpp/CMakeLists.txt
 +++ b/applications/h264/h264_endoscopy_tool_tracking/cpp/CMakeLists.txt
 @@ -57,6 +57,15 @@ if(HOLOHUB_DOWNLOAD_DATASETS)
@@ -134,7 +134,7 @@ index afb1ceee..e781f7f4 100644
  if(BUILD_TESTING)
    add_test(NAME h264_endoscopy_tool_tracking_cpp_test
 diff --git a/applications/h264/h264_endoscopy_tool_tracking/python/CMakeLists.txt b/applications/h264/h264_endoscopy_tool_tracking/python/CMakeLists.txt
-index bb229b36..69dab173 100644
+index fb6f1f4d..046cbe8a 100644
 --- a/applications/h264/h264_endoscopy_tool_tracking/python/CMakeLists.txt
 +++ b/applications/h264/h264_endoscopy_tool_tracking/python/CMakeLists.txt
 @@ -27,6 +27,14 @@ target_link_libraries(h264_endoscopy_tool_tracking_python
@@ -153,7 +153,7 @@ index bb229b36..69dab173 100644
  if(BUILD_TESTING)
    add_test(NAME h264_endoscopy_tool_tracking_python_test
 diff --git a/applications/h264/h264_video_decode/cpp/CMakeLists.txt b/applications/h264/h264_video_decode/cpp/CMakeLists.txt
-index f0c13c46..dbab2a94 100644
+index 655a368f..50da1193 100644
 --- a/applications/h264/h264_video_decode/cpp/CMakeLists.txt
 +++ b/applications/h264/h264_video_decode/cpp/CMakeLists.txt
 @@ -50,6 +50,15 @@ if(HOLOHUB_DOWNLOAD_DATASETS)
@@ -173,11 +173,11 @@ index f0c13c46..dbab2a94 100644
  if(BUILD_TESTING)
    add_test(NAME h264_video_decode_cpp_test
 diff --git a/applications/h264/h264_video_decode/python/CMakeLists.txt b/applications/h264/h264_video_decode/python/CMakeLists.txt
-index f83ef3b7..f9804d99 100644
+index f996df12..e55c4325 100644
 --- a/applications/h264/h264_video_decode/python/CMakeLists.txt
 +++ b/applications/h264/h264_video_decode/python/CMakeLists.txt
 @@ -17,6 +17,14 @@ cmake_minimum_required(VERSION 3.20)
- find_package(holoscan 2.1.0 REQUIRED CONFIG
+ find_package(holoscan 3.6.1 REQUIRED CONFIG
               PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
  
 +# Install the application
@@ -231,7 +231,7 @@ index bc802e7b..2fe1db83 100644
  if(BUILD_TESTING)
    # To get the environment path
 diff --git a/applications/multiai_endoscopy/cpp/post-proc-cpu/CMakeLists.txt b/applications/multiai_endoscopy/cpp/post-proc-cpu/CMakeLists.txt
-index e87e1177..55b69339 100644
+index c6dc9e7f..2b54bfa4 100644
 --- a/applications/multiai_endoscopy/cpp/post-proc-cpu/CMakeLists.txt
 +++ b/applications/multiai_endoscopy/cpp/post-proc-cpu/CMakeLists.txt
 @@ -49,6 +49,16 @@ add_custom_target(app_config_yaml
@@ -272,7 +272,7 @@ index fa03e318..1579868d 100644
  if(BUILD_TESTING)
  
 diff --git a/applications/multiai_ultrasound/cpp/CMakeLists.txt b/applications/multiai_ultrasound/cpp/CMakeLists.txt
-index 1dcfb8d3..01e67ea3 100644
+index c491ca40..09877bc8 100644
 --- a/applications/multiai_ultrasound/cpp/CMakeLists.txt
 +++ b/applications/multiai_ultrasound/cpp/CMakeLists.txt
 @@ -56,6 +56,17 @@ add_custom_target(mgpu_multiai_ultrasound_yaml
@@ -294,10 +294,10 @@ index 1dcfb8d3..01e67ea3 100644
  if(BUILD_TESTING)
    set(RECORDING_DIR ${CMAKE_CURRENT_BINARY_DIR}/recording_output)
 diff --git a/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt b/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt
-index 88dc6b48..01817d23 100644
+index be0664bc..98a8f30e 100644
 --- a/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt
 +++ b/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt
-@@ -35,6 +35,8 @@ target_include_directories(visualizer_icardio INTERFACE ${CMAKE_CURRENT_SOURCE_D
+@@ -43,6 +43,8 @@ target_include_directories(visualizer_icardio INTERFACE ${CMAKE_CURRENT_SOURCE_D
  target_compile_definitions(visualizer_icardio PRIVATE HOLOSCAN_MAJOR_VERSION=${holoscan_VERSION_MAJOR})
  target_compile_definitions(visualizer_icardio PRIVATE HOLOSCAN_MINOR_VERSION=${holoscan_VERSION_MINOR})
  
@@ -326,10 +326,10 @@ index 8af6d5ec..acab477c 100644
  if(BUILD_TESTING)
    # To get the environment path
 diff --git a/applications/object_detection_torch/CMakeLists.txt b/applications/object_detection_torch/CMakeLists.txt
-index 09a4dcf6..f7689cfe 100644
+index 98c2a0d0..6418b608 100644
 --- a/applications/object_detection_torch/CMakeLists.txt
 +++ b/applications/object_detection_torch/CMakeLists.txt
-@@ -119,6 +119,15 @@ add_custom_target(object_detection_torch_yaml
+@@ -128,6 +128,15 @@ add_custom_target(object_detection_torch_yaml
  )
  add_dependencies(object_detection_torch object_detection_torch_yaml)
  
@@ -346,7 +346,7 @@ index 09a4dcf6..f7689cfe 100644
  if(BUILD_TESTING)
  
 diff --git a/applications/ultrasound_segmentation/cpp/CMakeLists.txt b/applications/ultrasound_segmentation/cpp/CMakeLists.txt
-index 31136c7f..83d41ca4 100644
+index 543f7e1a..78ce3d7a 100644
 --- a/applications/ultrasound_segmentation/cpp/CMakeLists.txt
 +++ b/applications/ultrasound_segmentation/cpp/CMakeLists.txt
 @@ -47,6 +47,15 @@ add_custom_target(ultrasound_segmentation_yaml

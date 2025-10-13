@@ -4,20 +4,19 @@ LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327"
 
 SRC_URI = "git://github.com/nvidia-holoscan/holohub.git;protocol=https;nobranch=1;tag=holoscan-sdk-${PV}"
-SRCREV = "b67ae6d1a749a24db5b4cdf72f51fcc9860ce688"
+SRCREV = "3a4b3e12af228467bb2282513ff822c42bc7cdfe"
 
 SRC_URI += " \
     file://desktop-icons \
     file://0001-Add-install-rules.patch \
-    file://0002-fix-the-dependency-with-AJA-operator.patch \
-    file://0003-Remove-relative-gxf_extension-paths.patch \
-    file://0004-Build-python-libs-with-install-RPATH-and-add-find-py.patch \
-    file://0005-disable-build-emergent-sample-applications.patch \
-    file://0006-Fix-default-data-paths-in-python-apps.patch \
-    file://0007-Fix-volume_renderer-application.patch \
-    file://0008-Skip-model-download-for-object_detection_torch.patch \
-    file://0009-Remove-native-CUDA_ARCHITECTURE.patch \
-    file://0010-Updates-for-OE-cross-builds.patch \
+    file://0002-Remove-relative-gxf_extension-paths.patch \
+    file://0003-Build-python-libs-with-install-RPATH-and-add-find-py.patch \
+    file://0004-disable-build-emergent-sample-applications.patch \
+    file://0005-Fix-default-data-paths-in-python-apps.patch \
+    file://0006-Fix-volume_renderer-application.patch \
+    file://0007-Skip-model-download-for-object_detection_torch.patch \
+    file://0008-Remove-native-CUDA_ARCHITECTURE.patch \
+    file://0009-Updates-for-OE-cross-builds.patch \
 "
 
 HOLOHUB_INSTALL_PATH = "/opt/nvidia/holohub"

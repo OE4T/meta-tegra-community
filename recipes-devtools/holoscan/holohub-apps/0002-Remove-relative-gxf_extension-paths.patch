@@ -1,7 +1,7 @@
-From 33555895864736f1342a61bdb35f935bc79c9090 Mon Sep 17 00:00:00 2001
+From de11b710bb16e9c254a67b1d4ce29670d6baa4b6 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 18 Sep 2025 12:24:08 +0100
-Subject: [PATCH 03/10] Remove relative gxf_extension paths
+Date: Mon, 13 Oct 2025 10:21:59 +0100
+Subject: [PATCH 2/9] Remove relative gxf_extension paths
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
