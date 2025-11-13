@@ -1,21 +1,36 @@
-From 04cd040ec80588ccdc338d4afbf9ffc08dfc1db4 Mon Sep 17 00:00:00 2001
+From f7008de8c5940707f28a793c6024b40609feb343 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Mon, 13 Oct 2025 10:04:43 +0100
+Date: Thu, 13 Nov 2025 15:36:37 +0000
 Subject: [PATCH 7/7] Updates for OE cross builds
+
+- drop building v4l2_camera examples
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
+ examples/CMakeLists.txt                   |  1 -
  modules/holoinfer/src/CMakeLists.txt      |  4 ++++
  modules/holoviz/src/glfw_window.cpp       |  2 +-
- modules/holoviz/src/vulkan/vulkan_app.cpp | 14 +++++++-------
- 3 files changed, 12 insertions(+), 8 deletions(-)
+ modules/holoviz/src/vulkan/vulkan_app.cpp | 18 +++++++++---------
+ 4 files changed, 14 insertions(+), 11 deletions(-)
 
+diff --git a/examples/CMakeLists.txt b/examples/CMakeLists.txt
+index 7bf4454..e766036 100644
+--- a/examples/CMakeLists.txt
++++ b/examples/CMakeLists.txt
+@@ -98,7 +98,6 @@ add_subdirectory(resources)
+ add_subdirectory(round_robin_parallel)
+ add_subdirectory(subgraph)
+ add_subdirectory(tensor_interop)
+-add_subdirectory(v4l2_camera)
+ add_subdirectory(video_replayer)
+ add_subdirectory(video_replayer_distributed)
+ add_subdirectory(custom_cuda_kernel_1d_sample)
 diff --git a/modules/holoinfer/src/CMakeLists.txt b/modules/holoinfer/src/CMakeLists.txt
-index cc1e1ac..09dd40a 100644
+index 31e78e9..1977638 100644
 --- a/modules/holoinfer/src/CMakeLists.txt
 +++ b/modules/holoinfer/src/CMakeLists.txt
-@@ -121,6 +121,10 @@ target_link_libraries(${PROJECT_NAME}
+@@ -127,6 +127,10 @@ target_link_libraries(${PROJECT_NAME}
  #     get rid of the holoscan::infer_utils target which could be merged back in holoinfer. The point
  #     of this comment was to highlight the current architecture which can appear confusing otherwise.
  
@@ -27,10 +42,10 @@ index cc1e1ac..09dd40a 100644
      # no target_link_libraries to holoinfer_torch: we dlopen it as a plugin
      target_compile_definitions(${PROJECT_NAME} PUBLIC "HOLOINFER_TORCH_ENABLED")
 diff --git a/modules/holoviz/src/glfw_window.cpp b/modules/holoviz/src/glfw_window.cpp
-index d979417..f0a48e7 100644
+index e79834c..1ab80be 100644
 --- a/modules/holoviz/src/glfw_window.cpp
 +++ b/modules/holoviz/src/glfw_window.cpp
-@@ -592,7 +592,7 @@ vk::SurfaceKHR GLFWWindow::create_surface(vk::PhysicalDevice physical_device,
+@@ -677,7 +677,7 @@ vk::SurfaceKHR GLFWWindow::create_surface(vk::PhysicalDevice physical_device,
    VkSurfaceKHR surface;
    const vk::Result result =
        vk::Result(glfwCreateWindowSurface(instance, impl_->window_, nullptr, &surface));
@@ -40,10 +55,10 @@ index d979417..f0a48e7 100644
  }
  
 diff --git a/modules/holoviz/src/vulkan/vulkan_app.cpp b/modules/holoviz/src/vulkan/vulkan_app.cpp
-index d9838d8..fcbc706 100644
+index 9e9a918..d2c93dc 100644
 --- a/modules/holoviz/src/vulkan/vulkan_app.cpp
 +++ b/modules/holoviz/src/vulkan/vulkan_app.cpp
-@@ -797,7 +797,7 @@ void Vulkan::Impl::end_transfer_pass() {
+@@ -826,7 +826,7 @@ void Vulkan::Impl::end_transfer_pass() {
    // submit staged transfers
    const vk::Result result =
        vk::Result(nvvk_.transfer_batch_submission_.execute(transfer_job.fence_.get(), 0b0000'0001));
@@ -52,7 +67,7 @@ index d9838d8..fcbc706 100644
  
    // next graphics submission must wait for transfer completion
    nvvk_.batch_submission_.enqueueWait(transfer_job.semaphore_.get(),
-@@ -866,7 +866,7 @@ void Vulkan::Impl::cleanup_transfer_jobs() {
+@@ -895,7 +895,7 @@ void Vulkan::Impl::cleanup_transfer_jobs() {
  
          it->fence_triggered_ = true;
        } else if (result != vk::Result::eNotReady) {
@@ -61,7 +76,7 @@ index d9838d8..fcbc706 100644
        }
      }
  
-@@ -884,7 +884,7 @@ void Vulkan::Impl::cleanup_transfer_jobs() {
+@@ -913,7 +913,7 @@ void Vulkan::Impl::cleanup_transfer_jobs() {
            it = next;
            continue;
          } else if (result != vk::Result::eNotReady) {
@@ -70,7 +85,7 @@ index d9838d8..fcbc706 100644
          }
        } else {
          // this is a stale transfer buffer (no end_transfer_pass()?), remove it
-@@ -917,7 +917,7 @@ void Vulkan::Impl::prepare_frame() {
+@@ -946,7 +946,7 @@ void Vulkan::Impl::prepare_frame() {
    if (result != vk::Result::eSuccess) {
      // This allows Aftermath to do things and exit below
      usleep(1000);
@@ -79,7 +94,7 @@ index d9838d8..fcbc706 100644
      exit(-1);
    }
  
-@@ -949,7 +949,7 @@ void Vulkan::Impl::submit_frame() {
+@@ -978,7 +978,7 @@ void Vulkan::Impl::submit_frame() {
  
    const vk::Result result =
        vk::Result(nvvk_.batch_submission_.execute(wait_fences_[image_index].get(), 0b0000'0001));
@@ -88,7 +103,7 @@ index d9838d8..fcbc706 100644
  
    // Presenting frame
    fb_sequence_->present(queue_gct_);
-@@ -2222,7 +2222,7 @@ void Vulkan::Impl::read_framebuffer(Vulkan* vulkan, ImageFormat fmt, uint32_t wi
+@@ -2251,7 +2251,7 @@ void Vulkan::Impl::read_framebuffer(Vulkan* vulkan, ImageFormat fmt, uint32_t wi
      if (result != vk::Result::eSuccess) {
        // This allows Aftermath to do things and exit below
        usleep(1000);
@@ -97,7 +112,7 @@ index d9838d8..fcbc706 100644
        exit(-1);
      }
  
-@@ -2279,7 +2279,7 @@ void Vulkan::Impl::read_framebuffer(Vulkan* vulkan, ImageFormat fmt, uint32_t wi
+@@ -2308,7 +2308,7 @@ void Vulkan::Impl::read_framebuffer(Vulkan* vulkan, ImageFormat fmt, uint32_t wi
    // submit the command buffer
    const vk::Result result =
        vk::Result(nvvk_.batch_submission_.execute(read_job.fence_.get(), 0b0000'0001));
@@ -106,6 +121,24 @@ index d9838d8..fcbc706 100644
  
    // copy the buffer to CUDA memory
    {
+@@ -2396,7 +2396,7 @@ bool Vulkan::Impl::wait_for_present(uint64_t present_id, uint64_t timeout_ns) {
+   if (result == vk::Result::eTimeout) {
+     return false;
+   }
+-  vk::resultCheck(result, "Failed to wait for present");
++  vk::detail::resultCheck(result, "Failed to wait for present");
+   return true;
+ }
+ 
+@@ -2420,7 +2420,7 @@ bool Vulkan::Impl::wait_for_display_event(DisplayEventType display_event_type,
+   if (result == vk::Result::eTimeout) {
+     return false;
+   }
+-  vk::resultCheck(result, "Failed to wait for display event");
++  vk::detail::resultCheck(result, "Failed to wait for display event");
+   return true;
+ }
+ 
 -- 
 2.34.1
 
