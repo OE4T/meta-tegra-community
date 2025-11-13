@@ -1,6 +1,6 @@
-From 3d6e0597ea07a9f458234a1a2f2063824308e1c7 Mon Sep 17 00:00:00 2001
+From 494697f22ca984f10fbeaa8e8423afc0b35323fb Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Mon, 13 Oct 2025 10:17:10 +0100
+Date: Thu, 13 Nov 2025 17:18:44 +0000
 Subject: [PATCH 1/9] Add install rules
 
 Upstream-Status: Inappropriate [OE-specific]
@@ -25,7 +25,7 @@ Signed-off-by: Ian Stewart <istewart@nvidia.com>
  .../ultrasound_segmentation/cpp/CMakeLists.txt        |  9 +++++++++
  .../ultrasound_segmentation/python/CMakeLists.txt     |  8 ++++++++
  applications/volume_rendering/cpp/CMakeLists.txt      |  6 ++++++
- applications/volume_rendering/python/CMakeLists.txt   | 10 +++++++++-
+ applications/volume_rendering/python/CMakeLists.txt   |  7 +++++++
  cmake/pybind11_add_holohub_module.cmake               |  5 +++++
  gxf_extensions/emergent_source/CMakeLists.txt         |  2 ++
  operators/aja_source/CMakeLists.txt                   |  2 ++
@@ -33,7 +33,7 @@ Signed-off-by: Ian Stewart <istewart@nvidia.com>
  operators/orsi/orsi_format_converter/CMakeLists.txt   |  2 ++
  operators/tensor_to_video_buffer/CMakeLists.txt       |  2 ++
  operators/video_encoder/CMakeLists.txt                |  2 ++
- 27 files changed, 183 insertions(+), 1 deletion(-)
+ 27 files changed, 181 insertions(+)
 
 diff --git a/applications/colonoscopy_segmentation/CMakeLists.txt b/applications/colonoscopy_segmentation/CMakeLists.txt
 index 2c4a9b4a..4a609c9e 100644
@@ -294,12 +294,12 @@ index c491ca40..09877bc8 100644
  if(BUILD_TESTING)
    set(RECORDING_DIR ${CMAKE_CURRENT_BINARY_DIR}/recording_output)
 diff --git a/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt b/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt
-index be0664bc..98a8f30e 100644
+index 7453836c..c2bad623 100644
 --- a/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt
 +++ b/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt
-@@ -43,6 +43,8 @@ target_include_directories(visualizer_icardio INTERFACE ${CMAKE_CURRENT_SOURCE_D
- target_compile_definitions(visualizer_icardio PRIVATE HOLOSCAN_MAJOR_VERSION=${holoscan_VERSION_MAJOR})
- target_compile_definitions(visualizer_icardio PRIVATE HOLOSCAN_MINOR_VERSION=${holoscan_VERSION_MINOR})
+@@ -41,6 +41,8 @@ endif()
+ 
+ target_include_directories(visualizer_icardio INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
  
 +install(TARGETS visualizer_icardio)
 +
@@ -326,10 +326,10 @@ index 8af6d5ec..acab477c 100644
  if(BUILD_TESTING)
    # To get the environment path
 diff --git a/applications/object_detection_torch/CMakeLists.txt b/applications/object_detection_torch/CMakeLists.txt
-index 98c2a0d0..6418b608 100644
+index 163c6a00..6d9e685d 100644
 --- a/applications/object_detection_torch/CMakeLists.txt
 +++ b/applications/object_detection_torch/CMakeLists.txt
-@@ -128,6 +128,15 @@ add_custom_target(object_detection_torch_yaml
+@@ -129,6 +129,15 @@ add_custom_target(object_detection_torch_yaml
  )
  add_dependencies(object_detection_torch object_detection_torch_yaml)
  
@@ -399,17 +399,13 @@ index 07312a9b..9858353e 100644
 +  DESTINATION ${install_path}
 +)
 diff --git a/applications/volume_rendering/python/CMakeLists.txt b/applications/volume_rendering/python/CMakeLists.txt
-index 4ec7fa60..389d2e4a 100644
+index ebf82249..b96f0d3f 100644
 --- a/applications/volume_rendering/python/CMakeLists.txt
 +++ b/applications/volume_rendering/python/CMakeLists.txt
-@@ -34,4 +34,12 @@ if(HOLOHUB_DOWNLOAD_DATASETS)
-     ALL
-   )
-   add_dependencies(volume_rendering volume_rendering_data)
--endif()
-\ No newline at end of file
-+endif()
-+
+@@ -36,6 +36,13 @@ if(HOLOHUB_DOWNLOAD_DATASETS)
+   add_dependencies(volume_rendering_python volume_rendering_data)
+ endif()
+ 
 +# Install the application
 +file(RELATIVE_PATH install_path ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 +install(FILES
@@ -417,6 +413,9 @@ index 4ec7fa60..389d2e4a 100644
 +  DESTINATION ${install_path}
 +)
 +
+ if(BUILD_TESTING)
+ 
+   add_test(NAME volume_rendering_python_test
 diff --git a/cmake/pybind11_add_holohub_module.cmake b/cmake/pybind11_add_holohub_module.cmake
 index a3ee8f0d..27a94a65 100644
 --- a/cmake/pybind11_add_holohub_module.cmake

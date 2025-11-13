@@ -1,6 +1,6 @@
-From b8494700c8440b7e877135cc051aa0fd3840fe27 Mon Sep 17 00:00:00 2001
+From 7369df5e978cd725fc48d9d25e9c9907ff9f0874 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Mon, 13 Oct 2025 10:23:08 +0100
+Date: Thu, 13 Nov 2025 17:20:31 +0000
 Subject: [PATCH 4/9] disable build emergent sample applications
 
 Upstream-Status: Inappropriate [OE-specific]
@@ -12,19 +12,19 @@ Signed-off-by: Ian Stewart <istewart@nvidia.com>
  3 files changed, 9 insertions(+), 2 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index c9c447d8..aedf656c 100644
+index bd08a260..a6c47973 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -47,6 +47,7 @@ include(CTest)
- # Options
+@@ -48,6 +48,7 @@ include(CTest)
  option(HOLOHUB_DOWNLOAD_DATASETS "Download datasets" ON)
+ option(HOLOHUB_BUILD_CPP "Build support for C++" ON)
  option(HOLOHUB_BUILD_PYTHON "Build support for Python" ON)
 +option(HOLOHUB_ENABLE_EMERGENT "Build Emergent-based sample applications" OFF)
  
  # Enable flow benchmarking
  option(FLOW_BENCHMARKING "Enable Flow Benchmarking" OFF)
 diff --git a/applications/CMakeLists.txt b/applications/CMakeLists.txt
-index 2d0469b3..ea327d74 100644
+index 380abe6f..b5fbf51f 100644
 --- a/applications/CMakeLists.txt
 +++ b/applications/CMakeLists.txt
 @@ -60,8 +60,10 @@ add_subdirectory(h264)
