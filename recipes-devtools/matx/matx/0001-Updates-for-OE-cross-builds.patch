@@ -1,6 +1,6 @@
-From b953e6f2b196f2530fc9a1ba9be87170fbb1cbc9 Mon Sep 17 00:00:00 2001
+From 09c801d20fe36ec6efc11bdf200f6e75f285f548 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Mon, 1 Sep 2025 23:11:39 +0100
+Date: Wed, 5 Nov 2025 16:54:06 +0000
 Subject: [PATCH] Updates for OE cross builds
 
 Upstream-Status: Inappropriate [OE-specific]
@@ -10,7 +10,7 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  1 file changed, 12 insertions(+), 34 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index f07e0c10..9d0eb683 100644
+index 08dc1d60..8319fc9f 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -9,25 +9,19 @@ else()
@@ -74,7 +74,7 @@ index f07e0c10..9d0eb683 100644
 -endif()
  message(STATUS "Using GPU architectures ${CMAKE_CUDA_ARCHITECTURES}")
  
- rapids_cmake_write_version_file(include/version_config.h)
+ rapids_cmake_write_version_file(include/matx/version_config.h)
 @@ -130,12 +114,6 @@ if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)
      message(FATAL_ERROR "MatX requires CUDA 11.5 or higher. Please update before using.")
  endif()
