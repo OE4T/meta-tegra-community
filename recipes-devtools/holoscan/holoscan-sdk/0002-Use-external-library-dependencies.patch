@@ -1,6 +1,6 @@
-From 011317c3b2b95af6947efae682fb22e12a4588bb Mon Sep 17 00:00:00 2001
+From 49810de9ab7186871fb1ecbe4beabbd15046578e Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Mon, 13 Oct 2025 09:59:03 +0100
+Date: Thu, 13 Nov 2025 15:33:35 +0000
 Subject: [PATCH 2/7] Use external library dependencies
 
 This changes the dependencies on the following libraries so
@@ -59,14 +59,14 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  cmake/deps/pybind11.cmake                     |  20 +-
  cmake/deps/rmm.cmake                          |  44 +-
  cmake/deps/spdlog_rapids.cmake                |  29 +-
- cmake/deps/ucx.cmake                          |  55 +-
+ cmake/deps/ucx.cmake                          |  67 +-
  cmake/deps/ucxx_rapids.cmake                  | 132 +--
  cmake/deps/yaml-cpp_rapids.cmake              |  51 +-
  cmake/modules/FindONNXRuntime.cmake           |  45 +-
  cmake/modules/SetupCUDA.cmake                 |  44 -
  cmake/modules/SetupCache.cmake                |   3 -
  cmake/modules/SetupRapidsCMake.cmake          |  12 +-
- cmake/setup_dependencies.cmake                |   4 -
+ cmake/setup_dependencies.cmake                |   7 -
  .../cpp/operator_status_tracking.cpp          |   2 +-
  .../matx/matx_basic/cpp/CMakeLists.min.txt    |  33 +-
  .../distributed_pose_tree/cpp/CMakeLists.txt  |   6 +-
@@ -89,24 +89,25 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  .../simple_text_serializer.cpp                |   2 +-
  src/operators/holoviz/holoviz.cpp             |   2 +-
  .../v4l2_video_capture/v4l2_video_capture.cpp |   2 +-
- 50 files changed, 127 insertions(+), 2246 deletions(-)
+ 50 files changed, 127 insertions(+), 2261 deletions(-)
  delete mode 100644 cmake/deps/hwloc.config.h.in
  delete mode 100644 cmake/deps/hwloc.private.config.h.in
  delete mode 100644 cmake/deps/hwloc.static-components.h.in
  delete mode 100644 cmake/deps/nvtx3.cmake
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index f5a6fc1..995fcb8 100644
+index 850a723..2eb6744 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -269,17 +269,12 @@ endif()
+@@ -288,7 +288,6 @@ endif()
  # List targets to export/install
  list(APPEND HOLOSCAN_INSTALL_TARGETS
      core
 -    eigen3_interface
+     gpu_resident_cuda
      holoviz
      holoviz_imgui
-     holoinfer
+@@ -296,10 +295,6 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS
      holoinfer_utils
      infer_utils
      logger
@@ -117,7 +118,7 @@ index f5a6fc1..995fcb8 100644
      data_loggers_async_console_logger
      data_loggers_basic_console_logger
      op_async_ping_rx
-@@ -302,7 +297,6 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS
+@@ -322,7 +317,6 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS
      pose_tree
      profiler
      spdlog_logger
@@ -125,7 +126,7 @@ index f5a6fc1..995fcb8 100644
  )
  if(HOLOSCAN_BUILD_LIBTORCH)
    list(APPEND HOLOSCAN_INSTALL_TARGETS holoinfer_torch)
-@@ -313,8 +307,7 @@ endif()
+@@ -333,8 +327,7 @@ endif()
  list(APPEND HOLOSCAN_INSTALL_TARGETS pybind11_abi_config)
  
  # Copy library files
@@ -135,7 +136,7 @@ index f5a6fc1..995fcb8 100644
      DESTINATION ${HOLOSCAN_INSTALL_LIB_DIR}
      EXPORT ${HOLOSCAN_PACKAGE_NAME}-exports
      COMPONENT holoscan-core
-@@ -326,36 +319,6 @@ install(DIRECTORY include/holoscan/
+@@ -346,36 +339,6 @@ install(DIRECTORY include/holoscan/
      COMPONENT holoscan-core
  )
  
@@ -172,7 +173,7 @@ index f5a6fc1..995fcb8 100644
  # Copy version file
  install(FILES ${${HOLOSCAN_PACKAGE_NAME}_BINARY_DIR}/include/holoscan/version_config.hpp
      DESTINATION include/holoscan
-@@ -509,52 +472,6 @@ endforeach()
+@@ -544,52 +507,6 @@ endforeach()
  
  @HOLOSCAN_GXF_INSTALL_HOOK@
  
@@ -508,7 +509,7 @@ index 360f64c..8b877f0 100644
  # Looks for gRPCConfig.cmake file installed by gRPC's cmake installation.
  find_package(gRPC CONFIG REQUIRED)
 diff --git a/cmake/deps/gtest_rapids.cmake b/cmake/deps/gtest_rapids.cmake
-index 1ca5a39..01baab4 100644
+index 0c40dd0..f4b67dc 100644
 --- a/cmake/deps/gtest_rapids.cmake
 +++ b/cmake/deps/gtest_rapids.cmake
 @@ -13,40 +13,4 @@
@@ -520,12 +521,12 @@ index 1ca5a39..01baab4 100644
 -# Workaround for issue where `FetchContent_Declare(GTest)` does not respect `SOURCE_DIR` for caching.
 -# https://github.com/google/googletest/issues/4384
 -# https://gitlab.kitware.com/cmake/cmake/-/issues/25714
--set(version 1.12.1)
+-set(version 1.17.0)
 -rapids_cpm_find(googletest ${version}
 -    GLOBAL_TARGETS GTest::gtest GTest::gmock GTest::gtest_main GTest::gmock_main
 -    CPM_ARGS FIND_PACKAGE_ARGUMENTS "EXACT"
 -    GIT_REPOSITORY "https://github.com/google/googletest.git"
--    GIT_TAG release-${version}
+-    GIT_TAG v${version}
 -    GIT_SHALLOW ON
 -    PATCH_COMMAND ""
 -    EXCLUDE_FROM_ALL OFF
@@ -552,7 +553,7 @@ index 1ca5a39..01baab4 100644
 -    add_library(GTest::gmock ALIAS gmock)
 -    add_library(GTest::gmock_main ALIAS gmock_main)
 -endif()
-+find_package(GTest 1.16.0 REQUIRED)
++find_package(GTest 1.17.0 REQUIRED)
 diff --git a/cmake/deps/hwloc.cmake b/cmake/deps/hwloc.cmake
 index 9c20ea4..be9c2a0 100644
 --- a/cmake/deps/hwloc.cmake
@@ -1902,7 +1903,7 @@ index 3f8203b..bff89fc 100644
 -endif()
 +rapids_find_package(magic_enum 0.9.7 REQUIRED)
 diff --git a/cmake/deps/matx.cmake b/cmake/deps/matx.cmake
-index 65ae225..1f06550 100644
+index c99f31e..a02910c 100644
 --- a/cmake/deps/matx.cmake
 +++ b/cmake/deps/matx.cmake
 @@ -13,35 +13,4 @@
@@ -1912,13 +1913,13 @@ index 65ae225..1f06550 100644
 -# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_find_package.html#
 -include(${rapids-cmake-dir}/cpm/find.cmake)
 -
--rapids_cpm_find(matx 0.9.2
+-rapids_cpm_find(matx 0.9.3
 -    GLOBAL_TARGETS matx
 -    BUILD_EXPORT_SET ${HOLOSCAN_PACKAGE_NAME}-exports
 -
 -    CPM_ARGS
 -    GITHUB_REPOSITORY NVIDIA/MatX
--    GIT_TAG v0.9.2
+-    GIT_TAG v0.9.3
 -    GIT_SHALLOW TRUE
 -    EXCLUDE_FROM_ALL
 -)
@@ -1941,7 +1942,7 @@ index 65ae225..1f06550 100644
 -        COMPONENT "holoscan-dependencies"
 -        )
 -endif()
-+rapids_find_package(matx 0.9.1 REQUIRED)
++rapids_find_package(matx 0.9.3 REQUIRED)
 diff --git a/cmake/deps/nvtx3.cmake b/cmake/deps/nvtx3.cmake
 deleted file mode 100644
 index 6b9ccf8..0000000
@@ -2101,10 +2102,10 @@ index 74baaa7..cf07302 100644
 -endif()
 +rapids_find_package(spdlog 1.13.0 REQUIRED)
 diff --git a/cmake/deps/ucx.cmake b/cmake/deps/ucx.cmake
-index 90fa701..ef90732 100644
+index 2273e95..ef90732 100644
 --- a/cmake/deps/ucx.cmake
 +++ b/cmake/deps/ucx.cmake
-@@ -13,57 +13,4 @@
+@@ -13,69 +13,4 @@
  # See the License for the specific language governing permissions and
  # limitations under the License.
  
@@ -2162,6 +2163,18 @@ index 90fa701..ef90732 100644
 -    COMPONENT "holoscan-dependencies"
 -  )
 -endforeach()
+-
+-install(
+-  FILES ${ucx_DIR}/ucx-config-version.cmake
+-  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/ucx"
+-  COMPONENT "holoscan-dependencies"
+-)
+-install(
+-  FILES ${CMAKE_CURRENT_LIST_DIR}/configs/ucx-config.cmake.in
+-  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/ucx"
+-  COMPONENT "holoscan-dependencies"
+-  RENAME "ucx-config.cmake"
+-)
 +find_package(ucx 1.19.0 REQUIRED)
 diff --git a/cmake/deps/ucxx_rapids.cmake b/cmake/deps/ucxx_rapids.cmake
 index bf0f43b..cc4d34f 100644
@@ -2509,20 +2522,23 @@ index 3cf88df..68f5af6 100644
  include(rapids-cpm)
  include(rapids-cuda)
 diff --git a/cmake/setup_dependencies.cmake b/cmake/setup_dependencies.cmake
-index d57544c..c6563fe 100644
+index 9266655..989a590 100644
 --- a/cmake/setup_dependencies.cmake
 +++ b/cmake/setup_dependencies.cmake
-@@ -37,9 +37,6 @@ rapids_cpm_init(OVERRIDE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/deps/rapids-cmake-pa
+@@ -15,12 +15,6 @@
  
- # Define packages to override the default ones.
+ list(APPEND CMAKE_MESSAGE_CONTEXT "deps")
  
--# CCCL is a dependency of matx.
--include(${rapids-cmake-dir}/cpm/cccl.cmake)
--rapids_cpm_cccl()
- # fmt must be populated before rmm and spdlog to ensure fmt headers are installed in the package
- superbuild_depend(fmt_rapids)
- # rmm is fetched by spdlog but need to call this first because a patch needs to be applied to rmm
-@@ -63,7 +60,6 @@ superbuild_depend(ucx)
+-# Disable FetchContent_Populate deprecation warnings for older CPM version
+-# See: https://cmake.org/cmake/help/latest/policy/CMP0169.html
+-# TODO: Re-enable this warning when we update rapids-cmake
+-cmake_policy(SET CMP0169 OLD)
+-set(CMAKE_POLICY_DEFAULT_CMP0169 OLD)
+-
+ function(superbuild_depend module_name)
+     cmake_parse_arguments(PARSE_ARGV 1 _SUPER_BUILD "" "COMPONENT" "")
+     # Set CMAKE_INSTALL_DEFAULT_COMPONENT_NAME before including .cmake file
+@@ -66,7 +60,6 @@ superbuild_depend(ucx)
  superbuild_depend(v4l2)
  superbuild_depend(yaml-cpp_rapids)
  superbuild_depend(gxf)
@@ -2629,7 +2645,7 @@ index ae533f1..0842e08 100644
  
  # Copy config file
 diff --git a/include/holoscan/core/resources/async_data_logger.hpp b/include/holoscan/core/resources/async_data_logger.hpp
-index 170f97f..5045794 100644
+index 6221fd9..e8f7a50 100644
 --- a/include/holoscan/core/resources/async_data_logger.hpp
 +++ b/include/holoscan/core/resources/async_data_logger.hpp
 @@ -31,7 +31,7 @@
@@ -2655,7 +2671,7 @@ index 047d384..58f6146 100644
  // Copy of nvtx3::v1::scoped_range_in which checks whether tracing is enabled or not
  namespace nvtx3::v1 {
 diff --git a/modules/holoinfer/src/CMakeLists.txt b/modules/holoinfer/src/CMakeLists.txt
-index fee47cd..1b57d7a 100644
+index 48f48de..33a4456 100644
 --- a/modules/holoinfer/src/CMakeLists.txt
 +++ b/modules/holoinfer/src/CMakeLists.txt
 @@ -49,6 +49,15 @@ set_target_properties(holoinfer_utils PROPERTIES
@@ -2674,9 +2690,9 @@ index fee47cd..1b57d7a 100644
  set(holoinfer_src
      infer/trt/core.cpp
      infer/trt/utils.cpp
-@@ -67,9 +76,9 @@ target_include_directories(${PROJECT_NAME}
-     PRIVATE
+@@ -73,9 +82,9 @@ target_include_directories(${PROJECT_NAME}
          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/manager>
      PUBLIC
 -        $<BUILD_INTERFACE:${tl-expected_SOURCE_DIR}/include>
 -        $<BUILD_INTERFACE:${dlpack_SOURCE_DIR}/include>
@@ -2945,20 +2961,20 @@ index e9c5987..f0414b4 100644
 +        ${MAGIC_ENUM_INCLUDE_DIRS}
  )
 diff --git a/python/holoscan/operators/holoviz/holoviz.cpp b/python/holoscan/operators/holoviz/holoviz.cpp
-index 980fd28..a78b128 100644
+index 2fca96c..d50e8b9 100644
 --- a/python/holoscan/operators/holoviz/holoviz.cpp
 +++ b/python/holoscan/operators/holoviz/holoviz.cpp
-@@ -30,7 +30,7 @@
+@@ -31,7 +31,7 @@
  
  // the default range for enums is 128 which is not enough for the Key enum, increase to 512
  #define MAGIC_ENUM_RANGE_MAX 512  // NOLINT(cppcoreguidelines-macro-usage)
 -#include <magic_enum.hpp>
 +#include <magic_enum/magic_enum.hpp>
  
+ #include "../../core/component_util.hpp"
  #include "../operator_util.hpp"
- #include "./pydoc.hpp"
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index cf3165b..f5cd337 100644
+index 2eabe6c..21c4027 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
 @@ -127,14 +127,10 @@ target_link_libraries(holoscan_matx
@@ -3010,7 +3026,7 @@ index cf3165b..f5cd337 100644
  set(CORE_PROTO_FILES
      core/distributed/proto/app_driver.proto
      core/distributed/proto/app_worker.proto
-@@ -321,11 +327,9 @@ target_link_libraries(core
+@@ -327,11 +333,9 @@ target_link_libraries(core
          GXF::std
          GXF::ucx
          yaml-cpp
@@ -3024,7 +3040,7 @@ index cf3165b..f5cd337 100644
          gRPC::grpc++
          gRPC::grpc++_reflection
          protobuf::libprotobuf
-@@ -334,13 +338,10 @@ target_link_libraries(core
+@@ -340,13 +344,10 @@ target_link_libraries(core
  
  target_include_directories(core
      PUBLIC
@@ -3069,7 +3085,7 @@ index c5abb79..ec06c7a 100644
  #include "holoscan/core/gxf/gxf_utils.hpp"
  #include "holoscan/logger/logger.hpp"
 diff --git a/src/core/resources/async_data_logger.cpp b/src/core/resources/async_data_logger.cpp
-index 4465d8c..1d9d7be 100644
+index b2a0e90..c0d1060 100644
 --- a/src/core/resources/async_data_logger.cpp
 +++ b/src/core/resources/async_data_logger.cpp
 @@ -26,7 +26,7 @@
@@ -3082,7 +3098,7 @@ index 4465d8c..1d9d7be 100644
  #include "holoscan/core/component_spec.hpp"
  #include "holoscan/core/domain/tensor.hpp"
 diff --git a/src/data_loggers/basic_console_logger/simple_text_serializer.cpp b/src/data_loggers/basic_console_logger/simple_text_serializer.cpp
-index 6300cdc..ddded05 100644
+index b48f7ec..7e7c18d 100644
 --- a/src/data_loggers/basic_console_logger/simple_text_serializer.cpp
 +++ b/src/data_loggers/basic_console_logger/simple_text_serializer.cpp
 @@ -28,7 +28,7 @@
@@ -3095,7 +3111,7 @@ index 6300cdc..ddded05 100644
  #include "gxf/core/handle.hpp"
  #include "gxf/multimedia/video.hpp"
 diff --git a/src/operators/holoviz/holoviz.cpp b/src/operators/holoviz/holoviz.cpp
-index eee843c..f16f64d 100644
+index dae3ca4..e357b8e 100644
 --- a/src/operators/holoviz/holoviz.cpp
 +++ b/src/operators/holoviz/holoviz.cpp
 @@ -26,7 +26,7 @@
@@ -3108,7 +3124,7 @@ index eee843c..f16f64d 100644
  #include "holoscan/core/application.hpp"
  #include "holoscan/core/condition.hpp"
 diff --git a/src/operators/v4l2_video_capture/v4l2_video_capture.cpp b/src/operators/v4l2_video_capture/v4l2_video_capture.cpp
-index de63b59..9b07ae4 100644
+index b8b1d1f..7c7ae4f 100644
 --- a/src/operators/v4l2_video_capture/v4l2_video_capture.cpp
 +++ b/src/operators/v4l2_video_capture/v4l2_video_capture.cpp
 @@ -35,7 +35,7 @@
