@@ -1,6 +1,6 @@
-From 78ea4da4e327413460eec99af38c9d7f76d6c281 Mon Sep 17 00:00:00 2001
+From 1629c4a4a0b01eca5c83ead277e9c81173073686 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 11 Sep 2025 15:03:42 +0100
+Date: Thu, 13 Nov 2025 11:24:04 +0000
 Subject: [PATCH 2/2] Use external library dependencies
 
 This changes the dependencies on the following libraries so
@@ -14,14 +14,17 @@ fetched, built, and installed by CMake:
  - cutlass
  - flatbuffers
  - Python
+ - abseil_cpp
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
  cmake/CMakeLists.txt                            |  1 -
+ cmake/external/abseil-cpp.cmake                 |  1 -
  cmake/external/cutlass.cmake                    |  1 +
  cmake/external/onnxruntime_external_deps.cmake  | 17 +++++------------
  cmake/onnxruntime_python.cmake                  |  9 ---------
+ cmake/onnxruntime_webassembly.cmake             |  1 -
  onnxruntime/core/flatbuffers/schema/ort.fbs.h   |  7 -------
  .../schema/ort_training_checkpoint.fbs.h        |  7 -------
  .../transpose_optimization/optimizer_api.h      |  1 +
@@ -29,7 +32,7 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  .../OperatorFieldTypes_generated.h              |  7 -------
  .../lora/adapter_format/adapter_schema.fbs.h    |  7 -------
  .../flatbuffers/flatbuffers_utils_test.fbs.h    |  7 -------
- 11 files changed, 7 insertions(+), 64 deletions(-)
+ 13 files changed, 7 insertions(+), 66 deletions(-)
 
 diff --git a/cmake/CMakeLists.txt b/cmake/CMakeLists.txt
 index adf0fc0261..fde11b22e9 100644
@@ -43,6 +46,18 @@ index adf0fc0261..fde11b22e9 100644
    check_cxx_compiler_flag(-Wstringop-overflow HAS_STRINGOP_OVERFLOW)
    check_cxx_compiler_flag(-Wtautological-pointer-compare HAS_TAUTOLOGICAL_POINTER_COMPARE)
    check_cxx_compiler_flag(-Wundefined-var-template HAS_UNDEFINED_VAR_TEMPLATE)
+diff --git a/cmake/external/abseil-cpp.cmake b/cmake/external/abseil-cpp.cmake
+index cd93a8da00..40cb1a4215 100644
+--- a/cmake/external/abseil-cpp.cmake
++++ b/cmake/external/abseil-cpp.cmake
+@@ -114,7 +114,6 @@ absl::absl_check
+ absl::hash_function_defaults
+ absl::function_ref
+ absl::city
+-absl::low_level_hash
+ absl::fixed_array
+ absl::variant
+ absl::meta
 diff --git a/cmake/external/cutlass.cmake b/cmake/external/cutlass.cmake
 index 65b0d61270..f202372e18 100644
 --- a/cmake/external/cutlass.cmake
@@ -138,6 +153,18 @@ index 67c80bfb49..70ba8f1d10 100644
  if (onnxruntime_USE_OPENVINO)
    add_custom_command(
      TARGET onnxruntime_pybind11_state POST_BUILD
+diff --git a/cmake/onnxruntime_webassembly.cmake b/cmake/onnxruntime_webassembly.cmake
+index bfb73e14ce..8a4fc8684c 100644
+--- a/cmake/onnxruntime_webassembly.cmake
++++ b/cmake/onnxruntime_webassembly.cmake
+@@ -278,7 +278,6 @@ else()
+     target_compile_options(absl_log_globals PRIVATE ${SMEMORY_FLAG} -Wno-experimental)
+     target_compile_options(absl_hash PRIVATE ${SMEMORY_FLAG} -Wno-experimental)
+     target_compile_options(absl_city PRIVATE ${SMEMORY_FLAG} -Wno-experimental)
+-    target_compile_options(absl_low_level_hash PRIVATE ${SMEMORY_FLAG} -Wno-experimental)
+     target_compile_options(absl_bad_variant_access PRIVATE ${SMEMORY_FLAG} -Wno-experimental)
+     target_compile_options(absl_vlog_config_internal PRIVATE ${SMEMORY_FLAG} -Wno-experimental)
+     target_compile_options(absl_synchronization PRIVATE ${SMEMORY_FLAG} -Wno-experimental)
 diff --git a/onnxruntime/core/flatbuffers/schema/ort.fbs.h b/onnxruntime/core/flatbuffers/schema/ort.fbs.h
 index 50fc1db862..bf5ab15886 100644
 --- a/onnxruntime/core/flatbuffers/schema/ort.fbs.h
