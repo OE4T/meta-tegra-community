@@ -1,10 +1,9 @@
-From d744ec81dd6ff06c725fec922303e47984dea435 Mon Sep 17 00:00:00 2001
+From fe673f5feaaae33785002e5abd91de5071d6859b Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Mon, 14 Jul 2025 19:56:35 +0100
-Subject: [PATCH] Fixups for cross building in OE with CUDA 13.0
+Date: Thu, 13 Nov 2025 12:32:16 +0000
+Subject: [PATCH 8/8] Fixups for cross building in OE with CUDA 13.0
 
 Upstream-Status: Inappropriate [OE-specific]
-
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
  aten/src/ATen/cuda/cub-RadixSortKeys.cu       |   2 +-
@@ -18,9 +17,11 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  aten/src/ATen/native/cuda/TensorTopK.cu       | 184 ++++---
  aten/src/ATen/native/cuda/UniqueCub.cu        |  18 +
  cmake/Dependencies.cmake                      |   2 +-
+ third_party/cutlass/include/cutlass/matrix.h  |   8 +-
+ .../include/cutlass/platform/platform.h       |  10 +-
  .../channel/cuda_ipc/context_impl.cc          |   4 +-
  torch/csrc/profiler/stubs/cuda.cpp            |   2 +-
- 13 files changed, 842 insertions(+), 186 deletions(-)
+ 15 files changed, 851 insertions(+), 195 deletions(-)
 
 diff --git a/aten/src/ATen/cuda/cub-RadixSortKeys.cu b/aten/src/ATen/cuda/cub-RadixSortKeys.cu
 index 74e82ae55..565712951 100644
@@ -1485,6 +1486,83 @@ index 5d3e08bf5..9e99f80a1 100644
    find_package(CUB)
    if(NOT CUB_FOUND)
      message(FATAL_ERROR "Cannot find CUB.")
+diff --git a/third_party/cutlass/include/cutlass/matrix.h b/third_party/cutlass/include/cutlass/matrix.h
+index ab32597e3..5d8ccb3c1 100644
+--- a/third_party/cutlass/include/cutlass/matrix.h
++++ b/third_party/cutlass/include/cutlass/matrix.h
+@@ -7825,7 +7825,7 @@ struct Matrix<Element_, 3, 3> {
+ 
+     Matrix m;
+ 
+-    m.set_slice3x3({
++    m.set_slice_3x3({
+       c + x * x * one_minus_cos, x * y * one_minus_cos - z * s, x * z * one_minus_cos + y * s,
+       y * x * one_minus_cos * z * s, c + y * y * one_minus_cos, y * z * one_minus_cos - x * s,
+       z * x * one_minus_cos - y * s, z * y * one_minus_cos + x * s, c + z * z * one_minus_cos
+@@ -7845,7 +7845,7 @@ struct Matrix<Element_, 3, 3> {
+ 
+     Matrix m = Matrix::identity();
+ 
+-    m.set_slice3x3({
++    m.set_slice_3x3({
+       Element(1) - Element(2) * a * a, Element(-2) * a * b, Element(-2) * a * c,
+       Element(-2) * a * b, Element(1) - Element(2) * b * b, Element(-2) * b * c,
+       Element(-2) * a * c, Element(-2) * b * c, Element(1) - Element(2) * c * c
+@@ -14005,7 +14005,7 @@ struct Matrix<Element_, 4, 4> {
+ 
+     Matrix m;
+ 
+-    m.set_slice3x3({
++    m.set_slice_3x3({
+       c + x * x * one_minus_cos, x * y * one_minus_cos - z * s, x * z * one_minus_cos + y * s,
+       y * x * one_minus_cos * z * s, c + y * y * one_minus_cos, y * z * one_minus_cos - x * s,
+       z * x * one_minus_cos - y * s, z * y * one_minus_cos + x * s, c + z * z * one_minus_cos
+@@ -14025,7 +14025,7 @@ struct Matrix<Element_, 4, 4> {
+ 
+     Matrix m = Matrix::identity();
+ 
+-    m.set_slice3x3({
++    m.set_slice_3x3({
+       Element(1) - Element(2) * a * a, Element(-2) * a * b, Element(-2) * a * c,
+       Element(-2) * a * b, Element(1) - Element(2) * b * b, Element(-2) * b * c,
+       Element(-2) * a * c, Element(-2) * b * c, Element(1) - Element(2) * c * c
+diff --git a/third_party/cutlass/include/cutlass/platform/platform.h b/third_party/cutlass/include/cutlass/platform/platform.h
+index 927f80cbd..c68d5921d 100644
+--- a/third_party/cutlass/include/cutlass/platform/platform.h
++++ b/third_party/cutlass/include/cutlass/platform/platform.h
+@@ -697,11 +697,11 @@ struct alignment_of<float4> {
+   enum { value = 16 };
+ };
+ template <>
+-struct alignment_of<long4> {
++struct alignment_of<long4_32a> {
+   enum { value = 16 };
+ };
+ template <>
+-struct alignment_of<ulong4> {
++struct alignment_of<ulong4_32a> {
+   enum { value = 16 };
+ };
+ template <>
+@@ -717,15 +717,15 @@ struct alignment_of<double2> {
+   enum { value = 16 };
+ };
+ template <>
+-struct alignment_of<longlong4> {
++struct alignment_of<longlong4_32a> {
+   enum { value = 16 };
+ };
+ template <>
+-struct alignment_of<ulonglong4> {
++struct alignment_of<ulonglong4_32a> {
+   enum { value = 16 };
+ };
+ template <>
+-struct alignment_of<double4> {
++struct alignment_of<double4_32a> {
+   enum { value = 16 };
+ };
+ 
 diff --git a/third_party/tensorpipe/tensorpipe/channel/cuda_ipc/context_impl.cc b/third_party/tensorpipe/tensorpipe/channel/cuda_ipc/context_impl.cc
 index 69db487d0..177eb1076 100644
 --- a/third_party/tensorpipe/tensorpipe/channel/cuda_ipc/context_impl.cc
