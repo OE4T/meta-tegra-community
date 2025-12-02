@@ -5,9 +5,9 @@ LIC_FILES_CHKSUM = "file://gxf-install/include/gxf/core/gxf.h;endline=16;md5=ffc
 COMPATIBLE_MACHINE = "(cuda)"
 
 GXF_VERSION = "${@d.getVar('PV').replace('-', '_')}"
-GXF_PACKAGE = "gxf_${GXF_VERSION}_holoscan-sdk_${TARGET_ARCH}"
+GXF_PACKAGE = "gxf_${GXF_VERSION}_holoscan-sdk-cu12_${TARGET_ARCH}"
 SRC_URI = "https://edge.urm.nvidia.com/artifactory/sw-holoscan-thirdparty-generic-local/gxf/${GXF_PACKAGE}.tar.gz;subdir=${GXF_PACKAGE}"
-SRC_URI[sha256sum] = "69cf003d8c72da7bcc7f8549242ef599953a944487306b6ffbe65002c3923213"
+SRC_URI[sha256sum] = "af753c0fa0e2b867f753348e49c53c85c30fab57ad4ade414d558a411aa73bb8"
 
 SRC_URI += " \
     file://0001-remove-TypenameAsString-from-nvidia-namespace.patch \
