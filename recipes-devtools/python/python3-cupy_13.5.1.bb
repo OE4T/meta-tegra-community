@@ -8,7 +8,7 @@ SRC_URI = " \
     git://github.com/cupy/cupy.git;protocol=https;nobranch=1;tag=v${PV} \
     file://0001-Fixups-for-cross-building-in-OE.patch \
 "
-SRCREV = "fca48bc15b00c17ac583ccd122bea4920f185b62"
+SRCREV = "f45081393d44e4c8e28d93873405b8391c2a3592"
 
 DEPENDS += " \
     cccl jitify cuda-profiler-api cuda-cudart cuda-nvrtc cuda-nvtx \
