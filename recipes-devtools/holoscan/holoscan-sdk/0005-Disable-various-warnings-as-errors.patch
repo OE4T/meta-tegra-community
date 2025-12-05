@@ -1,19 +1,20 @@
-From bd0a5e1da718cce4c37b1fbaaaecc07bcfa71f9e Mon Sep 17 00:00:00 2001
+From 3a1ed26940564b2320d94b04eadda781c78cfc96 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 24 Jun 2025 11:02:49 +0100
-Subject: [PATCH 5/7] Disable various warnings as errors
+Date: Wed, 5 Nov 2025 15:00:25 +0000
+Subject: [PATCH 5/6] Disable various warnings as errors
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
 ---
- CMakeLists.txt | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ CMakeLists.txt                       | 12 ++++++++++++
+ modules/holoinfer/src/CMakeLists.txt |  4 ++++
+ 2 files changed, 16 insertions(+)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d0f3c65..1cee9b1 100644
+index 2eb6744..4e9372b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -106,6 +106,18 @@ set(CMAKE_CXX_EXTENSIONS NO)
+@@ -125,6 +125,18 @@ set(CMAKE_CXX_EXTENSIONS NO)
  # Don't append suffix to shared libraries for debug build
  set(CMAKE_DEBUG_POSTFIX "")
  
@@ -32,6 +33,21 @@ index d0f3c65..1cee9b1 100644
  # ##############################################################################
  # # RAPIDS CMAKE configurations
  # # (https://docs.rapids.ai/api/rapids-cmake/stable/api.html)
+diff --git a/modules/holoinfer/src/CMakeLists.txt b/modules/holoinfer/src/CMakeLists.txt
+index 33a4456..31e78e9 100644
+--- a/modules/holoinfer/src/CMakeLists.txt
++++ b/modules/holoinfer/src/CMakeLists.txt
+@@ -77,6 +77,10 @@ target_compile_definitions(${PROJECT_NAME}
+         PROJECT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+ )
+ 
++target_compile_options(${PROJECT_NAME} PRIVATE
++    $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-Wno-deprecated-declarations>
++)
++
+ target_include_directories(${PROJECT_NAME}
+     PRIVATE
+         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 -- 
 2.34.1
 
