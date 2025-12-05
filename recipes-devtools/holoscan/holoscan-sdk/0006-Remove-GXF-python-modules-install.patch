@@ -1,7 +1,7 @@
-From 600cc340aa195707bcc7f14e5367dd81689468b2 Mon Sep 17 00:00:00 2001
+From 64234591a1f11b0a693341f23b0b1f5a00068c78 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 24 Jun 2025 11:03:13 +0100
-Subject: [PATCH 6/7] Remove GXF python modules install
+Date: Wed, 5 Nov 2025 15:01:07 +0000
+Subject: [PATCH 6/6] Remove GXF python modules install
 
 These are not yet compatible with Python 3.12
 
@@ -13,10 +13,10 @@ Signed-off-by: Ian Stewart <istewart@nvidia.com>
  2 files changed, 28 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 1cee9b1..d923278 100644
+index 4e9372b..dfada63 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -343,14 +343,6 @@ foreach(_component ${HOLOSCAN_GXF_COMPONENTS})
+@@ -448,14 +448,6 @@ endif()"
      endif()
  endforeach()
  
@@ -32,7 +32,7 @@ index 1cee9b1..d923278 100644
  install(FILES "${CMAKE_SOURCE_DIR}/cmake/modules/GenerateGXEAppInstall.cmake"
  RENAME GenerateGXEApp.cmake
 diff --git a/cmake/deps/gxf.cmake b/cmake/deps/gxf.cmake
-index 23abb54..8bdb1b5 100644
+index 4441a6a..7126cc4 100644
 --- a/cmake/deps/gxf.cmake
 +++ b/cmake/deps/gxf.cmake
 @@ -130,26 +130,6 @@ find_path(GXF_PYTHON_MODULE_PATH
