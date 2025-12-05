@@ -1,0 +1,249 @@
+From bec75c5a1bd2fcd6bbeb4ab90ed7255b0cbb2ca6 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 13 Oct 2025 10:26:02 +0100
+Subject: [PATCH 9/9] Updates for OE cross builds
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ .../endoscopy_out_of_body_detection/CMakeLists.txt     |  1 +
+ .../endoscopy_tool_tracking/cpp/CMakeLists.txt         |  1 +
+ .../multiai_endoscopy/cpp/post-proc-cpu/CMakeLists.txt |  1 +
+ applications/multiai_ultrasound/cpp/CMakeLists.txt     |  1 +
+ .../operators/visualizer_icardio/CMakeLists.txt        |  1 +
+ applications/object_detection_torch/CMakeLists.txt     |  1 +
+ .../ultrasound_segmentation/cpp/CMakeLists.txt         |  1 +
+ applications/volume_rendering/cpp/CMakeLists.txt       |  1 +
+ gxf_extensions/lstm_tensor_rt_inference/CMakeLists.txt |  1 +
+ operators/aja_source/CMakeLists.txt                    |  1 +
+ operators/lstm_tensor_rt_inference/CMakeLists.txt      |  1 +
+ operators/slang_shader/CMakeLists.txt                  |  1 +
+ operators/slang_shader/cpp/CMakeLists.txt              | 10 ++--------
+ operators/tool_tracking_postprocessor/CMakeLists.txt   |  1 +
+ operators/volume_loader/CMakeLists.txt                 |  1 +
+ operators/volume_renderer/CMakeLists.txt               |  1 +
+ operators/volume_renderer/dataset.cpp                  |  1 +
+ 17 files changed, 18 insertions(+), 8 deletions(-)
+
+diff --git a/applications/endoscopy_out_of_body_detection/CMakeLists.txt b/applications/endoscopy_out_of_body_detection/CMakeLists.txt
+index ffaa4f5a..d25281a7 100644
+--- a/applications/endoscopy_out_of_body_detection/CMakeLists.txt
++++ b/applications/endoscopy_out_of_body_detection/CMakeLists.txt
+@@ -17,6 +17,7 @@ cmake_minimum_required(VERSION 3.20)
+ 
+ project(endoscopy_out_of_body_detection CXX)
+ 
++find_package(Eigen3 REQUIRED)
+ find_package(holoscan 1.0 REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
+ 
+diff --git a/applications/endoscopy_tool_tracking/cpp/CMakeLists.txt b/applications/endoscopy_tool_tracking/cpp/CMakeLists.txt
+index 270b6c33..7ea4b432 100644
+--- a/applications/endoscopy_tool_tracking/cpp/CMakeLists.txt
++++ b/applications/endoscopy_tool_tracking/cpp/CMakeLists.txt
+@@ -16,6 +16,7 @@
+ cmake_minimum_required(VERSION 3.20)
+ project(endoscopy_tool_tracking CXX)
+ 
++find_package(Eigen3 REQUIRED)
+ find_package(holoscan 1.0 REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
+ 
+diff --git a/applications/multiai_endoscopy/cpp/post-proc-cpu/CMakeLists.txt b/applications/multiai_endoscopy/cpp/post-proc-cpu/CMakeLists.txt
+index 2b54bfa4..d95700a3 100644
+--- a/applications/multiai_endoscopy/cpp/post-proc-cpu/CMakeLists.txt
++++ b/applications/multiai_endoscopy/cpp/post-proc-cpu/CMakeLists.txt
+@@ -16,6 +16,7 @@
+ cmake_minimum_required(VERSION 3.20)
+ project(multiai_endoscopy CXX)
+ 
++find_package(Eigen3 REQUIRED)
+ # Holoscan
+ find_package(holoscan 0.6 REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
+diff --git a/applications/multiai_ultrasound/cpp/CMakeLists.txt b/applications/multiai_ultrasound/cpp/CMakeLists.txt
+index 09877bc8..e8166481 100644
+--- a/applications/multiai_ultrasound/cpp/CMakeLists.txt
++++ b/applications/multiai_ultrasound/cpp/CMakeLists.txt
+@@ -16,6 +16,7 @@
+ cmake_minimum_required(VERSION 3.20)
+ project(multiai_ultrasound CXX)
+ 
++find_package(Eigen3 REQUIRED)
+ find_package(holoscan 0.6 REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
+ 
+diff --git a/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt b/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt
+index 98a8f30e..7acab74a 100644
+--- a/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt
++++ b/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt
+@@ -15,6 +15,7 @@
+ cmake_minimum_required(VERSION 3.20)
+ project(visualizer_icardio LANGUAGES CXX CUDA)
+ 
++find_package(Eigen3 REQUIRED)
+ find_package(holoscan 0.5 REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
+ 
+diff --git a/applications/object_detection_torch/CMakeLists.txt b/applications/object_detection_torch/CMakeLists.txt
+index e4bdf129..3f06f00d 100644
+--- a/applications/object_detection_torch/CMakeLists.txt
++++ b/applications/object_detection_torch/CMakeLists.txt
+@@ -16,6 +16,7 @@
+ cmake_minimum_required(VERSION 3.20)
+ project(object_detection_torch CXX)
+ 
++find_package(Eigen3 REQUIRED)
+ find_package(holoscan 0.6 REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
+ 
+diff --git a/applications/ultrasound_segmentation/cpp/CMakeLists.txt b/applications/ultrasound_segmentation/cpp/CMakeLists.txt
+index 78ce3d7a..948f8911 100644
+--- a/applications/ultrasound_segmentation/cpp/CMakeLists.txt
++++ b/applications/ultrasound_segmentation/cpp/CMakeLists.txt
+@@ -16,6 +16,7 @@
+ cmake_minimum_required(VERSION 3.20)
+ project(ultrasound_segmentation CXX)
+ 
++find_package(Eigen3 REQUIRED)
+ find_package(holoscan 0.6 REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
+ 
+diff --git a/applications/volume_rendering/cpp/CMakeLists.txt b/applications/volume_rendering/cpp/CMakeLists.txt
+index 76301978..ab08f9cd 100644
+--- a/applications/volume_rendering/cpp/CMakeLists.txt
++++ b/applications/volume_rendering/cpp/CMakeLists.txt
+@@ -15,6 +15,7 @@
+ cmake_minimum_required(VERSION 3.20)
+ project(volume_rendering)
+ 
++find_package(Eigen3 REQUIRED)
+ find_package(holoscan 1.0 REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
+ 
+diff --git a/gxf_extensions/lstm_tensor_rt_inference/CMakeLists.txt b/gxf_extensions/lstm_tensor_rt_inference/CMakeLists.txt
+index 6175810c..68edcc89 100644
+--- a/gxf_extensions/lstm_tensor_rt_inference/CMakeLists.txt
++++ b/gxf_extensions/lstm_tensor_rt_inference/CMakeLists.txt
+@@ -15,6 +15,7 @@
+ cmake_minimum_required(VERSION 3.20)
+ project(gxf_lstm_tensor_rt_inference)
+ 
++find_package(Eigen3 REQUIRED)
+ find_package(holoscan REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
+ 
+diff --git a/operators/aja_source/CMakeLists.txt b/operators/aja_source/CMakeLists.txt
+index 6bdb1baf..7c869704 100644
+--- a/operators/aja_source/CMakeLists.txt
++++ b/operators/aja_source/CMakeLists.txt
+@@ -15,6 +15,7 @@
+ cmake_minimum_required(VERSION 3.20)
+ project(aja_source)
+ 
++find_package(Eigen3 REQUIRED)
+ find_package(holoscan 1.0 REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
+ 
+diff --git a/operators/lstm_tensor_rt_inference/CMakeLists.txt b/operators/lstm_tensor_rt_inference/CMakeLists.txt
+index 3e6720c1..a53b04c5 100644
+--- a/operators/lstm_tensor_rt_inference/CMakeLists.txt
++++ b/operators/lstm_tensor_rt_inference/CMakeLists.txt
+@@ -15,6 +15,7 @@
+ cmake_minimum_required(VERSION 3.20)
+ project(lstm_tensor_rt_inference)
+ 
++find_package(Eigen3 REQUIRED)
+ find_package(holoscan REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
+ 
+diff --git a/operators/slang_shader/CMakeLists.txt b/operators/slang_shader/CMakeLists.txt
+index 6a7674fa..e9b41035 100644
+--- a/operators/slang_shader/CMakeLists.txt
++++ b/operators/slang_shader/CMakeLists.txt
+@@ -17,6 +17,7 @@ cmake_minimum_required(VERSION 3.20)
+ 
+ project(slang_shader)
+ 
++find_package(Eigen3 REQUIRED)
+ find_package(holoscan 3.3.0 REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
+ 
+diff --git a/operators/slang_shader/cpp/CMakeLists.txt b/operators/slang_shader/cpp/CMakeLists.txt
+index 537a7928..b25db6a4 100644
+--- a/operators/slang_shader/cpp/CMakeLists.txt
++++ b/operators/slang_shader/cpp/CMakeLists.txt
+@@ -25,20 +25,14 @@ endif()
+ include(FetchContent)
+ FetchContent_Declare(
+   Slang
+-  URL https://github.com/shader-slang/slang/releases/download/v2025.14.3/slang-2025.14.3-linux-${CMAKE_SYSTEM_PROCESSOR}.tar.gz
++  URL https://github.com/shader-slang/slang/releases/download/v2025.14.3/slang-2025.14.3-linux-${SLANG_RUNTIME_TARGETS}.tar.gz
+   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+ )
+ FetchContent_MakeAvailable(Slang)
+ 
+ include(${slang_SOURCE_DIR}/cmake/slangConfig.cmake)
+ 
+-# Fetch nlohmann_json
+-FetchContent_Declare(
+-  nlohmann_json
+-  URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+-)
+-FetchContent_MakeAvailable(nlohmann_json)
++find_package(nlohmann_json REQUIRED)
+ 
+ # Add slang_shader operator
+ add_library(slang_shader SHARED
+diff --git a/operators/tool_tracking_postprocessor/CMakeLists.txt b/operators/tool_tracking_postprocessor/CMakeLists.txt
+index 4ecda911..59cc9e6b 100644
+--- a/operators/tool_tracking_postprocessor/CMakeLists.txt
++++ b/operators/tool_tracking_postprocessor/CMakeLists.txt
+@@ -16,6 +16,7 @@ cmake_minimum_required(VERSION 3.24)
+ 
+ project(tool_tracking_postprocessor LANGUAGES CXX CUDA)
+ 
++find_package(Eigen3 REQUIRED)
+ find_package(holoscan REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
+ 
+diff --git a/operators/volume_loader/CMakeLists.txt b/operators/volume_loader/CMakeLists.txt
+index c3ed9a2c..cda71801 100644
+--- a/operators/volume_loader/CMakeLists.txt
++++ b/operators/volume_loader/CMakeLists.txt
+@@ -15,6 +15,7 @@
+ cmake_minimum_required(VERSION 3.20)
+ project(volume_loader)
+ 
++find_package(Eigen3 REQUIRED)
+ find_package(holoscan 0.6 REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
+ 
+diff --git a/operators/volume_renderer/CMakeLists.txt b/operators/volume_renderer/CMakeLists.txt
+index 05fcce4b..c6df7b52 100644
+--- a/operators/volume_renderer/CMakeLists.txt
++++ b/operators/volume_renderer/CMakeLists.txt
+@@ -15,6 +15,7 @@
+ cmake_minimum_required(VERSION 3.20)
+ project(volume_renderer)
+ 
++find_package(Eigen3 REQUIRED)
+ find_package(holoscan 0.6 REQUIRED CONFIG
+              PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
+ 
+diff --git a/operators/volume_renderer/dataset.cpp b/operators/volume_renderer/dataset.cpp
+index 62caa6ad..b73afdd3 100644
+--- a/operators/volume_renderer/dataset.cpp
++++ b/operators/volume_renderer/dataset.cpp
+@@ -14,6 +14,7 @@
+  * limitations under the License.
+  */
+ 
++#include <math.h>
+ #include "dataset.hpp"
+ 
+ #include <filesystem>
+-- 
+2.34.1
+

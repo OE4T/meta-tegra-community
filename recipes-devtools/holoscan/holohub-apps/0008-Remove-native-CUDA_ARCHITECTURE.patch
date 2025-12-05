@@ -1,0 +1,27 @@
+From 5378cc5b32d7266406947f1e48f2c506cf9c0b09 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 13 Oct 2025 10:25:30 +0100
+Subject: [PATCH 8/9] Remove native CUDA_ARCHITECTURE
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ian Stewart <istewart@nvidia.com>
+---
+ operators/tool_tracking_postprocessor/CMakeLists.txt | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/operators/tool_tracking_postprocessor/CMakeLists.txt b/operators/tool_tracking_postprocessor/CMakeLists.txt
+index a288d518..4ecda911 100644
+--- a/operators/tool_tracking_postprocessor/CMakeLists.txt
++++ b/operators/tool_tracking_postprocessor/CMakeLists.txt
+@@ -30,8 +30,6 @@ set_target_properties(tool_tracking_postprocessor
+   PROPERTIES
+     # separable compilation is required since we launch kernels from within kernels
+     CUDA_SEPARABLE_COMPILATION ON
+-    # compile for the architecture of the current GPU
+-    CUDA_ARCHITECTURES "native"
+   )
+ 
+ target_link_libraries(tool_tracking_postprocessor
+-- 
+2.34.1
+

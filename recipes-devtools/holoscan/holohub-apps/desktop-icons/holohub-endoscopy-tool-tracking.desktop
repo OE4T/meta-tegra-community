@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Holohub: Endoscopy Tool Tracking
+Comment=Holohub Endoscopy Tool Tracking Application
+Exec=rxvt -cd /opt/nvidia/holohub -fg white -bg black -e applications/endoscopy_tool_tracking/cpp/endoscopy_tool_tracking
+Icon=holohub-endoscopy-tool-tracking
+Categories=Holoscan

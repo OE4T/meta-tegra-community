@@ -1,0 +1,49 @@
+From 3d6e7d3c08ee7dc482eb85e9773cbc1e42ed4150 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 13 Oct 2025 10:22:25 +0100
+Subject: [PATCH 3/9] Build python libs with install RPATH and add find
+ pybind11 package
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ian Stewart <istewart@nvidia.com>
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ cmake/pybind11_add_holohub_module.cmake | 15 +++------------
+ 1 file changed, 3 insertions(+), 12 deletions(-)
+
+diff --git a/cmake/pybind11_add_holohub_module.cmake b/cmake/pybind11_add_holohub_module.cmake
+index 27a94a65..785df33f 100644
+--- a/cmake/pybind11_add_holohub_module.cmake
++++ b/cmake/pybind11_add_holohub_module.cmake
+@@ -16,15 +16,7 @@
+ # Find pybind11
+ find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+ 
+-# We fetch pybind11 since we need the same version as the Holoscan SDK
+-# and it's not necessarily available on all the platforms
+-include(FetchContent)
+-FetchContent_Declare(pybind11
+-  GIT_REPOSITORY https://github.com/pybind/pybind11
+-  GIT_TAG v2.13.6
+-  GIT_SHALLOW TRUE
+-)
+-FetchContent_MakeAvailable(pybind11)
++find_package(pybind11 2.11.1 REQUIRED)
+ 
+ # Helper function to generate pybind11 operator modules
+ function(pybind11_add_holohub_module)
+@@ -68,9 +60,8 @@ function(pybind11_add_holohub_module)
+         "\$ORIGIN/../lib" # in our python wheel"
+     )
+     list(JOIN _rpath ":" _rpath)
+-    set_property(TARGET ${target_name}
+-        APPEND PROPERTY BUILD_RPATH ${_rpath}
+-    )
++    set_target_properties(${target_name} PROPERTIES INSTALL_RPATH ${_rpath})
++    set_target_properties(${target_name} PROPERTIES BUILD_WITH_INSTALL_RPATH ON)
+     unset(_rpath)
+ 
+     # make submodule folder
+-- 
+2.34.1
+

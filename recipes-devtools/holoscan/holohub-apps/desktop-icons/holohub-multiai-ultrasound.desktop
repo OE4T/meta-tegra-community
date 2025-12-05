@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Holohub: Multi AI Ultrasound
+Comment=Holohub Multi AI Ultrasound Application
+Exec=rxvt -cd /opt/nvidia/holohub -fg white -bg black -e applications/multiai_ultrasound/cpp/multiai_ultrasound
+Icon=holohub-multiai-ultrasound
+Categories=Holoscan
