@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Holohub: Volume Rendering
+Comment=Holohub Volume Rendering Application
+Exec=rxvt -cd /opt/nvidia/holohub/applications/volume_rendering/cpp -fg white -bg black -e ./volume_rendering
+Icon=holohub-volume-rendering
+Categories=Holoscan

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Holohub: Ultrasound Segmentation
+Comment=Holohub Ultrasound Segmentation Application
+Exec=rxvt -cd /opt/nvidia/holohub -fg white -bg black -e applications/ultrasound_segmentation/cpp/ultrasound_segmentation
+Icon=holohub-ultrasound-segmentation
+Categories=Holoscan

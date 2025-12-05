@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Holohub: Colonoscopy Segmentation
+Comment=Holohub Colonoscopy Segmentation Application
+Exec=rxvt -cd /opt/nvidia/holohub -fg white -bg black -e python3 applications/colonoscopy_segmentation/colonoscopy_segmentation.py
+Icon=holohub-colonoscopy-segmentation
+Categories=Holoscan
