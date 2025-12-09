@@ -1,0 +1,33 @@
+From 6f302d37667770dcc914a54df94646e579271ba2 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 24 Nov 2025 11:05:44 +0000
+Subject: [PATCH] Updates for OE cross builds
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ include/nvtx3/nvtxDetail/nvtxExtImpl.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/include/nvtx3/nvtxDetail/nvtxExtImpl.h b/include/nvtx3/nvtxDetail/nvtxExtImpl.h
+index e31abf7..dbeb3ff 100644
+--- a/include/nvtx3/nvtxDetail/nvtxExtImpl.h
++++ b/include/nvtx3/nvtxDetail/nvtxExtImpl.h
+@@ -91,6 +91,14 @@ extern "C" {
+ #pragma GCC visibility push(hidden)
+ #endif
+ 
++#if !defined(NVTX_NULLPTR)
++#if defined(__cplusplus) && __cplusplus >= 201103L
++#define NVTX_NULLPTR nullptr
++#else
++#define NVTX_NULLPTR NULL
++#endif
++#endif
++
+ #define NVTX_EXTENSION_FRESH 0    /* Uninitialized extension or function slot */
+ #define NVTX_EXTENSION_DISABLED 1 /* Disabled extension or function slot */
+ #define NVTX_EXTENSION_STARTING 2 /* Extension is being initialized. */
+-- 
+2.34.1
+
