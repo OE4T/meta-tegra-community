@@ -4,7 +4,7 @@ LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE.txt;md5=3b83ef96387f14655fc854ddc3c6bd57"
 
 SRC_URI = "git://github.com/nvidia-holoscan/holoscan-sdk.git;protocol=https;nobranch=1;tag=v${PV}"
-SRCREV = "27991008e444855550275cc92c5f79e53dc9c571"
+SRCREV = "3500b333de5883d06517bb636fa0c106c5cbd129"
 
 SRC_URI += " \
     file://desktop-icons \
@@ -32,7 +32,6 @@ EXTRA_OECMAKE:append = " \
     -DCMAKE_INSTALL_PREFIX=${HOLOSCAN_INSTALL_PATH} \
     -DGXF_DIR=${RECIPE_SYSROOT}/opt/nvidia/gxf/lib/cmake/GXF \
     -DIMGUI_SOURCE_DIR=${RECIPE_SYSROOT}/opt/nvidia/imgui \
-    -DNVTX3_INCLUDEDIR=${RECIPE_SYSROOT}/opt/nvidia/nvtx3/include \
     -Dstb_INCLUDE_DIRS=${RECIPE_SYSROOT}${includedir}/stb \
     -DCPM_SOURCE_CACHE=${RECIPE_SYSROOT}${datadir} \
     -DRAPIDS_CMAKE_DIR=${RECIPE_SYSROOT}/opt/nvidia/rapids-cmake \
@@ -74,7 +73,7 @@ DEPENDS += " \
     v4l-utils \
     vulkan-headers \
     vulkan-loader \
-    yaml-cpp \
+    yaml-cpp-080 \
     curl-native \
     stb \
     imgui \
