@@ -1,7 +1,7 @@
-From 7369df5e978cd725fc48d9d25e9c9907ff9f0874 Mon Sep 17 00:00:00 2001
+From 425e9ee0173cf2fdf508ef4020572f99d9031e16 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 13 Nov 2025 17:20:31 +0000
-Subject: [PATCH 4/9] disable build emergent sample applications
+Date: Tue, 9 Dec 2025 20:12:29 +0000
+Subject: [PATCH 4/9] Enable Emergent apps
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
@@ -12,7 +12,7 @@ Signed-off-by: Ian Stewart <istewart@nvidia.com>
  3 files changed, 9 insertions(+), 2 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index bd08a260..a6c47973 100644
+index 300c6acd..b59fb58a 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -48,6 +48,7 @@ include(CTest)
@@ -24,7 +24,7 @@ index bd08a260..a6c47973 100644
  # Enable flow benchmarking
  option(FLOW_BENCHMARKING "Enable Flow Benchmarking" OFF)
 diff --git a/applications/CMakeLists.txt b/applications/CMakeLists.txt
-index 380abe6f..b5fbf51f 100644
+index 4300aaff..bc32301f 100644
 --- a/applications/CMakeLists.txt
 +++ b/applications/CMakeLists.txt
 @@ -60,8 +60,10 @@ add_subdirectory(h264)

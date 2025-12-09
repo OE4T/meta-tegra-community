@@ -1,6 +1,6 @@
-From e780a4cd4c9645703d2a73008c3e8df820864565 Mon Sep 17 00:00:00 2001
+From c19a4a30446cbc09b9c2538894a54ce148e30d0a Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Mon, 13 Oct 2025 10:24:09 +0100
+Date: Tue, 9 Dec 2025 20:17:45 +0000
 Subject: [PATCH 5/9] Fix default data paths in python apps
 
 Upstream-Status: Inappropriate [OE-specific]
@@ -39,10 +39,10 @@ index 112b5873..e9074e9b 100644
          self.sample_data_path = data
  
 diff --git a/applications/multiai_ultrasound/python/multiai_ultrasound.py b/applications/multiai_ultrasound/python/multiai_ultrasound.py
-index 4e59c4c3..a7af3699 100644
+index a57b117a..ad4ddf6a 100644
 --- a/applications/multiai_ultrasound/python/multiai_ultrasound.py
 +++ b/applications/multiai_ultrasound/python/multiai_ultrasound.py
-@@ -37,7 +37,7 @@ class MultiAIICardio(Application):
+@@ -36,7 +36,7 @@ class MultiAIICardio(Application):
          super().__init__()
  
          if data == "none":
