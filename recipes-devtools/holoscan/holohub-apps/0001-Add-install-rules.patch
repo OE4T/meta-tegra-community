@@ -1,6 +1,6 @@
-From 494697f22ca984f10fbeaa8e8423afc0b35323fb Mon Sep 17 00:00:00 2001
+From 8cf6d165b47d35c2c6867462ebf3eaf7a598ce68 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 13 Nov 2025 17:18:44 +0000
+Date: Tue, 9 Dec 2025 20:08:42 +0000
 Subject: [PATCH 1/9] Add install rules
 
 Upstream-Status: Inappropriate [OE-specific]
@@ -36,7 +36,7 @@ Signed-off-by: Ian Stewart <istewart@nvidia.com>
  27 files changed, 181 insertions(+)
 
 diff --git a/applications/colonoscopy_segmentation/CMakeLists.txt b/applications/colonoscopy_segmentation/CMakeLists.txt
-index 2c4a9b4a..4a609c9e 100644
+index bdff2308..aa67ff28 100644
 --- a/applications/colonoscopy_segmentation/CMakeLists.txt
 +++ b/applications/colonoscopy_segmentation/CMakeLists.txt
 @@ -34,6 +34,14 @@ if(HOLOHUB_DOWNLOAD_DATASETS)
@@ -399,23 +399,20 @@ index 07312a9b..9858353e 100644
 +  DESTINATION ${install_path}
 +)
 diff --git a/applications/volume_rendering/python/CMakeLists.txt b/applications/volume_rendering/python/CMakeLists.txt
-index ebf82249..b96f0d3f 100644
+index 4a313608..bf531857 100644
 --- a/applications/volume_rendering/python/CMakeLists.txt
 +++ b/applications/volume_rendering/python/CMakeLists.txt
-@@ -36,6 +36,13 @@ if(HOLOHUB_DOWNLOAD_DATASETS)
-   add_dependencies(volume_rendering_python volume_rendering_data)
+@@ -51,3 +51,10 @@ if(BUILD_TESTING)
+   set_tests_properties(volume_rendering_python_test PROPERTIES
+                        PASS_REGULAR_EXPRESSION "Application has finished running.")
  endif()
- 
++
 +# Install the application
 +file(RELATIVE_PATH install_path ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 +install(FILES
 +  ${CMAKE_CURRENT_SOURCE_DIR}/volume_rendering.py
 +  DESTINATION ${install_path}
 +)
-+
- if(BUILD_TESTING)
- 
-   add_test(NAME volume_rendering_python_test
 diff --git a/cmake/pybind11_add_holohub_module.cmake b/cmake/pybind11_add_holohub_module.cmake
 index a3ee8f0d..27a94a65 100644
 --- a/cmake/pybind11_add_holohub_module.cmake
