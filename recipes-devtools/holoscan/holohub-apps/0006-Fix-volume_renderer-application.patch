@@ -1,6 +1,6 @@
-From 959ce218d199ba7a587dcee93b496e9842ba2f71 Mon Sep 17 00:00:00 2001
+From 86abc9cd00c396c644e92a94c59e08dbf89c6697 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Mon, 13 Oct 2025 10:24:32 +0100
+Date: Tue, 9 Dec 2025 20:19:22 +0000
 Subject: [PATCH 6/9] Fix volume_renderer application
 
 Upstream-Status: Inappropriate [OE-specific]

@@ -4,14 +4,14 @@ LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327"
 
 SRC_URI = "git://github.com/nvidia-holoscan/holohub.git;protocol=https;nobranch=1;tag=holoscan-sdk-${PV}"
-SRCREV = "83ae8d2e14ac0a4c15b628b49a23ec02df576c0c"
+SRCREV = "d11c079b4d6857a8bcfd0359055503374d2b04e1"
 
 SRC_URI += " \
     file://desktop-icons \
     file://0001-Add-install-rules.patch \
-    file://0002-Remove-relative-gxf_extension-paths.patch \
+    file://0002-Fix-ajantv2-dependencies.patch \
     file://0003-Build-python-libs-with-install-RPATH-and-add-find-py.patch \
-    file://0004-disable-build-emergent-sample-applications.patch \
+    file://0004-Enable-Emergent-apps.patch \
     file://0005-Fix-default-data-paths-in-python-apps.patch \
     file://0006-Fix-volume_renderer-application.patch \
     file://0007-Skip-model-download-for-object_detection_torch.patch \
@@ -91,6 +91,7 @@ DEPENDS += " \
     libeigen \
     ucxx \
     cccl \
+    rmm \
 "
 
 RDEPENDS:${PN} += " \
