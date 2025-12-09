@@ -1,0 +1,27 @@
+From 6e260a3254de82e86a25af1e1c9d8c55aa7ebd92 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Thu, 20 Nov 2025 19:29:12 +0000
+Subject: [PATCH] Update cmake required version
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ RAPIDS.cmake | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/RAPIDS.cmake b/RAPIDS.cmake
+index 73585d8..f2d4bf2 100644
+--- a/RAPIDS.cmake
++++ b/RAPIDS.cmake
+@@ -17,7 +17,7 @@
+ # This is the preferred entry point for projects using rapids-cmake
+ #
+ # Enforce the minimum required CMake version for all users
+-cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
++cmake_minimum_required(VERSION 3.28.3 FATAL_ERROR)
+ 
+ # Allow users to control which version is used
+ if(NOT (rapids-cmake-branch OR rapids-cmake-version))
+-- 
+2.34.1
+
