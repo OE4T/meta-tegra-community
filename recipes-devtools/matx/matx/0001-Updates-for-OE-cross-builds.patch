@@ -1,19 +1,19 @@
-From 09c801d20fe36ec6efc11bdf200f6e75f285f548 Mon Sep 17 00:00:00 2001
+From efca2056a911a44dc9396b8ca65e72592c33b925 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Wed, 5 Nov 2025 16:54:06 +0000
+Date: Fri, 21 Nov 2025 17:55:23 +0000
 Subject: [PATCH] Updates for OE cross builds
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt | 46 ++++++++++++----------------------------------
- 1 file changed, 12 insertions(+), 34 deletions(-)
+ CMakeLists.txt | 56 +++++++++++++++++++++-----------------------------
+ 1 file changed, 23 insertions(+), 33 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 08dc1d60..8319fc9f 100644
+index 08dc1d60..8d0a7944 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -9,25 +9,19 @@ else()
+@@ -9,25 +9,31 @@ else()
    set(NOT_SUBPROJECT OFF)
  endif()
  
@@ -32,26 +32,37 @@ index 08dc1d60..8319fc9f 100644
 -else()
 -  # The include() commands below search the module path for the corresponding .cmake files
 -  list(APPEND CMAKE_MODULE_PATH "${rapids-cmake-dir}")
--endif()
 +find_package(CCCL REQUIRED)
 +find_package(CUB REQUIRED)
 +find_package(libcudacxx REQUIRED)
 +find_package(Thrust REQUIRED)
 +
 +
-+set(CPM_DOWNLOAD_VERSION 0.40.0)
++set(CPM_DOWNLOAD_VERSION 0.40.2)
 +set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
 +message(STATUS "CPM download location: ${CPM_DOWNLOAD_LOCATION}")
++
++if(NOT EXISTS "${RAPIDS_CMAKE_DIR}/RAPIDS.cmake")
++  message(FATAL_ERROR "Required RAPIDS.cmake does not exist!")
+ endif()
  
 -include(${rapids-cmake-dir}/cpm/cccl.cmake)
 -include(${rapids-cmake-dir}/cpm/nvbench.cmake)
-+list(APPEND CMAKE_MODULE_PATH "${RAPIDS_CMAKE_DIR}/rapids-cmake")
++set(rapids-cmake_POPULATED "TRUE")
++if(NOT rapids-cmake-version)
++  set(rapids-cmake-version "25.10")
++endif()
++if(NOT rapids-cmake-branch)
++  set(rapids-cmake-branch "branch-25.10")
++endif()
 +set(rapids-cmake-dir "${RAPIDS_CMAKE_DIR}/rapids-cmake")
++message(STATUS "Rapids cmake DIR: ${rapids-cmake-dir}")
++list(APPEND CMAKE_MODULE_PATH "${rapids-cmake-dir}")
 +include("${RAPIDS_CMAKE_DIR}/RAPIDS.cmake")
  include(rapids-cmake)
  include(rapids-cpm)
  include(rapids-cuda)
-@@ -36,13 +30,6 @@ include(rapids-find)
+@@ -36,13 +42,6 @@ include(rapids-find)
  
  rapids_cpm_init(OVERRIDE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json")
  
@@ -65,7 +76,7 @@ index 08dc1d60..8319fc9f 100644
  # This needs to go after rapids initialization otherwise we get a rapids_export_parse_version error
  project(MATX
          LANGUAGES CUDA CXX
-@@ -50,9 +37,6 @@ project(MATX
+@@ -50,9 +49,6 @@ project(MATX
          VERSION ${MATX_VERSION}
          HOMEPAGE_URL "https://github.com/NVIDIA/MatX")
  
@@ -75,7 +86,7 @@ index 08dc1d60..8319fc9f 100644
  message(STATUS "Using GPU architectures ${CMAKE_CUDA_ARCHITECTURES}")
  
  rapids_cmake_write_version_file(include/matx/version_config.h)
-@@ -130,12 +114,6 @@ if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)
+@@ -130,12 +126,6 @@ if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)
      message(FATAL_ERROR "MatX requires CUDA 11.5 or higher. Please update before using.")
  endif()
  
