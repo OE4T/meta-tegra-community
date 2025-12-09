@@ -1,10 +1,9 @@
-From 889e1271748184bee6a59bf9b8d89569b605e5d7 Mon Sep 17 00:00:00 2001
+From 726206c3457e7c1c6340b5d92fd0b3f4666d53b3 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 2 Sep 2025 22:06:10 +0100
+Date: Fri, 21 Nov 2025 11:19:49 +0000
 Subject: [PATCH] OE cross build fixups
 
 Upstream-Status: Inappropriate [OE-specific]
-
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
@@ -13,10 +12,10 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  2 files changed, 2 insertions(+), 5 deletions(-)
 
 diff --git a/gxf-install/include/common/type_name.hpp b/gxf-install/include/common/type_name.hpp
-index 333ea17..e4bae84 100644
+index 5b240ac..f19feb0 100644
 --- a/gxf-install/include/common/type_name.hpp
 +++ b/gxf-install/include/common/type_name.hpp
-@@ -57,7 +57,6 @@ namespace helper {
+@@ -58,7 +58,6 @@ namespace helper {
  }  // namespace helper
  }  // namespace nvidia
  
@@ -24,7 +23,7 @@ index 333ea17..e4bae84 100644
  // Gives a string representation of the name of a C++ type.
  //
  // The function will compute the typename during the first invocation and store it in heap memory.
-@@ -83,11 +82,9 @@ const char* TypenameAsString() {
+@@ -117,12 +116,10 @@ const char* TypenameAsString() {
    static char s_name[kMaxNameLength] = {0};  // Initialize with 0 to get a null-terminated string.
    static char* result = s_name;
    if (s_name[0] == 0 && result != nullptr) {  // Check for first invocation of this function.
@@ -32,18 +31,19 @@ index 333ea17..e4bae84 100644
 +    result = nvidia::TypenameAsStringImpl(template_name, s_name, kMaxNameLength);
    }
    return result;
+ #endif
  }
  
 -}  // namespace nvidia
 -
  #endif  // NVIDIA_COMMON_TYPE_NAME_HPP_
 diff --git a/gxf-install/include/gxf/core/expected_macro.hpp b/gxf-install/include/gxf/core/expected_macro.hpp
-index 4fc79f5..82349ec 100644
+index ad5a799..98896fa 100644
 --- a/gxf-install/include/gxf/core/expected_macro.hpp
 +++ b/gxf-install/include/gxf/core/expected_macro.hpp
-@@ -21,7 +21,7 @@
+@@ -26,7 +26,7 @@
+ #endif
  
- #include "gxf/core/common_expected_macro.hpp"
  #include "gxf/core/expected.hpp"
 -#include "magic_enum.hpp"  // NOLINT(build/include)
 +#include <magic_enum/magic_enum.hpp>
