@@ -1,21 +1,22 @@
-From dd28c5e28646529f6fedf4fb34f99903c3e7f3a5 Mon Sep 17 00:00:00 2001
+From 4abab7e3d59880626cf0beebaba983b2eb1d0724 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 1 May 2025 14:37:06 +0100
-Subject: [PATCH] remove TypenameAsString from nvidia namespace
+Date: Wed, 17 Dec 2025 18:53:40 -0800
+Subject: [PATCH] OE cross build fixups
 
 Upstream-Status: Inappropriate [OE-specific]
 
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- gxf-install/include/common/type_name.hpp | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ gxf-install/include/common/type_name.hpp        | 5 +----
+ gxf-install/include/gxf/core/expected_macro.hpp | 2 +-
+ 2 files changed, 2 insertions(+), 5 deletions(-)
 
 diff --git a/gxf-install/include/common/type_name.hpp b/gxf-install/include/common/type_name.hpp
-index 333ea17..e4bae84 100644
+index 5b240ac..f19feb0 100644
 --- a/gxf-install/include/common/type_name.hpp
 +++ b/gxf-install/include/common/type_name.hpp
-@@ -57,7 +57,6 @@ namespace helper {
+@@ -58,7 +58,6 @@ namespace helper {
  }  // namespace helper
  }  // namespace nvidia
  
@@ -23,7 +24,7 @@ index 333ea17..e4bae84 100644
  // Gives a string representation of the name of a C++ type.
  //
  // The function will compute the typename during the first invocation and store it in heap memory.
-@@ -83,11 +82,9 @@ const char* TypenameAsString() {
+@@ -117,12 +116,10 @@ const char* TypenameAsString() {
    static char s_name[kMaxNameLength] = {0};  // Initialize with 0 to get a null-terminated string.
    static char* result = s_name;
    if (s_name[0] == 0 && result != nullptr) {  // Check for first invocation of this function.
@@ -31,11 +32,25 @@ index 333ea17..e4bae84 100644
 +    result = nvidia::TypenameAsStringImpl(template_name, s_name, kMaxNameLength);
    }
    return result;
+ #endif
  }
  
 -}  // namespace nvidia
 -
  #endif  // NVIDIA_COMMON_TYPE_NAME_HPP_
+diff --git a/gxf-install/include/gxf/core/expected_macro.hpp b/gxf-install/include/gxf/core/expected_macro.hpp
+index ad5a799..98896fa 100644
+--- a/gxf-install/include/gxf/core/expected_macro.hpp
++++ b/gxf-install/include/gxf/core/expected_macro.hpp
+@@ -26,7 +26,7 @@
+ #endif
+ 
+ #include "gxf/core/expected.hpp"
+-#include "magic_enum.hpp"  // NOLINT(build/include)
++#include <magic_enum/magic_enum.hpp>
+ 
+ //////////////////////////////////////////
+ // Configuration for using bool as status:
 -- 
 2.34.1
 
