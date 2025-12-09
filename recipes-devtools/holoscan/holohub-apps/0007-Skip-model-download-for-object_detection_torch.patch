@@ -1,6 +1,6 @@
-From c501eac7bf3b493964c885c9793e893098d6cd9c Mon Sep 17 00:00:00 2001
+From 1a9fb198c48677839a8a5273bac07a9902a472f1 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 13 Nov 2025 17:22:02 +0000
+Date: Tue, 9 Dec 2025 20:19:51 +0000
 Subject: [PATCH 7/9] Skip model download for object_detection_torch
 
 This step requires a native installation of PyTorch, which
