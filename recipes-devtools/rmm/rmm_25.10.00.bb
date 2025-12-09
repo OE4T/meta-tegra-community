@@ -11,12 +11,19 @@ SRC_URI = " \
     git://github.com/rapidsai/rmm.git;protocol=https;nobranch=1;tag=v${PV} \
     file://0001-Updates-for-OE-cross-builds.patch \
 "
-SRCREV = "8f19c9c3aacf6e612a0cd61f4cf882903bf045aa"
+SRCREV = "7aaad1dee0690a48db8c92210593f6c70f6f7648"
 
-DEPENDS += "fmt spdlog cccl cpm-cmake rapids-cmake"
+DEPENDS += "cccl nvtx cpm-cmake rapids-cmake rapids-logger"
+
+OECMAKE_SOURCEPATH = "${S}/cpp"
 
 EXTRA_OECMAKE:append = " \
+    -DCCCL_DIR=${RECIPE_SYSROOT}/opt/nvidia/cccl/lib/cmake/cccl \
     -DCPM_SOURCE_CACHE=${RECIPE_SYSROOT}${datadir} \
     -DRAPIDS_CMAKE_DIR=${RECIPE_SYSROOT}/opt/nvidia/rapids-cmake \
+    -DRMM_NVTX=ON \
     -DBUILD_TESTS=OFF \
 "
+
+SOLIBS = "*.so*"
+FILES_SOLIBSDEV = ""

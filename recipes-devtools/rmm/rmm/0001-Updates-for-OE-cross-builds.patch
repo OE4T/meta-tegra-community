@@ -1,136 +1,144 @@
-From a45974f491ddb0a7ede455fda734fe39c44d8ca1 Mon Sep 17 00:00:00 2001
+From 2e72f5975d0856abe711d73e04c8629c70b975f9 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 1 May 2025 11:06:13 +0100
+Date: Fri, 21 Nov 2025 17:08:19 +0000
 Subject: [PATCH] Updates for OE cross builds
 
 Upstream-Status: Inappropriate [OE-specific]
-
-Signed-off-by: Gregory Lee <grelee@nvidia.com>
-Signed-off-by: Ian Stewart <istewart@nvidia.com>
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt                                | 10 +++++--
- include/rmm/cuda_stream_view.hpp              |  4 ++-
- include/rmm/logger.hpp                        |  4 ++-
- .../mr/device/cuda_async_memory_resource.hpp  | 30 +++++++++----------
- rapids_config.cmake                           | 14 ++++-----
- 5 files changed, 35 insertions(+), 27 deletions(-)
+ cmake/rapids_config.cmake            | 14 +++++++++++++-
+ cpp/CMakeLists.txt                   | 11 +++++++----
+ cpp/cmake/thirdparty/get_cccl.cmake  | 13 ++++---------
+ cpp/cmake/thirdparty/get_nvtx.cmake  | 10 +---------
+ cpp/include/rmm/cuda_stream_view.hpp |  3 +++
+ 5 files changed, 28 insertions(+), 23 deletions(-)
 
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 56454d4b..254cb782 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -68,9 +68,13 @@ rapids_find_package(
+diff --git a/cmake/rapids_config.cmake b/cmake/rapids_config.cmake
+index d36b24e9..d254810b 100644
+--- a/cmake/rapids_config.cmake
++++ b/cmake/rapids_config.cmake
+@@ -34,10 +34,22 @@ if(NOT _rapids_branch)
+   )
+ endif()
+ 
++set(CPM_DOWNLOAD_VERSION 0.40.2)
++set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
++message(STATUS "CPM download location: ${CPM_DOWNLOAD_LOCATION}")
++
++if(NOT EXISTS "${RAPIDS_CMAKE_DIR}/RAPIDS.cmake")
++  message(FATAL_ERROR "Required RAPIDS.cmake does not exist!")
++endif()
++
++set(rapids-cmake_POPULATED "TRUE")
+ if(NOT rapids-cmake-version)
+   set(rapids-cmake-version "${RAPIDS_VERSION_MAJOR_MINOR}")
+ endif()
+ if(NOT rapids-cmake-branch)
+   set(rapids-cmake-branch "${_rapids_branch}")
+ endif()
+-include("${CMAKE_CURRENT_LIST_DIR}/RAPIDS.cmake")
++set(rapids-cmake-dir "${RAPIDS_CMAKE_DIR}/rapids-cmake")
++message(STATUS "Rapids cmake DIR: ${rapids-cmake-dir}")
++list(APPEND CMAKE_MODULE_PATH "${rapids-cmake-dir}")
++include("${RAPIDS_CMAKE_DIR}/RAPIDS.cmake")
+diff --git a/cpp/CMakeLists.txt b/cpp/CMakeLists.txt
+index fb3f6455..98ae8999 100644
+--- a/cpp/CMakeLists.txt
++++ b/cpp/CMakeLists.txt
+@@ -12,7 +12,7 @@
+ # the License.
+ # =============================================================================
+ 
+-cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
++cmake_minimum_required(VERSION 3.28.3 FATAL_ERROR)
+ 
+ include(../cmake/rapids_config.cmake)
+ 
+@@ -50,7 +50,7 @@ set(RMM_LOGGING_LEVEL
+ set_property(CACHE RMM_LOGGING_LEVEL PROPERTY STRINGS "TRACE" "DEBUG" "INFO" "WARN" "ERROR"
+                                               "CRITICAL" "OFF")
+ 
+-message(VERBOSE "RMM: Build with NVTX support: ${RMM_NVTX}")
++message(STATUS "RMM: Build with NVTX support: ${RMM_NVTX}")
+ # Set logging level. Must go before including gtests and benchmarks. Set the possible values of
+ # build type for cmake-gui.
+ message(STATUS "RMM: RMM_LOGGING_LEVEL = '${RMM_LOGGING_LEVEL}'")
+@@ -76,8 +76,7 @@ rapids_find_package(
  # add third party dependencies using CPM
  rapids_cpm_init()
  
--include(cmake/thirdparty/get_fmt.cmake)
--include(cmake/thirdparty/get_spdlog.cmake)
--include(cmake/thirdparty/get_cccl.cmake)
-+find_package(PkgConfig)
-+pkg_check_modules(FMT REQUIRED IMPORTED_TARGET GLOBAL fmt>=10.1.1)
+-include(${rapids-cmake-dir}/cpm/rapids_logger.cmake)
+-rapids_cpm_rapids_logger(BUILD_EXPORT_SET rmm-exports INSTALL_EXPORT_SET rmm-exports)
++find_package(rapids_logger 0.2.0 REQUIRED)
+ create_logger_macros(RMM "rmm::default_logger()" include/rmm)
+ 
+ include(cmake/thirdparty/get_cccl.cmake)
+@@ -113,8 +112,12 @@ else()
+   target_link_libraries(rmm PUBLIC CUDA::cudart)
+ endif()
+ 
++if(RMM_NVTX)
+ target_link_libraries(rmm PUBLIC CCCL::CCCL ${CMAKE_DL_LIBS} nvtx3::nvtx3-cpp
+                                  rapids_logger::rapids_logger)
++else()
++target_link_libraries(rmm PUBLIC CCCL::CCCL ${CMAKE_DL_LIBS} rapids_logger::rapids_logger)
++endif()
+ 
+ set_target_properties(
+   rmm
+diff --git a/cpp/cmake/thirdparty/get_cccl.cmake b/cpp/cmake/thirdparty/get_cccl.cmake
+index ca6a8654..81d564a8 100644
+--- a/cpp/cmake/thirdparty/get_cccl.cmake
++++ b/cpp/cmake/thirdparty/get_cccl.cmake
+@@ -12,12 +12,7 @@
+ # the License.
+ # =============================================================================
+ 
+-# Use CPM to find or clone CCCL
+-function(find_and_configure_cccl)
+-
+-  include(${rapids-cmake-dir}/cpm/cccl.cmake)
+-  rapids_cpm_cccl(BUILD_EXPORT_SET rmm-exports INSTALL_EXPORT_SET rmm-exports)
+-
+-endfunction()
+-
+-find_and_configure_cccl()
 +find_package(CCCL REQUIRED)
 +find_package(CUB REQUIRED)
 +find_package(libcudacxx REQUIRED)
 +find_package(Thrust REQUIRED)
-+rapids_find_package(spdlog 1.13.0 REQUIRED)
+diff --git a/cpp/cmake/thirdparty/get_nvtx.cmake b/cpp/cmake/thirdparty/get_nvtx.cmake
+index 90487dd2..f04dab28 100644
+--- a/cpp/cmake/thirdparty/get_nvtx.cmake
++++ b/cpp/cmake/thirdparty/get_nvtx.cmake
+@@ -12,12 +12,4 @@
+ # the License.
+ # =============================================================================
  
- # ##################################################################################################
- # * library targets --------------------------------------------------------------------------------
-diff --git a/include/rmm/cuda_stream_view.hpp b/include/rmm/cuda_stream_view.hpp
-index a34897df..d6e52f70 100644
---- a/include/rmm/cuda_stream_view.hpp
-+++ b/include/rmm/cuda_stream_view.hpp
-@@ -17,7 +17,9 @@
- #pragma once
- 
- #include <rmm/detail/error.hpp>
+-# Use CPM to find or clone NVTX3
+-function(find_and_configure_nvtx3)
 -
+-  include(${rapids-cmake-dir}/cpm/nvtx3.cmake)
+-  rapids_cpm_nvtx3(BUILD_EXPORT_SET rmm-exports INSTALL_EXPORT_SET rmm-exports)
+-
+-endfunction()
+-
+-find_and_configure_nvtx3()
++find_package(nvtx3 3.3.0 REQUIRED)
+diff --git a/cpp/include/rmm/cuda_stream_view.hpp b/cpp/include/rmm/cuda_stream_view.hpp
+index 54b34bc8..e1345843 100644
+--- a/cpp/include/rmm/cuda_stream_view.hpp
++++ b/cpp/include/rmm/cuda_stream_view.hpp
+@@ -18,6 +18,9 @@
+ 
+ #include <rmm/detail/export.hpp>
+ 
 +#ifndef LIBCUDACXX_ENABLE_EXPERIMENTAL_MEMORY_RESOURCE
 +#define LIBCUDACXX_ENABLE_EXPERIMENTAL_MEMORY_RESOURCE
 +#endif
  #include <cuda/stream_ref>
  #include <cuda_runtime_api.h>
  
-diff --git a/include/rmm/logger.hpp b/include/rmm/logger.hpp
-index 6213221a..80641fc6 100644
---- a/include/rmm/logger.hpp
-+++ b/include/rmm/logger.hpp
-@@ -15,7 +15,9 @@
-  */
- 
- #pragma once
--
-+#ifndef FMT_HEADER_ONLY
-+#define FMT_HEADER_ONLY
-+#endif
- #include <fmt/format.h>
- #include <fmt/ostream.h>
- #include <spdlog/sinks/basic_file_sink.h>
-diff --git a/include/rmm/mr/device/cuda_async_memory_resource.hpp b/include/rmm/mr/device/cuda_async_memory_resource.hpp
-index ac6b7207..702efae6 100644
---- a/include/rmm/mr/device/cuda_async_memory_resource.hpp
-+++ b/include/rmm/mr/device/cuda_async_memory_resource.hpp
-@@ -85,22 +85,22 @@ class cuda_async_memory_resource final : public device_memory_resource {
-    * resource should support interprocess communication (IPC). Default is
-    * `cudaMemHandleTypeNone` for no IPC support.
-    */
--  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
--  template <class Optional,
--            cuda::std::enable_if_t<cuda::std::is_same_v<cuda::std::remove_cvref_t<Optional>,
--                                                        thrust::optional<std::size_t>>,
--                                   int> = 0>
--  [[deprecated("Use std::optional instead of thrust::optional.")]]  //
--  explicit cuda_async_memory_resource(
--    Optional initial_pool_size,
--    Optional release_threshold                                  = {},
--    thrust::optional<allocation_handle_type> export_handle_type = {})
--    : cuda_async_memory_resource(initial_pool_size.value_or(std::nullopt),
--                                 release_threshold.value_or(std::nullopt),
--                                 export_handle_type.value_or(std::nullopt))
-+  // // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-+  // template <class Optional,
-+  //           cuda::std::enable_if_t<cuda::std::is_same_v<cuda::std::remove_cvref_t<Optional>,
-+  //                                                       thrust::optional<std::size_t>>,
-+  //                                  int> = 0>
-+  // [[deprecated("Use std::optional instead of thrust::optional.")]]  //
-+  // explicit cuda_async_memory_resource(
-+  //   Optional initial_pool_size,
-+  //   Optional release_threshold                                  = {},
-+  //   thrust::optional<allocation_handle_type> export_handle_type = {})
-+  //   : cuda_async_memory_resource(initial_pool_size.value_or(std::nullopt),
-+  //                                release_threshold.value_or(std::nullopt),
-+  //                                export_handle_type.value_or(std::nullopt))
- 
--  {
--  }
-+  // {
-+  // }
- 
-   /**
-    * @brief Constructs a cuda_async_memory_resource with the optionally specified initial pool size
-diff --git a/rapids_config.cmake b/rapids_config.cmake
-index 84c20c01..c19f6c59 100644
---- a/rapids_config.cmake
-+++ b/rapids_config.cmake
-@@ -25,10 +25,10 @@ else()
-       "Could not determine RAPIDS version. Contents of VERSION file:\n${_rapids_version_formatted}")
- endif()
- 
--if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/RMM_RAPIDS-${RAPIDS_VERSION_MAJOR_MINOR}.cmake")
--  file(
--    DOWNLOAD
--    "https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-${RAPIDS_VERSION_MAJOR_MINOR}/RAPIDS.cmake"
--    "${CMAKE_CURRENT_BINARY_DIR}/RMM_RAPIDS-${RAPIDS_VERSION_MAJOR_MINOR}.cmake")
--endif()
--include("${CMAKE_CURRENT_BINARY_DIR}/RMM_RAPIDS-${RAPIDS_VERSION_MAJOR_MINOR}.cmake")
-+set(CPM_DOWNLOAD_VERSION 0.40.0)
-+set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
-+message(STATUS "CPM download location: ${CPM_DOWNLOAD_LOCATION}")
-+
-+list(APPEND CMAKE_MODULE_PATH "${RAPIDS_CMAKE_DIR}/rapids-cmake")
-+set(rapids-cmake-dir "${RAPIDS_CMAKE_DIR}/rapids-cmake")
-+include("${RAPIDS_CMAKE_DIR}/RAPIDS.cmake")
 -- 
 2.34.1
 
