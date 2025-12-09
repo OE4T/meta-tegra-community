@@ -69,7 +69,7 @@ EXTRA_OECMAKE = " \
     ${@bb.utils.contains('PACKAGECONFIG', 'python', '-Donnxruntime_ENABLE_PYTHON=ON', '', d)} \
 "
 
-OECMAKE_CXX_FLAGS:append = " -Wno-array-bounds -Wno-deprecated-declarations -Wno-unused-variable -Wno-template-id-cdtor -Wno-range-loop-construct -Wno-maybe-uninitialized -Wno-error=cpp"
+OECMAKE_CXX_FLAGS:append = " -Wno-array-bounds -Wno-deprecated-declarations -Wno-unused-variable -Wno-template-id-cdtor -Wno-range-loop-construct -Wno-maybe-uninitialized -Wno-error=cpp -Wno-error=uninitialized"
 OECMAKE_SOURCEPATH = "${S}/cmake"
 
 PACKAGECONFIG ?= "python"
