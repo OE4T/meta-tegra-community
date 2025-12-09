@@ -1,43 +1,50 @@
-From 821329975c0b54409790e515dac659c5e9d520b6 Mon Sep 17 00:00:00 2001
+From 009c15302eb3c803dd3d70f3c6a5629b85cc1e0e Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 4 Sep 2025 21:12:48 +0100
+Date: Tue, 9 Dec 2025 19:14:48 +0000
 Subject: [PATCH] Updates for OE cross builds
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
  RAPIDS_VERSION            |  2 +-
- cmake/rapids_config.cmake | 13 ++++++++++++-
- 2 files changed, 13 insertions(+), 2 deletions(-)
+ cmake/rapids_config.cmake | 21 +++++++++++++++++++--
+ 2 files changed, 20 insertions(+), 3 deletions(-)
 
 diff --git a/RAPIDS_VERSION b/RAPIDS_VERSION
-index cc83d7a..af28c42 100644
+index cc83d7a..296e352 100644
 --- a/RAPIDS_VERSION
 +++ b/RAPIDS_VERSION
 @@ -1 +1 @@
 -25.06.00
-+24.12.00
++25.10.00
 diff --git a/cmake/rapids_config.cmake b/cmake/rapids_config.cmake
-index 0051673..8253620 100644
+index 0051673..b5358a8 100644
 --- a/cmake/rapids_config.cmake
 +++ b/cmake/rapids_config.cmake
-@@ -26,5 +26,16 @@ else()
+@@ -26,5 +26,22 @@ else()
    )
  endif()
  
-+set(CPM_DOWNLOAD_VERSION 0.40.0)
+-set(rapids-cmake-version "${RAPIDS_VERSION_MAJOR_MINOR}")
+-include("${CMAKE_CURRENT_LIST_DIR}/RAPIDS.cmake")
++set(CPM_DOWNLOAD_VERSION 0.40.2)
 +set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
 +message(STATUS "CPM download location: ${CPM_DOWNLOAD_LOCATION}")
 +
 +if(NOT EXISTS "${RAPIDS_CMAKE_DIR}/RAPIDS.cmake")
 +  message(FATAL_ERROR "Required RAPIDS.cmake does not exist!")
 +endif()
++ 
 +set(rapids-cmake_POPULATED "TRUE")
- set(rapids-cmake-version "${RAPIDS_VERSION_MAJOR_MINOR}")
--include("${CMAKE_CURRENT_LIST_DIR}/RAPIDS.cmake")
-+list(APPEND CMAKE_MODULE_PATH "${RAPIDS_CMAKE_DIR}/rapids-cmake")
-+
++if(NOT rapids-cmake-version)
++  set(rapids-cmake-version "${RAPIDS_VERSION_MAJOR_MINOR}")
++endif()
++if(NOT rapids-cmake-branch)
++  set(rapids-cmake-branch "branch-${RAPIDS_VERSION_MAJOR_MINOR}")
++endif()
 +set(rapids-cmake-dir "${RAPIDS_CMAKE_DIR}/rapids-cmake")
++message(STATUS "Rapids cmake DIR: ${rapids-cmake-dir}")
++list(APPEND CMAKE_MODULE_PATH "${rapids-cmake-dir}")
 +include("${RAPIDS_CMAKE_DIR}/RAPIDS.cmake")
 -- 
 2.34.1
