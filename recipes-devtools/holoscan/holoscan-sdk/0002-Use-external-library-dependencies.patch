@@ -1,7 +1,7 @@
-From 49810de9ab7186871fb1ecbe4beabbd15046578e Mon Sep 17 00:00:00 2001
+From e2015e592f413b1c771bb64d3ca615da7aff32c9 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 13 Nov 2025 15:33:35 +0000
-Subject: [PATCH 2/7] Use external library dependencies
+Date: Fri, 21 Nov 2025 17:26:32 +0000
+Subject: [PATCH 2/6] Use external library dependencies
 
 This changes the dependencies on the following libraries so
 that they are provided at build time instead of being
@@ -21,6 +21,7 @@ fetched, built, and installed by CMake:
  - pybind11
  - cpm-cmake
  - rapids-cmake
+ - rapids-logger
  - rmm
  - cccl
  - cub
@@ -30,22 +31,20 @@ fetched, built, and installed by CMake:
  - magic_enum
  - onnxruntime
  - ucx
- - ucxx
  - Protobuf
  - Eigen3
- - concurrentqueue
- - matx
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt                                |  85 +-
+ CMakeLists.txt                                |  93 +-
+ cmake/deps/cccl.cmake                         |  26 +-
  cmake/deps/cli11_rapids.cmake                 |  18 +-
  cmake/deps/concurrent_queue.cmake             |  18 +-
  cmake/deps/dlpack_rapids.cmake                |  18 +-
  cmake/deps/eigen3_urm.cmake                   |  77 +-
  cmake/deps/expected_rapids.cmake              |  21 +-
- cmake/deps/fmt_rapids.cmake                   |  26 +-
+ cmake/deps/fmt_rapids.cmake                   |  25 +-
  cmake/deps/glfw_rapids.cmake                  |  20 +-
  cmake/deps/grpc.cmake                         |  10 +-
  cmake/deps/gtest_rapids.cmake                 |  38 +-
@@ -55,24 +54,24 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  cmake/deps/hwloc.static-components.h.in       |  32 -
  cmake/deps/magic_enum.cmake                   |  29 +-
  cmake/deps/matx.cmake                         |  33 +-
- cmake/deps/nvtx3.cmake                        |  35 -
+ cmake/deps/nvtx3.cmake                        |  20 +-
  cmake/deps/pybind11.cmake                     |  20 +-
- cmake/deps/rmm.cmake                          |  44 +-
+ cmake/deps/rmm.cmake                          |  39 +-
  cmake/deps/spdlog_rapids.cmake                |  29 +-
- cmake/deps/ucx.cmake                          |  67 +-
+ cmake/deps/ucx.cmake                          |  65 --
  cmake/deps/ucxx_rapids.cmake                  | 132 +--
  cmake/deps/yaml-cpp_rapids.cmake              |  51 +-
  cmake/modules/FindONNXRuntime.cmake           |  45 +-
  cmake/modules/SetupCUDA.cmake                 |  44 -
  cmake/modules/SetupCache.cmake                |   3 -
- cmake/modules/SetupRapidsCMake.cmake          |  12 +-
- cmake/setup_dependencies.cmake                |   7 -
+ cmake/modules/SetupRapidsCMake.cmake          |  24 +-
+ cmake/setup_dependencies.cmake                |   6 -
+ examples/CMakeLists.txt                       |   1 -
  .../cpp/operator_status_tracking.cpp          |   2 +-
  .../matx/matx_basic/cpp/CMakeLists.min.txt    |  33 +-
  .../distributed_pose_tree/cpp/CMakeLists.txt  |   6 +-
  .../pose_tree_basic/cpp/CMakeLists.txt        |   6 +-
  .../core/resources/async_data_logger.hpp      |   2 +-
- include/holoscan/profiler/nvtx3.hpp           |   2 +-
  modules/holoinfer/src/CMakeLists.txt          |  15 +-
  .../holoinfer/src/infer/onnx/CMakeLists.txt   |   8 +-
  .../holoinfer/src/infer/torch/CMakeLists.txt  |   3 +-
@@ -82,24 +81,23 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  .../holoviz/thirdparty/imgui/CMakeLists.txt   |  44 +-
  .../holoscan/operators/holoviz/CMakeLists.txt |   5 +-
  python/holoscan/operators/holoviz/holoviz.cpp |   2 +-
- src/CMakeLists.txt                            |  39 +-
+ src/CMakeLists.txt                            |  40 +-
  src/core/conditions/gxf/asynchronous.cpp      |   2 +-
  src/core/gxf/gxf_utils.cpp                    |   2 +-
  src/core/resources/async_data_logger.cpp      |   2 +-
  .../simple_text_serializer.cpp                |   2 +-
  src/operators/holoviz/holoviz.cpp             |   2 +-
  .../v4l2_video_capture/v4l2_video_capture.cpp |   2 +-
- 50 files changed, 127 insertions(+), 2261 deletions(-)
+ 51 files changed, 138 insertions(+), 2272 deletions(-)
  delete mode 100644 cmake/deps/hwloc.config.h.in
  delete mode 100644 cmake/deps/hwloc.private.config.h.in
  delete mode 100644 cmake/deps/hwloc.static-components.h.in
- delete mode 100644 cmake/deps/nvtx3.cmake
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 850a723..2eb6744 100644
+index 1292c0c..d100f21 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -288,7 +288,6 @@ endif()
+@@ -296,7 +296,6 @@ endif()
  # List targets to export/install
  list(APPEND HOLOSCAN_INSTALL_TARGETS
      core
@@ -107,7 +105,7 @@ index 850a723..2eb6744 100644
      gpu_resident_cuda
      holoviz
      holoviz_imgui
-@@ -296,10 +295,6 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS
+@@ -304,10 +303,6 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS
      holoinfer_utils
      infer_utils
      logger
@@ -118,7 +116,7 @@ index 850a723..2eb6744 100644
      data_loggers_async_console_logger
      data_loggers_basic_console_logger
      op_async_ping_rx
-@@ -322,7 +317,6 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS
+@@ -330,7 +325,6 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS
      pose_tree
      profiler
      spdlog_logger
@@ -126,7 +124,7 @@ index 850a723..2eb6744 100644
  )
  if(HOLOSCAN_BUILD_LIBTORCH)
    list(APPEND HOLOSCAN_INSTALL_TARGETS holoinfer_torch)
-@@ -333,8 +327,7 @@ endif()
+@@ -341,8 +335,7 @@ endif()
  list(APPEND HOLOSCAN_INSTALL_TARGETS pybind11_abi_config)
  
  # Copy library files
@@ -136,7 +134,7 @@ index 850a723..2eb6744 100644
      DESTINATION ${HOLOSCAN_INSTALL_LIB_DIR}
      EXPORT ${HOLOSCAN_PACKAGE_NAME}-exports
      COMPONENT holoscan-core
-@@ -346,36 +339,6 @@ install(DIRECTORY include/holoscan/
+@@ -354,36 +347,6 @@ install(DIRECTORY include/holoscan/
      COMPONENT holoscan-core
  )
  
@@ -173,7 +171,7 @@ index 850a723..2eb6744 100644
  # Copy version file
  install(FILES ${${HOLOSCAN_PACKAGE_NAME}_BINARY_DIR}/include/holoscan/version_config.hpp
      DESTINATION include/holoscan
-@@ -544,52 +507,6 @@ endforeach()
+@@ -518,60 +481,6 @@ endforeach()
  
  @HOLOSCAN_GXF_INSTALL_HOOK@
  
@@ -186,6 +184,14 @@ index 850a723..2eb6744 100644
 -        APPEND PROPERTY
 -            INTERFACE_INCLUDE_DIRECTORIES "${PACKAGE_PREFIX_DIR}/include/3rdparty/ucx"
 -    )
+-endif()
+-
+-if(NOT TARGET rmm::rmm)
+-  add_library(rmm::rmm SHARED IMPORTED)
+-  set_target_properties(rmm::rmm PROPERTIES
+-    INTERFACE_COMPILE_DEFINITIONS "LIBCUDACXX_ENABLE_EXPERIMENTAL_MEMORY_RESOURCE"
+-    IMPORTED_LOCATION "${PACKAGE_PREFIX_DIR}/lib/librmm.so"
+-  )
 -endif()
 -
 -# Find holoscan::ucp that is prerequisite of holoscan::ucxx
@@ -223,9 +229,43 @@ index 850a723..2eb6744 100644
 -  )
 -endif()
 -
- if(NOT TARGET GXF::gxe)
-   add_executable(GXF::gxe IMPORTED)
-   set_target_properties(GXF::gxe PROPERTIES
+ set(GXF_LIB_DIR "${PACKAGE_PREFIX_DIR}/lib")
+ set(GXF_EXTENSIONS_DIR "${PACKAGE_PREFIX_DIR}/lib/gxf_extensions")
+ 
+diff --git a/cmake/deps/cccl.cmake b/cmake/deps/cccl.cmake
+index 4b508e9..b563196 100644
+--- a/cmake/deps/cccl.cmake
++++ b/cmake/deps/cccl.cmake
+@@ -16,25 +16,7 @@
+ 
+ # CCCL is a dependency of MatX and RMM.
+ 
+-# Try to find system CCCL in the build container first.
+-# Subsequent RAPIDS CPM components (MatX) can get confused
+-# if both a compatible system and cache CCCL are present.
+-find_package(CCCL 3.0.3 PATHS /usr/local/cuda/lib64/cmake QUIET)
+-if(NOT CCCL_FOUND)
+-    rapids_cpm_find(CCCL 3.0.3
+-        GLOBAL_TARGETS CCCL CCCL::CCCL CCCL::CUB CCCL::libcudacxx
+-        BUILD_EXPORT_SET ${HOLOSCAN_PACKAGE_NAME}-exports
+-
+-        CPM_ARGS
+-        # CPM fails to cache CCCL in the expected CPM source directory, so use
+-        # the default FetchContent location for caching instead
+-        # https://gitlab.kitware.com/cmake/cmake/-/issues/25714
+-        SOURCE_DIR ${CMAKE_BINARY_DIR}/_deps/cccl-src
+-
+-        GIT_SHALLOW TRUE
+-
+-        EXCLUDE_FROM_ALL
+-        OPTIONS "CCCL_TOPLEVEL_PROJECT OFF"
+-                "CCCL_ENABLE_INSTALL_RULES ON"
+-    )
+-endif()
++find_package(CCCL REQUIRED)
++find_package(CUB REQUIRED)
++find_package(libcudacxx REQUIRED)
++find_package(Thrust REQUIRED)
 diff --git a/cmake/deps/cli11_rapids.cmake b/cmake/deps/cli11_rapids.cmake
 index db010da..c2b602c 100644
 --- a/cmake/deps/cli11_rapids.cmake
@@ -419,23 +459,23 @@ index 680c6ee..3cfa92a 100644
 -set(tl-expected_SOURCE_DIR ${tl-expected_SOURCE_DIR} PARENT_SCOPE)
 +rapids_find_package(tl-expected 1.1.0 REQUIRED)
 diff --git a/cmake/deps/fmt_rapids.cmake b/cmake/deps/fmt_rapids.cmake
-index e3ca363..8c015e4 100644
+index 4be303e..a943e4d 100644
 --- a/cmake/deps/fmt_rapids.cmake
 +++ b/cmake/deps/fmt_rapids.cmake
-@@ -13,27 +13,5 @@
+@@ -13,27 +13,4 @@
  # See the License for the specific language governing permissions and
  # limitations under the License.
  
 -# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_cpm_find.html
 -include(${rapids-cmake-dir}/cpm/find.cmake)
 -
--rapids_cpm_find(fmt 10.1.1
+-rapids_cpm_find(fmt 11.0.2
 -    GLOBAL_TARGETS fmt fmt-header-only
 -    BUILD_EXPORT_SET ${HOLOSCAN_PACKAGE_NAME}-exports
 -    CPM_ARGS
 -
 -    GITHUB_REPOSITORY fmtlib/fmt
--    GIT_TAG 10.1.1
+-    GIT_TAG 11.0.2
 -    GIT_SHALLOW TRUE
 -
 -    OPTIONS
@@ -450,8 +490,7 @@ index e3ca363..8c015e4 100644
 -        COMPONENT "holoscan-dependencies"
 -        )
 -endif()
-+find_package(PkgConfig)
-+pkg_check_modules(FMT REQUIRED IMPORTED_TARGET GLOBAL fmt>=10.1.1)
++find_package(fmt 11.0.2 REQUIRED)
 diff --git a/cmake/deps/glfw_rapids.cmake b/cmake/deps/glfw_rapids.cmake
 index 7ed90e6..77f3e08 100644
 --- a/cmake/deps/glfw_rapids.cmake
@@ -509,7 +548,7 @@ index 360f64c..8b877f0 100644
  # Looks for gRPCConfig.cmake file installed by gRPC's cmake installation.
  find_package(gRPC CONFIG REQUIRED)
 diff --git a/cmake/deps/gtest_rapids.cmake b/cmake/deps/gtest_rapids.cmake
-index 0c40dd0..f4b67dc 100644
+index 0c40dd0..b4f806a 100644
 --- a/cmake/deps/gtest_rapids.cmake
 +++ b/cmake/deps/gtest_rapids.cmake
 @@ -13,40 +13,4 @@
@@ -553,7 +592,7 @@ index 0c40dd0..f4b67dc 100644
 -    add_library(GTest::gmock ALIAS gmock)
 -    add_library(GTest::gmock_main ALIAS gmock_main)
 -endif()
-+find_package(GTest 1.17.0 REQUIRED)
++find_package(GTest 1.16.0 REQUIRED)
 diff --git a/cmake/deps/hwloc.cmake b/cmake/deps/hwloc.cmake
 index 9c20ea4..be9c2a0 100644
 --- a/cmake/deps/hwloc.cmake
@@ -1944,35 +1983,21 @@ index c99f31e..a02910c 100644
 -endif()
 +rapids_find_package(matx 0.9.3 REQUIRED)
 diff --git a/cmake/deps/nvtx3.cmake b/cmake/deps/nvtx3.cmake
-deleted file mode 100644
-index 6b9ccf8..0000000
+index a3990c3..fa8c831 100644
 --- a/cmake/deps/nvtx3.cmake
-+++ /dev/null
-@@ -1,35 +0,0 @@
--# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
--# SPDX-License-Identifier: Apache-2.0
--#
--# Licensed under the Apache License, Version 2.0 (the "License");
--# you may not use this file except in compliance with the License.
--# You may obtain a copy of the License at
--#
--# http://www.apache.org/licenses/LICENSE-2.0
--#
--# Unless required by applicable law or agreed to in writing, software
--# distributed under the License is distributed on an "AS IS" BASIS,
--# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
--# See the License for the specific language governing permissions and
--# limitations under the License.
--
++++ b/cmake/deps/nvtx3.cmake
+@@ -13,22 +13,4 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
 -# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_find_package.html#
 -include(${rapids-cmake-dir}/cpm/find.cmake)
 -
--rapids_cpm_find(nvtx3 3.1
+-rapids_cpm_find(nvtx3 3.3
 -    GLOBAL_TARGETS nvtx3-c nvtx3-cpp
--
 -    CPM_ARGS
 -    GITHUB_REPOSITORY NVIDIA/NVTX
--    GIT_TAG v3.1.0-c-cpp
+-    GIT_TAG v3.3.0-c-cpp
 -    GIT_SHALLOW TRUE
 -    EXCLUDE_FROM_ALL
 -)
@@ -1984,6 +2009,7 @@ index 6b9ccf8..0000000
 -        COMPONENT "holoscan-dependencies"
 -        )
 -endif()
++find_package(nvtx3 3.3.0 REQUIRED)
 diff --git a/cmake/deps/pybind11.cmake b/cmake/deps/pybind11.cmake
 index 3aa140e..ec475f2 100644
 --- a/cmake/deps/pybind11.cmake
@@ -2013,59 +2039,54 @@ index 3aa140e..ec475f2 100644
 -endif()
 +rapids_find_package(pybind11 2.11.1 REQUIRED)
 diff --git a/cmake/deps/rmm.cmake b/cmake/deps/rmm.cmake
-index 803fbeb..a5e6f23 100644
+index 49dc455..b710dd2 100644
 --- a/cmake/deps/rmm.cmake
 +++ b/cmake/deps/rmm.cmake
-@@ -13,42 +13,8 @@
+@@ -13,40 +13,5 @@
  # See the License for the specific language governing permissions and
  # limitations under the License.
  
 -# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_cpm_find.html
 -include(${rapids-cmake-dir}/cpm/find.cmake)
 -
--set(rmm_PATCH_FILEPATH "${CMAKE_CURRENT_LIST_DIR}/patches/rmm.diff")
--
--# Copy the patch file to rapids-cmake's patch directory.
--# Note: rapids-cmake automatically applies patches from its '${rapids-cmake-dir}/cpm/patches' directory.
--# (see https://docs.rapids.ai/api/rapids-cmake/stable/cpm/#rapids-cpm-command-line-controls)
--# The patch file extension (.diff or .patch) determines how it's processed.
--# (see https://github.com/rapidsai/rapids-cmake/blob/v24.04.00/rapids-cmake/cpm/patches/command_template.cmake.in#L38-L62)
--# If the patch contains 'diff' text, it may be skipped silently.
--# Check for errors in: <build_dir>/rapids-cmake/patches/rmm/err
--if(NOT EXISTS "${rmm_PATCH_FILEPATH}")
--  message(FATAL_ERROR "RMM patch file not found: ${rmm_PATCH_FILEPATH}")
--endif()
--file(COPY ${rmm_PATCH_FILEPATH} DESTINATION ${rapids-cmake-dir}/cpm/patches/rmm)
--
--rapids_cpm_find(rmm 24.04.00
+-rapids_cpm_find(rmm 25.10.00
 -    GLOBAL_TARGETS rmm
 -    BUILD_EXPORT_SET ${HOLOSCAN_PACKAGE_NAME}-exports
 -    CPM_ARGS
 -
 -    GITHUB_REPOSITORY rapidsai/rmm
--    GIT_TAG v24.04.00
--    # Note: If 'rmm' item is available in 'cmake/deps/rapids-cmake-packages.json', 'PATCH_COMMAND' is
--    #       ignored so the following statement is meaningless.
--    # PATCH_COMMAND git apply "${rmm_PATCH_FILEPATH}"
+-    GIT_TAG v25.10.00
+-    SOURCE_SUBDIR cpp
 -    GIT_SHALLOW TRUE
--
+-    OPTIONS
+-       BUILD_TESTS OFF
 -    EXCLUDE_FROM_ALL
 -)
 -
 -if(rmm_ADDED)
 -    # Install the headers needed for development with the SDK
--    install(DIRECTORY ${rmm_SOURCE_DIR}/include/rmm
+-    install(DIRECTORY ${rmm_SOURCE_DIR}/cpp/include/rmm
 -        DESTINATION "include"
 -        COMPONENT "holoscan-dependencies"
 -        )
+-    install(DIRECTORY ${rmm_BINARY_DIR}/include/rmm
+-        DESTINATION "include"
+-        COMPONENT "holoscan-dependencies"
+-        )
+-    install(DIRECTORY ${CPM_PACKAGE_rapids_logger_SOURCE_DIR}/include/rapids_logger
+-        DESTINATION "include"
+-        COMPONENT "holoscan-dependencies"
+-        )
+-    install(
+-       TARGETS rmm rapids_logger
+-       DESTINATION "${HOLOSCAN_INSTALL_LIB_DIR}"
+-       COMPONENT "holoscan-dependencies"
+-    )
 -endif()
-+rapids_find_package(CCCL REQUIRED)
-+rapids_find_package(CUB REQUIRED)
-+rapids_find_package(libcudacxx REQUIRED)
-+rapids_find_package(Thrust REQUIRED)
-+rapids_find_package(rmm 24.04.0 REQUIRED)
++rapids_find_package(rapids_logger 0.2.0 REQUIRED)
++rapids_find_package(rmm 25.10.0 REQUIRED)
 diff --git a/cmake/deps/spdlog_rapids.cmake b/cmake/deps/spdlog_rapids.cmake
-index 74baaa7..cf07302 100644
+index 74baaa7..3f5600a 100644
 --- a/cmake/deps/spdlog_rapids.cmake
 +++ b/cmake/deps/spdlog_rapids.cmake
 @@ -13,31 +13,4 @@
@@ -2100,16 +2121,15 @@ index 74baaa7..cf07302 100644
 -    set(spdlog_ADDED "${spdlog_ADDED}" PARENT_SCOPE)
 -    set(spdlog_VERSION ${version} PARENT_SCOPE)
 -endif()
-+rapids_find_package(spdlog 1.13.0 REQUIRED)
++rapids_find_package(spdlog 1.14.1 REQUIRED)
 diff --git a/cmake/deps/ucx.cmake b/cmake/deps/ucx.cmake
-index 2273e95..ef90732 100644
+index 2273e95..be105bc 100644
 --- a/cmake/deps/ucx.cmake
 +++ b/cmake/deps/ucx.cmake
-@@ -13,69 +13,4 @@
- # See the License for the specific language governing permissions and
+@@ -14,68 +14,3 @@
  # limitations under the License.
  
--find_package(ucx 1.17.0 REQUIRED)
+ find_package(ucx 1.17.0 REQUIRED)
 -
 -# Install UCX shared libs under <prefix>/lib/libuc*.so*
 -file(GLOB TOP_UCX_LIB_FILES "${UCX_LIBRARIES}/libuc*.so*")
@@ -2175,7 +2195,6 @@ index 2273e95..ef90732 100644
 -  COMPONENT "holoscan-dependencies"
 -  RENAME "ucx-config.cmake"
 -)
-+find_package(ucx 1.19.0 REQUIRED)
 diff --git a/cmake/deps/ucxx_rapids.cmake b/cmake/deps/ucxx_rapids.cmake
 index bf0f43b..cc4d34f 100644
 --- a/cmake/deps/ucxx_rapids.cmake
@@ -2317,7 +2336,7 @@ index bf0f43b..cc4d34f 100644
 -endif()
 +find_package(ucxx 0.44.0 REQUIRED)
 diff --git a/cmake/deps/yaml-cpp_rapids.cmake b/cmake/deps/yaml-cpp_rapids.cmake
-index f13166f..541077f 100644
+index f13166f..3e49726 100644
 --- a/cmake/deps/yaml-cpp_rapids.cmake
 +++ b/cmake/deps/yaml-cpp_rapids.cmake
 @@ -13,53 +13,4 @@
@@ -2484,10 +2503,10 @@ index ac575df..781faf8 100644
 -    endif()
 -endif()
 diff --git a/cmake/modules/SetupCache.cmake b/cmake/modules/SetupCache.cmake
-index 640443e..6ef500f 100644
+index cc54d58..e5dae04 100644
 --- a/cmake/modules/SetupCache.cmake
 +++ b/cmake/modules/SetupCache.cmake
-@@ -160,9 +160,6 @@ if(${HOLOSCAN_CACHE_DIR} STREQUAL " ")
+@@ -207,9 +207,6 @@ if(${HOLOSCAN_CACHE_DIR} STREQUAL " ")
      set(HOLOSCAN_CACHE_DIR "${CMAKE_SOURCE_DIR}/.cache" CACHE)
  endif()
  
@@ -2498,31 +2517,44 @@ index 640443e..6ef500f 100644
      configure_ccache(HOLOSCAN_CACHE_DIR)
  endif()
 diff --git a/cmake/modules/SetupRapidsCMake.cmake b/cmake/modules/SetupRapidsCMake.cmake
-index 3cf88df..68f5af6 100644
+index 72b2a02..2df6f7d 100644
 --- a/cmake/modules/SetupRapidsCMake.cmake
 +++ b/cmake/modules/SetupRapidsCMake.cmake
-@@ -16,13 +16,13 @@
+@@ -16,15 +16,25 @@
  # Note: The MatX library requires rapids-cmake version 24.12, which has a minimum CMake version
  # requirement of 3.26.4 (see https://github.com/rapidsai/rapids-cmake/pull/627).
  
 -# https://github.com/rapidsai/rapids-cmake#installation
--file(DOWNLOAD https://gitlab.com/nvidia/rapidsai/rapids-cmake/-/raw/branch-24.12/RAPIDS.cmake
--    ${CMAKE_BINARY_DIR}/RAPIDS.cmake
+-if(NOT EXISTS ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
+-file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-25.10/RAPIDS.cmake
+-     ${CMAKE_BINARY_DIR}/RAPIDS.cmake
 -)
--
--include(${CMAKE_BINARY_DIR}/RAPIDS.cmake)
-+set(CPM_DOWNLOAD_VERSION 0.40.0)
++set(CPM_DOWNLOAD_VERSION 0.40.2)
 +set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
 +message(STATUS "CPM download location: ${CPM_DOWNLOAD_LOCATION}")
++
++if(NOT EXISTS "${RAPIDS_CMAKE_DIR}/RAPIDS.cmake")
++  message(FATAL_ERROR "Required RAPIDS.cmake does not exist!")
+ endif()
  
-+list(APPEND CMAKE_MODULE_PATH "${RAPIDS_CMAKE_DIR}/rapids-cmake")
+-set(rapids-cmake-version 25.10)
+-include(${CMAKE_BINARY_DIR}/RAPIDS.cmake)
++set(rapids-cmake_POPULATED "TRUE")
++if(NOT rapids-cmake-version)
++  set(rapids-cmake-version "25.10")
++endif()
++if(NOT rapids-cmake-branch)
++  set(rapids-cmake-branch "branch-25.10")
++endif()
 +set(rapids-cmake-dir "${RAPIDS_CMAKE_DIR}/rapids-cmake")
++message(STATUS "Rapids cmake DIR: ${rapids-cmake-dir}")
++list(APPEND CMAKE_MODULE_PATH "${rapids-cmake-dir}")
 +include("${RAPIDS_CMAKE_DIR}/RAPIDS.cmake")
+ 
  include(rapids-cmake)
  include(rapids-cpm)
- include(rapids-cuda)
 diff --git a/cmake/setup_dependencies.cmake b/cmake/setup_dependencies.cmake
-index 9266655..989a590 100644
+index bcfbc38..0e767f4 100644
 --- a/cmake/setup_dependencies.cmake
 +++ b/cmake/setup_dependencies.cmake
 @@ -15,12 +15,6 @@
@@ -2538,14 +2570,18 @@ index 9266655..989a590 100644
  function(superbuild_depend module_name)
      cmake_parse_arguments(PARSE_ARGV 1 _SUPER_BUILD "" "COMPONENT" "")
      # Set CMAKE_INSTALL_DEFAULT_COMPONENT_NAME before including .cmake file
-@@ -66,7 +60,6 @@ superbuild_depend(ucx)
- superbuild_depend(v4l2)
- superbuild_depend(yaml-cpp_rapids)
- superbuild_depend(gxf)
--superbuild_depend(nvtx3)
- superbuild_depend(eigen3_urm)
- superbuild_depend(ucxx_rapids)
- superbuild_depend(matx)
+diff --git a/examples/CMakeLists.txt b/examples/CMakeLists.txt
+index 5bf0050..97946b3 100644
+--- a/examples/CMakeLists.txt
++++ b/examples/CMakeLists.txt
+@@ -57,7 +57,6 @@ include(CTest)
+ if(HOLOSCAN_CPP_EXAMPLES)
+   add_subdirectory(gpu_resident_example)
+   add_subdirectory(gpu_resident_input)
+-  add_subdirectory(matx)
+   add_subdirectory(ping_any)
+   add_subdirectory(ping_conditional)
+   add_subdirectory(ping_cycle)
 diff --git a/examples/execution_control/operator_status_tracking/cpp/operator_status_tracking.cpp b/examples/execution_control/operator_status_tracking/cpp/operator_status_tracking.cpp
 index d931057..f1e7e30 100644
 --- a/examples/execution_control/operator_status_tracking/cpp/operator_status_tracking.cpp
@@ -2645,7 +2681,7 @@ index ae533f1..0842e08 100644
  
  # Copy config file
 diff --git a/include/holoscan/core/resources/async_data_logger.hpp b/include/holoscan/core/resources/async_data_logger.hpp
-index 6221fd9..e8f7a50 100644
+index 86039a9..9b05a5d 100644
 --- a/include/holoscan/core/resources/async_data_logger.hpp
 +++ b/include/holoscan/core/resources/async_data_logger.hpp
 @@ -31,7 +31,7 @@
@@ -2657,19 +2693,6 @@ index 6221fd9..e8f7a50 100644
  #include "holoscan/core/arg.hpp"
  #include "holoscan/core/component_spec.hpp"
  #include "holoscan/core/domain/tensor.hpp"
-diff --git a/include/holoscan/profiler/nvtx3.hpp b/include/holoscan/profiler/nvtx3.hpp
-index 047d384..58f6146 100644
---- a/include/holoscan/profiler/nvtx3.hpp
-+++ b/include/holoscan/profiler/nvtx3.hpp
-@@ -18,7 +18,7 @@
- #ifndef HOLOSCAN_PROFILER_NVTX3_HPP
- #define HOLOSCAN_PROFILER_NVTX3_HPP
- 
--#include <nvtx3/nvtx3.hpp>
-+#include <nvtx3.hpp>
- 
- // Copy of nvtx3::v1::scoped_range_in which checks whether tracing is enabled or not
- namespace nvtx3::v1 {
 diff --git a/modules/holoinfer/src/CMakeLists.txt b/modules/holoinfer/src/CMakeLists.txt
 index 48f48de..33a4456 100644
 --- a/modules/holoinfer/src/CMakeLists.txt
@@ -2961,7 +2984,7 @@ index e9c5987..f0414b4 100644
 +        ${MAGIC_ENUM_INCLUDE_DIRS}
  )
 diff --git a/python/holoscan/operators/holoviz/holoviz.cpp b/python/holoscan/operators/holoviz/holoviz.cpp
-index 2fca96c..d50e8b9 100644
+index 1ec8f04..fe85b84 100644
 --- a/python/holoscan/operators/holoviz/holoviz.cpp
 +++ b/python/holoscan/operators/holoviz/holoviz.cpp
 @@ -31,7 +31,7 @@
@@ -2974,10 +2997,18 @@ index 2fca96c..d50e8b9 100644
  #include "../../core/component_util.hpp"
  #include "../operator_util.hpp"
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 2eabe6c..21c4027 100644
+index 2eabe6c..a6db095 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -127,14 +127,10 @@ target_link_libraries(holoscan_matx
+@@ -75,6 +75,7 @@ endfunction()
+ # ##############################################################################
+ # # Add library holoscan::spdlog_logger
+ # ##############################################################################
++find_package(spdlog 1.14.1 REQUIRED)
+ add_holoscan_library(spdlog_logger common/logger/spdlog_logger.cpp)
+ target_link_libraries(spdlog_logger
+     PUBLIC
+@@ -127,14 +128,10 @@ target_link_libraries(holoscan_matx
  # ##############################################################################
  add_holoscan_library(profiler
      profiler/profiler.cpp)
@@ -2994,7 +3025,7 @@ index 2eabe6c..21c4027 100644
  )
  
  # ##############################################################################
-@@ -148,19 +144,29 @@ add_holoscan_library(pose_tree
+@@ -148,19 +145,29 @@ add_holoscan_library(pose_tree
      pose_tree/pose_tree_ucx_server.cpp
  )
  
@@ -3026,7 +3057,7 @@ index 2eabe6c..21c4027 100644
  set(CORE_PROTO_FILES
      core/distributed/proto/app_driver.proto
      core/distributed/proto/app_worker.proto
-@@ -327,11 +333,9 @@ target_link_libraries(core
+@@ -327,11 +334,9 @@ target_link_libraries(core
          GXF::std
          GXF::ucx
          yaml-cpp
@@ -3040,7 +3071,7 @@ index 2eabe6c..21c4027 100644
          gRPC::grpc++
          gRPC::grpc++_reflection
          protobuf::libprotobuf
-@@ -340,13 +344,10 @@ target_link_libraries(core
+@@ -340,13 +345,10 @@ target_link_libraries(core
  
  target_include_directories(core
      PUBLIC
@@ -3111,7 +3142,7 @@ index b48f7ec..7e7c18d 100644
  #include "gxf/core/handle.hpp"
  #include "gxf/multimedia/video.hpp"
 diff --git a/src/operators/holoviz/holoviz.cpp b/src/operators/holoviz/holoviz.cpp
-index dae3ca4..e357b8e 100644
+index 628dd39..cbf6768 100644
 --- a/src/operators/holoviz/holoviz.cpp
 +++ b/src/operators/holoviz/holoviz.cpp
 @@ -26,7 +26,7 @@

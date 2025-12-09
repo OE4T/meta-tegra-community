@@ -1,23 +1,22 @@
-From efec08718e4ed4b92b1a173429cb765442d526b6 Mon Sep 17 00:00:00 2001
+From 6211c56495c80a1f2a4988fcece6301f79011a16 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 13 Nov 2025 15:36:01 +0000
-Subject: [PATCH 6/7] Remove GXF python modules install
+Date: Fri, 21 Nov 2025 17:46:09 +0000
+Subject: [PATCH 6/6] Remove GXF python modules install
 
 These are not yet compatible with Python 3.12
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
 ---
- CMakeLists.txt       |  8 --------
- cmake/deps/gxf.cmake | 20 --------------------
- 2 files changed, 28 deletions(-)
+ CMakeLists.txt | 8 --------
+ 1 file changed, 8 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 4e9372b..dfada63 100644
+index 5b4a1c4..b2fdc7a 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -448,14 +448,6 @@ endif()"
-     endif()
+         endif()
  endforeach()
  
 -if(HOLOSCAN_BUILD_PYTHON AND GXF_PYTHON_MODULE_PATH)
@@ -28,40 +27,9 @@ index 4e9372b..dfada63 100644
 -  )
 -endif()
 -
- # Install CMake script to build GXE applications
- install(FILES "${CMAKE_SOURCE_DIR}/cmake/modules/GenerateGXEAppInstall.cmake"
- RENAME GenerateGXEApp.cmake
-diff --git a/cmake/deps/gxf.cmake b/cmake/deps/gxf.cmake
-index 4441a6a..7126cc4 100644
---- a/cmake/deps/gxf.cmake
-+++ b/cmake/deps/gxf.cmake
-@@ -130,26 +130,6 @@ find_path(GXF_PYTHON_MODULE_PATH
-     PATHS ${GXF_ROOT}/python/gxf
- )
- 
--# Test that the GXF Python module is in PYTHONPATH
--find_package(Python3 COMPONENTS Interpreter REQUIRED)
--if(HOLOSCAN_REGISTER_GXF_EXTENSIONS)
--    # GXF Python module is required for registering GXF extensions
--    execute_process(
--        COMMAND "${Python3_EXECUTABLE}" -c "import os; import gxf; print(os.pathsep.join(gxf.__path__).strip())"
--        RESULT_VARIABLE GXF_MODULE_FOUND
--        OUTPUT_VARIABLE GXF_MODULE_DIR
--        OUTPUT_STRIP_TRAILING_WHITESPACE
--    )
--    if(NOT GXF_MODULE_FOUND EQUAL 0)
--        message(FATAL_ERROR "GXF Python module not found in PYTHONPATH")
--    endif()
--    if(NOT GXF_MODULE_DIR STREQUAL "${GXF_PYTHON_MODULE_PATH}")
--        message(WARNING
--            "Expected GXF Python module at ${GXF_PYTHON_MODULE_PATH} but found at ${GXF_MODULE_DIR}."
--            " Do you need to update your PYTHONPATH?")
--    endif()
--endif()
--
- # Set variables in parent scope for use throughout the Holoscan project
- set(GXF_INCLUDE_DIR ${GXF_INCLUDE_DIR} PARENT_SCOPE)
- set(GXF_PYTHON_MODULE_PATH ${GXF_PYTHON_MODULE_PATH} PARENT_SCOPE)
+ # Install CMake scripts to download data from NGC so it can be reused by HoloHub
+ install(FILES "${CMAKE_SOURCE_DIR}/cmake/modules/HoloscanDownloadData.cmake"
+ DESTINATION "${HOLOSCAN_INSTALL_LIB_DIR}/cmake/holoscan"
 -- 
 2.34.1
 

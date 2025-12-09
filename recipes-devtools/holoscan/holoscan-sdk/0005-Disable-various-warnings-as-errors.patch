@@ -1,7 +1,7 @@
-From d2fa74734ca60e067d3983f82c04fe53ccc6b13c Mon Sep 17 00:00:00 2001
+From 29ef589ec0beb3e198c9ee2f57d9ab6787b028fc Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 13 Nov 2025 15:35:25 +0000
-Subject: [PATCH 5/7] Disable various warnings as errors
+Date: Fri, 21 Nov 2025 17:41:46 +0000
+Subject: [PATCH 5/6] Disable various warnings as errors
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
@@ -11,7 +11,7 @@ Signed-off-by: Ian Stewart <istewart@nvidia.com>
  2 files changed, 16 insertions(+)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 2eb6744..4e9372b 100644
+index d100f21..5b4a1c4 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -125,6 +125,18 @@ set(CMAKE_CXX_EXTENSIONS NO)
