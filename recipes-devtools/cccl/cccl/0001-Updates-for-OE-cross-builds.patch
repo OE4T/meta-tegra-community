@@ -1,25 +1,50 @@
-From 8d3468edafb07f4566f1b4d8c5784dbfbd5906de Mon Sep 17 00:00:00 2001
+From 859fd8277488ee5d90c5a16430f166847b60ca1a Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Fri, 5 Sep 2025 10:46:15 +0100
+Date: Wed, 17 Dec 2025 15:38:09 -0800
 Subject: [PATCH] Updates for OE cross builds
 
-Those changes are based on the following commit:
+Those changes are based on the following pull request:
 https://github.com/NVIDIA/cccl/pull/5782
 
+Fix:
+
+error: '::isgreater' has not been declared
+  360 |   NV_IF_ELSE_TARGET(NV_IS_HOST,
+      |   ^~~~~~~~~~~~~~~~~
+
+error: '::isnan' has not been declared; did you mean 'std::isnan'? [-Wtemplate-body]
+   43 |     return ::isnan(__x);
+      |              ^~~~~
+      |              std::isnan
+
+error: '::isinf' has not been declared; did you mean 'std::isinf'? [-Wtemplate-body]
+   45 |     return ::isinf(__x);
+      |              ^~~~~
+      |              std::isinf
+
+error: '::isfinite' has not been declared; did you mean 'std::isfinite'? [-Wtemplate-body]
+   44 |     return ::isfinite(__x);
+      |              ^~~~~~~~
+      |              std::isfinite
+
 Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Michael Schellenberger Costa <miscco@nvidia.com>
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- include/cuda/std/__cccl/builtin.h | 20 +++++++++
- include/cuda/std/__cmath/traits.h | 70 ++++++++++++++++++++++++++++---
- 2 files changed, 85 insertions(+), 5 deletions(-)
+ include/cuda/std/__cccl/builtin.h   | 20 +++++++++
+ include/cuda/std/__cmath/isfinite.h |  2 +
+ include/cuda/std/__cmath/isinf.h    |  2 +
+ include/cuda/std/__cmath/isnan.h    |  2 +
+ include/cuda/std/__cmath/traits.h   | 70 ++++++++++++++++++++++++++---
+ 5 files changed, 91 insertions(+), 5 deletions(-)
 
 diff --git a/include/cuda/std/__cccl/builtin.h b/include/cuda/std/__cccl/builtin.h
-index 55e2f02..f181a8a 100644
+index cd45dd1..016d5d0 100644
 --- a/include/cuda/std/__cccl/builtin.h
 +++ b/include/cuda/std/__cccl/builtin.h
-@@ -261,6 +261,26 @@
- #  define _CCCL_BUILTIN_ISNAN(...) __builtin_isnan(__VA_ARGS__)
- #endif // _CCCL_CHECK_BUILTIN(isnan)
+@@ -472,6 +472,26 @@
+ #  define _CCCL_BUILTIN_ISNORMAL(...) __builtin_isnormal(__VA_ARGS__)
+ #endif // _CCCL_CHECK_BUILTIN(isnormal)
  
 +#if _CCCL_CHECK_BUILTIN(builtin_isgreater) || _CCCL_COMPILER(GCC)
 +#  define _CCCL_BUILTIN_ISGREATER(...) __builtin_isgreater(__VA_ARGS__)
@@ -41,14 +66,74 @@ index 55e2f02..f181a8a 100644
 +#  define _CCCL_BUILTIN_ISLESSGREATER(...) __builtin_islessgreater(__VA_ARGS__)
 +#endif // _CCCL_CHECK_BUILTIN(builtin_islessgreater)
 +
- // Below 11.7 nvcc treats the builtin as a host only function
- #if _CCCL_CUDACC_BELOW(11, 7)
- #  undef _CCCL_BUILTIN_ISNAN
+ // nvcc does not implement __builtin_isnormal
+ #if _CCCL_CUDA_COMPILER(NVCC)
+ #  undef _CCCL_BUILTIN_ISNORMAL
+diff --git a/include/cuda/std/__cmath/isfinite.h b/include/cuda/std/__cmath/isfinite.h
+index 8bd5bd9..07ae9a2 100644
+--- a/include/cuda/std/__cmath/isfinite.h
++++ b/include/cuda/std/__cmath/isfinite.h
+@@ -35,6 +35,7 @@
+ 
+ _LIBCUDACXX_BEGIN_NAMESPACE_STD
+ 
++#if !defined(_CCCL_BUILTIN_ISFINITE)
+ template <class _Tp>
+ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI constexpr bool __isfinite_impl(_Tp __x) noexcept
+ {
+@@ -45,6 +46,7 @@ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI constexpr bool __isfinite_impl(_Tp __x
+   }
+   return !_CUDA_VSTD::isnan(__x) && !_CUDA_VSTD::isinf(__x);
+ }
++#endif // ^^^ !_CCCL_BUILTIN_ISFINITE ^^^
+ 
+ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI constexpr bool isfinite(float __x) noexcept
+ {
+diff --git a/include/cuda/std/__cmath/isinf.h b/include/cuda/std/__cmath/isinf.h
+index a2a75ac..1bb14fc 100644
+--- a/include/cuda/std/__cmath/isinf.h
++++ b/include/cuda/std/__cmath/isinf.h
+@@ -36,6 +36,7 @@
+ 
+ _LIBCUDACXX_BEGIN_NAMESPACE_STD
+ 
++#if !defined(_CCCL_BUILTIN_ISINF) && !_CCCL_CUDA_COMPILER(NVCC) && !_CCCL_CUDA_COMPILER(NVRTC)
+ template <class _Tp>
+ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI constexpr bool __isinf_impl(_Tp __x) noexcept
+ {
+@@ -50,6 +51,7 @@ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI constexpr bool __isinf_impl(_Tp __x) n
+   }
+   return __x > numeric_limits<_Tp>::max() || __x < numeric_limits<_Tp>::lowest();
+ }
++#endif // ^^^ !_CCCL_BUILTIN_ISINF ^^^
+ 
+ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI constexpr bool isinf(float __x) noexcept
+ {
+diff --git a/include/cuda/std/__cmath/isnan.h b/include/cuda/std/__cmath/isnan.h
+index cd0cdf6..803b666 100644
+--- a/include/cuda/std/__cmath/isnan.h
++++ b/include/cuda/std/__cmath/isnan.h
+@@ -34,6 +34,7 @@
+ 
+ _LIBCUDACXX_BEGIN_NAMESPACE_STD
+ 
++#if !defined(_CCCL_BUILTIN_ISNAN)
+ template <class _Tp>
+ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI constexpr bool __isnan_impl(_Tp __x) noexcept
+ {
+@@ -44,6 +45,7 @@ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI constexpr bool __isnan_impl(_Tp __x) n
+   }
+   return __x != __x;
+ }
++#endif // ^^^ !_CCCL_BUILTIN_ISNAN ^^^
+ 
+ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI constexpr bool isnan(float __x) noexcept
+ {
 diff --git a/include/cuda/std/__cmath/traits.h b/include/cuda/std/__cmath/traits.h
-index cdfe4a8..d73456f 100644
+index f804387..a7fe0bc 100644
 --- a/include/cuda/std/__cmath/traits.h
 +++ b/include/cuda/std/__cmath/traits.h
-@@ -351,6 +351,18 @@ _CCCL_NODISCARD _CCCL_DEVICE _CCCL_HIDE_FROM_ABI bool __device_isgreater(_A1 __x
+@@ -47,6 +47,18 @@ _CCCL_NODISCARD _CCCL_DEVICE _CCCL_HIDE_FROM_ABI bool __device_isgreater(_A1 __x
    return __x > __y;
  }
  
@@ -67,7 +152,7 @@ index cdfe4a8..d73456f 100644
  template <class _A1,
            class _A2,
            enable_if_t<_CCCL_TRAIT(__is_extended_arithmetic, _A1) && _CCCL_TRAIT(__is_extended_arithmetic, _A2), int> = 0>
-@@ -358,7 +370,7 @@ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI bool isgreater(_A1 __x, _A2 __y) noexc
+@@ -54,7 +66,7 @@ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI bool isgreater(_A1 __x, _A2 __y) noexc
  {
    using type = __promote_t<_A1, _A2>;
    NV_IF_ELSE_TARGET(NV_IS_HOST,
@@ -76,7 +161,7 @@ index cdfe4a8..d73456f 100644
                      (return _CUDA_VSTD::__device_isgreater((type) __x, (type) __y);))
  }
  
-@@ -374,6 +386,18 @@ _CCCL_NODISCARD _CCCL_DEVICE _CCCL_HIDE_FROM_ABI bool __device_isgreaterequal(_A
+@@ -70,6 +82,18 @@ _CCCL_NODISCARD _CCCL_DEVICE _CCCL_HIDE_FROM_ABI bool __device_isgreaterequal(_A
    return __x >= __y;
  }
  
@@ -95,7 +180,7 @@ index cdfe4a8..d73456f 100644
  template <class _A1,
            class _A2,
            enable_if_t<_CCCL_TRAIT(__is_extended_arithmetic, _A1) && _CCCL_TRAIT(__is_extended_arithmetic, _A2), int> = 0>
-@@ -381,7 +405,7 @@ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI bool isgreaterequal(_A1 __x, _A2 __y)
+@@ -77,7 +101,7 @@ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI bool isgreaterequal(_A1 __x, _A2 __y)
  {
    using type = __promote_t<_A1, _A2>;
    NV_IF_ELSE_TARGET(NV_IS_HOST,
@@ -104,7 +189,7 @@ index cdfe4a8..d73456f 100644
                      (return _CUDA_VSTD::__device_isgreaterequal((type) __x, (type) __y);))
  }
  
-@@ -397,6 +421,18 @@ _CCCL_NODISCARD _CCCL_DEVICE _CCCL_HIDE_FROM_ABI bool __device_isless(_A1 __x, _
+@@ -93,6 +117,18 @@ _CCCL_NODISCARD _CCCL_DEVICE _CCCL_HIDE_FROM_ABI bool __device_isless(_A1 __x, _
    return __x < __y;
  }
  
@@ -123,7 +208,7 @@ index cdfe4a8..d73456f 100644
  template <class _A1,
            class _A2,
            enable_if_t<_CCCL_TRAIT(__is_extended_arithmetic, _A1) && _CCCL_TRAIT(__is_extended_arithmetic, _A2), int> = 0>
-@@ -404,7 +440,7 @@ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI bool isless(_A1 __x, _A2 __y) noexcept
+@@ -100,7 +136,7 @@ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI bool isless(_A1 __x, _A2 __y) noexcept
  {
    using type = __promote_t<_A1, _A2>;
    NV_IF_ELSE_TARGET(NV_IS_HOST,
@@ -132,7 +217,7 @@ index cdfe4a8..d73456f 100644
                      (return _CUDA_VSTD::__device_isless((type) __x, (type) __y);))
  }
  
-@@ -420,6 +456,18 @@ _CCCL_NODISCARD _CCCL_DEVICE _CCCL_HIDE_FROM_ABI bool __device_islessequal(_A1 _
+@@ -116,6 +152,18 @@ _CCCL_NODISCARD _CCCL_DEVICE _CCCL_HIDE_FROM_ABI bool __device_islessequal(_A1 _
    return __x <= __y;
  }
  
@@ -151,7 +236,7 @@ index cdfe4a8..d73456f 100644
  template <class _A1,
            class _A2,
            enable_if_t<_CCCL_TRAIT(__is_extended_arithmetic, _A1) && _CCCL_TRAIT(__is_extended_arithmetic, _A2), int> = 0>
-@@ -427,7 +475,7 @@ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI bool islessequal(_A1 __x, _A2 __y) noe
+@@ -123,7 +171,7 @@ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI bool islessequal(_A1 __x, _A2 __y) noe
  {
    using type = __promote_t<_A1, _A2>;
    NV_IF_ELSE_TARGET(NV_IS_HOST,
@@ -160,7 +245,7 @@ index cdfe4a8..d73456f 100644
                      (return _CUDA_VSTD::__device_islessequal((type) __x, (type) __y);))
  }
  
-@@ -443,6 +491,18 @@ _CCCL_NODISCARD _CCCL_DEVICE _CCCL_HIDE_FROM_ABI bool __device_islessgreater(_A1
+@@ -139,6 +187,18 @@ _CCCL_NODISCARD _CCCL_DEVICE _CCCL_HIDE_FROM_ABI bool __device_islessgreater(_A1
    return __x < __y || __x > __y;
  }
  
@@ -179,7 +264,7 @@ index cdfe4a8..d73456f 100644
  template <class _A1,
            class _A2,
            enable_if_t<_CCCL_TRAIT(__is_extended_arithmetic, _A1) && _CCCL_TRAIT(__is_extended_arithmetic, _A2), int> = 0>
-@@ -450,7 +510,7 @@ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI bool islessgreater(_A1 __x, _A2 __y) n
+@@ -146,7 +206,7 @@ _CCCL_NODISCARD _LIBCUDACXX_HIDE_FROM_ABI bool islessgreater(_A1 __x, _A2 __y) n
  {
    using type = __promote_t<_A1, _A2>;
    NV_IF_ELSE_TARGET(NV_IS_HOST,

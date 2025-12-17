@@ -5,7 +5,7 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 
 
 SRC_URI = "https://github.com/NVIDIA/cccl/releases/download/v${PV}/cccl-v${PV}.tar.gz"
-SRC_URI[sha256sum] = "93a4d704fd5179293b392e57cdc98df16cffca613b33fbaded395eb3e35125e4"
+SRC_URI[sha256sum] = "5d9704938be1e345cdc9db2be3bf784d1c8e4798ab0fd766177133ba03aa179e"
 UPSTREAM_CHECK_REGEX = "releases/tag/v(?P<pver>\d+(\.\d+)+)"
 UPSTREAM_CHECK_URI = "https://github.com/NVIDIA/cccl/releases/"
 
