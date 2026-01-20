@@ -1,6 +1,6 @@
-From aca6da1d8927fb6549f3fbc78c838687d03ca22b Mon Sep 17 00:00:00 2001
+From fab5c15c45c79e3561e51731ea820904a13fe4e1 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 9 Dec 2025 14:04:41 +0000
+Date: Fri, 16 Jan 2026 14:50:43 -0800
 Subject: [PATCH] Fixups for cross building in OE
 
 Upstream-Status: Inappropriate [OE-specific]
@@ -995,7 +995,7 @@ index 09b6fdb77..63ea9a809 100644
              if (PLATFORM_LINUX and len(rpath) != 0):
                  ldflag = '-Wl,'
 diff --git a/pyproject.toml b/pyproject.toml
-index e60b1ac7b..653d9b30e 100644
+index e60b1ac7b..fb6c15e09 100644
 --- a/pyproject.toml
 +++ b/pyproject.toml
 @@ -1,7 +1,7 @@
@@ -1003,7 +1003,7 @@ index e60b1ac7b..653d9b30e 100644
  # Need to be installed manually when using `--no-build-isolation`.
  # Keep in sync with `docs/source/contribution.rst`.
 -requires = ["setuptools>=77", "wheel", "Cython>=3,<3.2", "fastrlock>=0.5"]
-+requires = ["setuptools>=69", "wheel", "Cython>=3,<3.2", "fastrlock>=0.5"]
++requires = ["setuptools>=69", "wheel", "Cython>=3,<3.3", "fastrlock>=0.5"]
  build-backend = "setuptools.build_meta"
  
  [project]
@@ -1100,5 +1100,5 @@ index 36dca6295..ba37a2bf2 100644
      'a_dtype': ['float32', 'float64', 'complex64', 'complex128'],
      'b_dtype': ['float32', 'float64', 'complex64', 'complex128'],
 -- 
-2.34.1
+2.43.0
 
