@@ -96,6 +96,7 @@ RDEPENDS:${PN} += " \
     python3-packaging \
     pytorch \
     torchvision \
+    rxvt-unicode \
 "
 
 FILES:${PN}-staticdev += " \
