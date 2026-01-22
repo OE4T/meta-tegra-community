@@ -7,7 +7,7 @@ COMPATIBLE_MACHINE = "(cuda)"
 GXF_VERSION = "${@d.getVar('PV').replace('-', '_')}"
 GXF_PACKAGE = "gxf_${GXF_VERSION}_holoscan-sdk-cu13_${TARGET_ARCH}"
 SRC_URI = "https://edge.urm.nvidia.com/artifactory/sw-holoscan-thirdparty-generic-local/gxf/${GXF_PACKAGE}.tar.gz;subdir=${GXF_PACKAGE}"
-SRC_URI[sha256sum] = "c2fde2c75228377811c334c690cf3bf44985d9c97b03d53c401d11499eeaff6e"
+SRC_URI[sha256sum] = "d4d78d7f464c464114e46aa1ffb993820f306439220b01713d82d563cd036703"
 
 SRC_URI += " \
     file://0001-OE-cross-build-fixups.patch \
