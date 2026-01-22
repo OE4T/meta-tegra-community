@@ -1,7 +1,7 @@
-From cddf4af9b39907ec2ecb280930d710a855e44fbf Mon Sep 17 00:00:00 2001
+From 59d4b7e97490aafd0e1cdadaf0b85c575b934954 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Fri, 9 Jan 2026 16:40:02 -0800
-Subject: [PATCH 2/2] Use external library dependencies
+Date: Thu, 22 Jan 2026 09:56:37 -0800
+Subject: [PATCH 2/7] Use external library dependencies
 
 This changes the dependencies on the following libraries so
 that they are provided at build time instead of being
@@ -58,7 +58,7 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  cmake/deps/pybind11.cmake                     |  20 +-
  cmake/deps/rmm.cmake                          |  39 +-
  cmake/deps/spdlog_rapids.cmake                |  29 +-
- cmake/deps/ucx.cmake                          |  65 --
+ cmake/deps/ucx.cmake                          | 107 +--
  cmake/deps/ucxx_rapids.cmake                  | 132 +--
  cmake/deps/yaml-cpp_rapids.cmake              |  51 +-
  cmake/modules/FindONNXRuntime.cmake           |  45 +-
@@ -74,7 +74,7 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  .../core/resources/async_data_logger.hpp      |   2 +-
  modules/holoinfer/src/CMakeLists.txt          |  15 +-
  .../holoinfer/src/infer/onnx/CMakeLists.txt   |   8 +-
- .../holoinfer/src/infer/torch/CMakeLists.txt  |   3 +-
+ .../holoinfer/src/infer/torch/CMakeLists.txt  |  17 +-
  modules/holoviz/examples/demo/CMakeLists.txt  |  14 +-
  .../holoviz/examples/depth_map/CMakeLists.txt |  14 +-
  .../holoviz/tests/functional/CMakeLists.txt   |  14 +-
@@ -88,7 +88,7 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  .../simple_text_serializer.cpp                |   2 +-
  src/operators/holoviz/holoviz.cpp             |   2 +-
  .../v4l2_video_capture/v4l2_video_capture.cpp |   2 +-
- 51 files changed, 143 insertions(+), 2282 deletions(-)
+ 51 files changed, 146 insertions(+), 2335 deletions(-)
  delete mode 100644 cmake/deps/hwloc.config.h.in
  delete mode 100644 cmake/deps/hwloc.private.config.h.in
  delete mode 100644 cmake/deps/hwloc.static-components.h.in
@@ -2123,32 +2123,37 @@ index 74baaa7..3f5600a 100644
 -endif()
 +rapids_find_package(spdlog 1.14.1 REQUIRED)
 diff --git a/cmake/deps/ucx.cmake b/cmake/deps/ucx.cmake
-index 2273e95..be105bc 100644
+index 9d96eb2..ef90732 100644
 --- a/cmake/deps/ucx.cmake
 +++ b/cmake/deps/ucx.cmake
-@@ -14,68 +14,3 @@
+@@ -13,109 +13,4 @@
+ # See the License for the specific language governing permissions and
  # limitations under the License.
  
- find_package(ucx 1.17.0 REQUIRED)
+-find_package(ucx 1.17.0 REQUIRED)
 -
--# Install UCX shared libs under <prefix>/lib/libuc*.so*
+-# Install UCX shared libs under <prefix>/lib/libuc*.so* and libgdrapi*.so*
+-# Core UCX libraries: libucp.so, libucs.so, libuct.so, libucm.so, libucs_signal.so
+-# gdrcopy library: libgdrapi.so (copied to UCX lib dir during Docker build)
 -file(GLOB TOP_UCX_LIB_FILES "${UCX_LIBRARIES}/libuc*.so*")
+-file(GLOB GDRCOPY_LIB_FILES "${UCX_LIBRARIES}/libgdrapi*.so*")
 -install(
--  FILES ${TOP_UCX_LIB_FILES}
+-  FILES ${TOP_UCX_LIB_FILES} ${GDRCOPY_LIB_FILES}
 -  DESTINATION "${HOLOSCAN_INSTALL_LIB_DIR}"
 -  COMPONENT "holoscan-dependencies"
 -)
 -
--# Set RPATH on installed UCX libraries so they can find each other
+-# Set RPATH on installed UCX and gdrcopy libraries so they can find each other
 -# Note: CPack sets and requires the DESTDIR prefix. See:
 -# https://gitlab.kitware.com/cmake/cmake/-/issues/24212
 -install(CODE "
 -  file(GLOB UCX_INSTALLED_LIBS \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${HOLOSCAN_INSTALL_LIB_DIR}/libuc*.so*\")
+-  file(GLOB GDRCOPY_INSTALLED_LIBS \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${HOLOSCAN_INSTALL_LIB_DIR}/libgdrapi*.so*\")
 -  list(LENGTH UCX_INSTALLED_LIBS UCX_INSTALLED_LIBS_COUNT)
 -  if(UCX_INSTALLED_LIBS_COUNT LESS_EQUAL 0)
 -    message(WARNING \"No UCX libraries found in \$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${HOLOSCAN_INSTALL_LIB_DIR}/\")
 -  endif()
--  foreach(ucx_lib \${UCX_INSTALLED_LIBS})
+-  foreach(ucx_lib \${UCX_INSTALLED_LIBS} \${GDRCOPY_INSTALLED_LIBS})
 -    if(NOT IS_SYMLINK \${ucx_lib})
 -      execute_process(COMMAND patchelf --set-rpath \$ORIGIN \${ucx_lib})
 -    endif()
@@ -2175,6 +2180,42 @@ index 2273e95..be105bc 100644
 -  endforeach()
 -" COMPONENT "holoscan-dependencies")
 -
+-# Install essential UCX binaries for diagnostics and benchmarking:
+-# - ucx_info: Display UCX configuration, available transports, and devices
+-# - ucx_perftest: Benchmark UCX performance (latency, bandwidth)
+-# These binaries are built against Holoscan's UCX version to avoid version conflicts
+-# with HPC-X UCX that may be present in base images.
+-get_filename_component(UCX_ROOT "${UCX_LIBRARIES}" DIRECTORY)
+-set(UCX_BIN_DIR "${UCX_ROOT}/bin")
+-if(EXISTS "${UCX_BIN_DIR}")
+-  set(UCX_ESSENTIAL_BINS
+-    "${UCX_BIN_DIR}/ucx_info"
+-    "${UCX_BIN_DIR}/ucx_perftest"
+-  )
+-  foreach(ucx_bin ${UCX_ESSENTIAL_BINS})
+-    if(EXISTS "${ucx_bin}")
+-      install(
+-        PROGRAMS "${ucx_bin}"
+-        DESTINATION "${CMAKE_INSTALL_BINDIR}"
+-        COMPONENT "holoscan-dependencies"
+-      )
+-    endif()
+-  endforeach()
+-
+-  # Set RPATH on installed UCX binaries to find libraries in ../lib
+-  # Note: CPack sets and requires the DESTDIR prefix. See:
+-  # https://gitlab.kitware.com/cmake/cmake/-/issues/24212
+-  install(CODE "
+-    set(UCX_BIN_NAMES ucx_info ucx_perftest)
+-    foreach(ucx_bin_name \${UCX_BIN_NAMES})
+-      set(ucx_bin \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/\${ucx_bin_name}\")
+-      if(EXISTS \${ucx_bin} AND NOT IS_SYMLINK \${ucx_bin})
+-        execute_process(COMMAND patchelf --set-rpath \$ORIGIN/../lib \${ucx_bin})
+-      endif()
+-    endforeach()
+-  " COMPONENT "holoscan-dependencies")
+-endif()
+-
 -# Install UCX headers
 -foreach(ucx_target ucm ucp ucs uct)
 -  install(
@@ -2195,8 +2236,9 @@ index 2273e95..be105bc 100644
 -  COMPONENT "holoscan-dependencies"
 -  RENAME "ucx-config.cmake"
 -)
++find_package(ucx 1.19.0 REQUIRED)
 diff --git a/cmake/deps/ucxx_rapids.cmake b/cmake/deps/ucxx_rapids.cmake
-index bf0f43b..cc4d34f 100644
+index 6ecbdc2..a91d0b2 100644
 --- a/cmake/deps/ucxx_rapids.cmake
 +++ b/cmake/deps/ucxx_rapids.cmake
 @@ -13,134 +13,4 @@
@@ -2206,13 +2248,13 @@ index bf0f43b..cc4d34f 100644
 -# https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_cpm_find.html
 -include(${rapids-cmake-dir}/cpm/find.cmake)
 -
--rapids_cpm_find(ucxx 0.44.0
+-rapids_cpm_find(ucxx 0.46.0
 -    GLOBAL_TARGETS ucxx
 -    BUILD_EXPORT_SET ${HOLOSCAN_PACKAGE_NAME}-exports
 -    CPM_ARGS
 -
 -    GITHUB_REPOSITORY rapidsai/ucxx
--    GIT_TAG v0.44.00
+-    GIT_TAG v0.46.00
 -    GIT_SHALLOW TRUE
 -    SOURCE_SUBDIR cpp
 -    DOWNLOAD_ONLY TRUE
@@ -2334,7 +2376,7 @@ index bf0f43b..cc4d34f 100644
 -        COMPONENT "holoscan-dependencies"
 -        )
 -endif()
-+find_package(ucxx 0.44.0 REQUIRED)
++find_package(ucxx 0.46.0 REQUIRED)
 diff --git a/cmake/deps/yaml-cpp_rapids.cmake b/cmake/deps/yaml-cpp_rapids.cmake
 index f13166f..541077f 100644
 --- a/cmake/deps/yaml-cpp_rapids.cmake
@@ -2691,7 +2733,7 @@ index ae533f1..0842e08 100644
  
  # Copy config file
 diff --git a/include/holoscan/core/resources/async_data_logger.hpp b/include/holoscan/core/resources/async_data_logger.hpp
-index 86039a9..9b05a5d 100644
+index 32e9293..b6d804a 100644
 --- a/include/holoscan/core/resources/async_data_logger.hpp
 +++ b/include/holoscan/core/resources/async_data_logger.hpp
 @@ -31,7 +31,7 @@
@@ -2769,18 +2811,32 @@ index 903f006..a944c2c 100644
          $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}>
      )
 diff --git a/modules/holoinfer/src/infer/torch/CMakeLists.txt b/modules/holoinfer/src/infer/torch/CMakeLists.txt
-index faadf2b..92ee017 100644
+index c228bb3..92ee017 100644
 --- a/modules/holoinfer/src/infer/torch/CMakeLists.txt
 +++ b/modules/holoinfer/src/infer/torch/CMakeLists.txt
-@@ -51,6 +51,7 @@ message(STATUS "TORCH_CUDA_ARCH_LIST: ${TORCH_CUDA_ARCH_LIST}")
+@@ -49,18 +49,9 @@ else()
+ endif()
+ message(STATUS "TORCH_CUDA_ARCH_LIST: ${TORCH_CUDA_ARCH_LIST}")
  
- # Find dependencies
- find_package(Torch REQUIRED)
+-# Find Torch
+-find_package(Python3 COMPONENTS Interpreter QUIET)
+-set(PYTHON_MAJOR_MINOR "${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}")
+-set(TORCH_SEARCH_DIRS
+-  "/usr/local/lib/python${PYTHON_MAJOR_MINOR}/dist-packages"
+-  "/usr/lib/python${PYTHON_MAJOR_MINOR}/dist-packages"
+-  "/usr/local/lib/python${PYTHON_MAJOR_MINOR}/site-packages"
+-  "/usr/lib/python${PYTHON_MAJOR_MINOR}/site-packages"
+-  "$ENV{HOME}/.local/lib/python${PYTHON_MAJOR_MINOR}/site-packages"
+-  "/opt/nvidia/torch"
+-)
+-find_package(Torch 2.8 REQUIRED CONFIG PATHS ${TORCH_SEARCH_DIRS})
++# Find dependencies
++find_package(Torch REQUIRED)
 +find_package(dlpack 1.0 REQUIRED)
  
  # Create the holoinfer torch backend library
  add_library(holoinfer_torch SHARED core.cpp)
-@@ -76,6 +77,6 @@ target_include_directories(holoinfer_torch
+@@ -86,6 +77,6 @@ target_include_directories(holoinfer_torch
          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../..>
      PUBLIC
          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include>
@@ -3133,10 +3189,10 @@ index c5abb79..ec06c7a 100644
  #include "holoscan/core/gxf/gxf_utils.hpp"
  #include "holoscan/logger/logger.hpp"
 diff --git a/src/core/resources/async_data_logger.cpp b/src/core/resources/async_data_logger.cpp
-index b2a0e90..c0d1060 100644
+index cccaa31..ec89e01 100644
 --- a/src/core/resources/async_data_logger.cpp
 +++ b/src/core/resources/async_data_logger.cpp
-@@ -26,7 +26,7 @@
+@@ -27,7 +27,7 @@
  #include <string>
  #include <utility>
  
@@ -3185,5 +3241,5 @@ index b8b1d1f..7c7ae4f 100644
  #include "holoscan/core/execution_context.hpp"
  #include "holoscan/core/resources/gxf/allocator.hpp"
 -- 
-2.34.1
+2.43.0
 

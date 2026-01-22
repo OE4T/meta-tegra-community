@@ -1,6 +1,6 @@
-From f7008de8c5940707f28a793c6024b40609feb343 Mon Sep 17 00:00:00 2001
+From 097445b74bbf7d2596e2e6cd44f3cd2ebd4c85be Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 13 Nov 2025 15:36:37 +0000
+Date: Thu, 22 Jan 2026 09:59:08 -0800
 Subject: [PATCH 7/7] Updates for OE cross builds
 
 - drop building v4l2_camera examples
@@ -15,10 +15,10 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  4 files changed, 14 insertions(+), 11 deletions(-)
 
 diff --git a/examples/CMakeLists.txt b/examples/CMakeLists.txt
-index 7bf4454..e766036 100644
+index 5bf0050..b1d9ea3 100644
 --- a/examples/CMakeLists.txt
 +++ b/examples/CMakeLists.txt
-@@ -98,7 +98,6 @@ add_subdirectory(resources)
+@@ -97,7 +97,6 @@ add_subdirectory(resources)
  add_subdirectory(round_robin_parallel)
  add_subdirectory(subgraph)
  add_subdirectory(tensor_interop)
@@ -140,5 +140,5 @@ index 9e9a918..d2c93dc 100644
  }
  
 -- 
-2.34.1
+2.43.0
 
