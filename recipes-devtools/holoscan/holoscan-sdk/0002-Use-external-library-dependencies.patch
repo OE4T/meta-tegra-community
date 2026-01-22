@@ -1,7 +1,7 @@
-From e2015e592f413b1c771bb64d3ca615da7aff32c9 Mon Sep 17 00:00:00 2001
+From cddf4af9b39907ec2ecb280930d710a855e44fbf Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Fri, 21 Nov 2025 17:26:32 +0000
-Subject: [PATCH 2/6] Use external library dependencies
+Date: Fri, 9 Jan 2026 16:40:02 -0800
+Subject: [PATCH 2/2] Use external library dependencies
 
 This changes the dependencies on the following libraries so
 that they are provided at build time instead of being
@@ -66,9 +66,9 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  cmake/modules/SetupCache.cmake                |   3 -
  cmake/modules/SetupRapidsCMake.cmake          |  24 +-
  cmake/setup_dependencies.cmake                |   6 -
- examples/CMakeLists.txt                       |   1 -
  .../cpp/operator_status_tracking.cpp          |   2 +-
  .../matx/matx_basic/cpp/CMakeLists.min.txt    |  33 +-
+ examples/matx/matx_basic/cpp/CMakeLists.txt   |   4 +-
  .../distributed_pose_tree/cpp/CMakeLists.txt  |   6 +-
  .../pose_tree_basic/cpp/CMakeLists.txt        |   6 +-
  .../core/resources/async_data_logger.hpp      |   2 +-
@@ -78,17 +78,17 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  modules/holoviz/examples/demo/CMakeLists.txt  |  14 +-
  .../holoviz/examples/depth_map/CMakeLists.txt |  14 +-
  .../holoviz/tests/functional/CMakeLists.txt   |  14 +-
- .../holoviz/thirdparty/imgui/CMakeLists.txt   |  44 +-
+ .../holoviz/thirdparty/imgui/CMakeLists.txt   |  50 +-
  .../holoscan/operators/holoviz/CMakeLists.txt |   5 +-
  python/holoscan/operators/holoviz/holoviz.cpp |   2 +-
- src/CMakeLists.txt                            |  40 +-
+ src/CMakeLists.txt                            |  46 +-
  src/core/conditions/gxf/asynchronous.cpp      |   2 +-
  src/core/gxf/gxf_utils.cpp                    |   2 +-
  src/core/resources/async_data_logger.cpp      |   2 +-
  .../simple_text_serializer.cpp                |   2 +-
  src/operators/holoviz/holoviz.cpp             |   2 +-
  .../v4l2_video_capture/v4l2_video_capture.cpp |   2 +-
- 51 files changed, 138 insertions(+), 2272 deletions(-)
+ 51 files changed, 143 insertions(+), 2282 deletions(-)
  delete mode 100644 cmake/deps/hwloc.config.h.in
  delete mode 100644 cmake/deps/hwloc.private.config.h.in
  delete mode 100644 cmake/deps/hwloc.static-components.h.in
@@ -2336,7 +2336,7 @@ index bf0f43b..cc4d34f 100644
 -endif()
 +find_package(ucxx 0.44.0 REQUIRED)
 diff --git a/cmake/deps/yaml-cpp_rapids.cmake b/cmake/deps/yaml-cpp_rapids.cmake
-index f13166f..3e49726 100644
+index f13166f..541077f 100644
 --- a/cmake/deps/yaml-cpp_rapids.cmake
 +++ b/cmake/deps/yaml-cpp_rapids.cmake
 @@ -13,53 +13,4 @@
@@ -2570,18 +2570,6 @@ index bcfbc38..0e767f4 100644
  function(superbuild_depend module_name)
      cmake_parse_arguments(PARSE_ARGV 1 _SUPER_BUILD "" "COMPONENT" "")
      # Set CMAKE_INSTALL_DEFAULT_COMPONENT_NAME before including .cmake file
-diff --git a/examples/CMakeLists.txt b/examples/CMakeLists.txt
-index 5bf0050..97946b3 100644
---- a/examples/CMakeLists.txt
-+++ b/examples/CMakeLists.txt
-@@ -57,7 +57,6 @@ include(CTest)
- if(HOLOSCAN_CPP_EXAMPLES)
-   add_subdirectory(gpu_resident_example)
-   add_subdirectory(gpu_resident_input)
--  add_subdirectory(matx)
-   add_subdirectory(ping_any)
-   add_subdirectory(ping_conditional)
-   add_subdirectory(ping_cycle)
 diff --git a/examples/execution_control/operator_status_tracking/cpp/operator_status_tracking.cpp b/examples/execution_control/operator_status_tracking/cpp/operator_status_tracking.cpp
 index d931057..f1e7e30 100644
 --- a/examples/execution_control/operator_status_tracking/cpp/operator_status_tracking.cpp
@@ -2646,6 +2634,28 @@ index 3aa2cb1..1202629 100644
  )
  
  # Testing
+diff --git a/examples/matx/matx_basic/cpp/CMakeLists.txt b/examples/matx/matx_basic/cpp/CMakeLists.txt
+index 1080265..b0841ee 100644
+--- a/examples/matx/matx_basic/cpp/CMakeLists.txt
++++ b/examples/matx/matx_basic/cpp/CMakeLists.txt
+@@ -13,6 +13,8 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
++find_package(matx 0.9.1 REQUIRED)
++
+ # Create examples
+ add_executable(matx_basic
+   matx_basic.cu
+@@ -20,7 +22,7 @@ add_executable(matx_basic
+ target_link_libraries(matx_basic
+   PUBLIC
+   holoscan::core
+-  holoscan::matx
++  matx::matx
+ )
+ 
+ # Suppress NVCC warning from CLI11 third-party library
 diff --git a/examples/pose_tree/distributed_pose_tree/cpp/CMakeLists.txt b/examples/pose_tree/distributed_pose_tree/cpp/CMakeLists.txt
 index 7588cae..8fdaf3a 100644
 --- a/examples/pose_tree/distributed_pose_tree/cpp/CMakeLists.txt
@@ -2875,7 +2885,7 @@ index c52e451..769fa81 100644
  
  target_link_libraries(${PROJECT_NAME}
 diff --git a/modules/holoviz/thirdparty/imgui/CMakeLists.txt b/modules/holoviz/thirdparty/imgui/CMakeLists.txt
-index 3facf71..8d880dc 100644
+index 3facf71..c52786c 100644
 --- a/modules/holoviz/thirdparty/imgui/CMakeLists.txt
 +++ b/modules/holoviz/thirdparty/imgui/CMakeLists.txt
 @@ -18,29 +18,17 @@ include(GNUInstallDirs)
@@ -2911,7 +2921,7 @@ index 3facf71..8d880dc 100644
    )
  
  target_compile_definitions(imgui_backend
-@@ -62,16 +50,16 @@ add_library(holoscan::viz::imgui ALIAS holoviz_imgui)
+@@ -62,39 +50,19 @@ add_library(holoscan::viz::imgui ALIAS holoviz_imgui)
  
  target_sources(holoviz_imgui
    PRIVATE
@@ -2930,37 +2940,33 @@ index 3facf71..8d880dc 100644
  target_include_directories(holoviz_imgui
    PUBLIC
 -    $<BUILD_INTERFACE:${imgui_SOURCE_DIR}>
+-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>/holoviz/imgui
 +    $<BUILD_INTERFACE:${IMGUI_SOURCE_DIR}>
-     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>/holoviz/imgui
    )
  
-@@ -82,19 +70,19 @@ set_target_properties(holoviz_imgui
- 
- install(
-   FILES
+ set_target_properties(holoviz_imgui
+   PROPERTIES POSITION_INDEPENDENT_CODE ON
+   EXPORT_NAME viz::imgui
+   )
+-
+-install(
+-  FILES
 -    ${imgui_SOURCE_DIR}/imconfig.h
 -    ${imgui_SOURCE_DIR}/imgui_internal.h
 -    ${imgui_SOURCE_DIR}/imgui.h
 -    ${imgui_SOURCE_DIR}/imstb_rectpack.h
 -    ${imgui_SOURCE_DIR}/imstb_textedit.h
 -    ${imgui_SOURCE_DIR}/imstb_truetype.h
-+    ${IMGUI_SOURCE_DIR}/imconfig.h
-+    ${IMGUI_SOURCE_DIR}/imgui_internal.h
-+    ${IMGUI_SOURCE_DIR}/imgui.h
-+    ${IMGUI_SOURCE_DIR}/imstb_rectpack.h
-+    ${IMGUI_SOURCE_DIR}/imstb_textedit.h
-+    ${IMGUI_SOURCE_DIR}/imstb_truetype.h
-   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/holoviz/imgui
-   COMPONENT "holoscan-dependencies"
-   )
- 
- install(
-   FILES
+-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/holoviz/imgui
+-  COMPONENT "holoscan-dependencies"
+-  )
+-
+-install(
+-  FILES
 -    ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.h
-+    ${IMGUI_SOURCE_DIR}/misc/cpp/imgui_stdlib.h
-   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/holoviz/imgui/misc/cpp
-   COMPONENT "holoscan-dependencies"
-   )
+-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/holoviz/imgui/misc/cpp
+-  COMPONENT "holoscan-dependencies"
+-  )
 \ No newline at end of file
 diff --git a/python/holoscan/operators/holoviz/CMakeLists.txt b/python/holoscan/operators/holoviz/CMakeLists.txt
 index e9c5987..f0414b4 100644
@@ -2997,7 +3003,7 @@ index 1ec8f04..fe85b84 100644
  #include "../../core/component_util.hpp"
  #include "../operator_util.hpp"
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 2eabe6c..a6db095 100644
+index 2eabe6c..c9fb536 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
 @@ -75,6 +75,7 @@ endfunction()
@@ -3008,24 +3014,35 @@ index 2eabe6c..a6db095 100644
  add_holoscan_library(spdlog_logger common/logger/spdlog_logger.cpp)
  target_link_libraries(spdlog_logger
      PUBLIC
-@@ -127,14 +128,10 @@ target_link_libraries(holoscan_matx
+@@ -125,16 +126,24 @@ target_link_libraries(holoscan_matx
  # ##############################################################################
+ # # Add library holoscan::profiler
+ # ##############################################################################
++
++find_package(nvtx3 3.3.0 REQUIRED)
++get_target_property(NVTX3_INCLUDE_DIRS nvtx3::nvtx3-c INTERFACE_INCLUDE_DIRECTORIES)
++
++message(STATUS  "NVTX3_INCLUDE_DIR: ${NVTX3_INCLUDE_DIRS}")
++
++
  add_holoscan_library(profiler
      profiler/profiler.cpp)
--target_link_libraries(profiler
--    PUBLIC
++
+ target_link_libraries(profiler
+     PUBLIC
 -        nvtx3-cpp
--)
++        nvtx3::nvtx3-cpp
+ )
 +
  target_include_directories(profiler
      PUBLIC
 -      $<BUILD_INTERFACE:${nvtx3_SOURCE_DIR}/include>
 -      $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/3rdparty>
-+      ${NVTX3_INCLUDEDIR}
++      ${NVTX3_INCLUDE_DIRS}
  )
  
  # ##############################################################################
-@@ -148,19 +145,29 @@ add_holoscan_library(pose_tree
+@@ -148,19 +157,29 @@ add_holoscan_library(pose_tree
      pose_tree/pose_tree_ucx_server.cpp
  )
  
@@ -3057,7 +3074,7 @@ index 2eabe6c..a6db095 100644
  set(CORE_PROTO_FILES
      core/distributed/proto/app_driver.proto
      core/distributed/proto/app_worker.proto
-@@ -327,11 +334,9 @@ target_link_libraries(core
+@@ -327,11 +346,9 @@ target_link_libraries(core
          GXF::std
          GXF::ucx
          yaml-cpp
@@ -3071,7 +3088,7 @@ index 2eabe6c..a6db095 100644
          gRPC::grpc++
          gRPC::grpc++_reflection
          protobuf::libprotobuf
-@@ -340,13 +345,10 @@ target_link_libraries(core
+@@ -340,13 +357,10 @@ target_link_libraries(core
  
  target_include_directories(core
      PUBLIC
