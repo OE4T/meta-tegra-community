@@ -1,6 +1,6 @@
-From dbe7e8eb643d4a185cd95b019e6e2bc2d5edb6b2 Mon Sep 17 00:00:00 2001
+From b56bf746e1fdb321ca126c1aab1635f2d092b9fd Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 9 Dec 2025 20:11:14 +0000
+Date: Thu, 22 Jan 2026 12:39:38 -0800
 Subject: [PATCH 3/9] Build python libs with install RPATH and add find
  pybind11 package
 
@@ -12,7 +12,7 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  1 file changed, 3 insertions(+), 12 deletions(-)
 
 diff --git a/cmake/pybind11_add_holohub_module.cmake b/cmake/pybind11_add_holohub_module.cmake
-index 27a94a65..cfa3496e 100644
+index 27a94a65..785df33f 100644
 --- a/cmake/pybind11_add_holohub_module.cmake
 +++ b/cmake/pybind11_add_holohub_module.cmake
 @@ -16,15 +16,7 @@
@@ -28,7 +28,7 @@ index 27a94a65..cfa3496e 100644
 -  GIT_SHALLOW TRUE
 -)
 -FetchContent_MakeAvailable(pybind11)
-+find_package(pybind11 3.0.1 REQUIRED)
++find_package(pybind11 2.11.1 REQUIRED)
  
  # Helper function to generate pybind11 operator modules
  function(pybind11_add_holohub_module)
@@ -45,5 +45,5 @@ index 27a94a65..cfa3496e 100644
  
      # make submodule folder
 -- 
-2.34.1
+2.43.0
 

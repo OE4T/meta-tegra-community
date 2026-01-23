@@ -4,12 +4,12 @@ LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327"
 
 SRC_URI = "git://github.com/nvidia-holoscan/holohub.git;protocol=https;nobranch=1;tag=holoscan-sdk-${PV}"
-SRCREV = "d11c079b4d6857a8bcfd0359055503374d2b04e1"
+SRCREV = "e3edcf4c2b41901887630c803e66410d8c68c0cd"
 
 SRC_URI += " \
     file://desktop-icons \
     file://0001-Add-install-rules.patch \
-    file://0002-Fix-ajantv2-dependencies.patch \
+    file://0002-Remove-relative-gxf_extension-paths.patch \
     file://0003-Build-python-libs-with-install-RPATH-and-add-find-py.patch \
     file://0004-Enable-Emergent-apps.patch \
     file://0005-Fix-default-data-paths-in-python-apps.patch \

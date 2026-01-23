@@ -1,6 +1,6 @@
-From 8cf6d165b47d35c2c6867462ebf3eaf7a598ce68 Mon Sep 17 00:00:00 2001
+From 2d3fceb333b36c5a51b36701fbc3ac2f5c1c2e9b Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 9 Dec 2025 20:08:42 +0000
+Date: Thu, 22 Jan 2026 12:32:24 -0800
 Subject: [PATCH 1/9] Add install rules
 
 Upstream-Status: Inappropriate [OE-specific]
@@ -36,7 +36,7 @@ Signed-off-by: Ian Stewart <istewart@nvidia.com>
  27 files changed, 181 insertions(+)
 
 diff --git a/applications/colonoscopy_segmentation/CMakeLists.txt b/applications/colonoscopy_segmentation/CMakeLists.txt
-index bdff2308..aa67ff28 100644
+index e128bd2a..cd573ba1 100644
 --- a/applications/colonoscopy_segmentation/CMakeLists.txt
 +++ b/applications/colonoscopy_segmentation/CMakeLists.txt
 @@ -34,6 +34,14 @@ if(HOLOHUB_DOWNLOAD_DATASETS)
@@ -294,7 +294,7 @@ index c491ca40..09877bc8 100644
  if(BUILD_TESTING)
    set(RECORDING_DIR ${CMAKE_CURRENT_BINARY_DIR}/recording_output)
 diff --git a/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt b/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt
-index 7453836c..c2bad623 100644
+index 81a13c79..021243b9 100644
 --- a/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt
 +++ b/applications/multiai_ultrasound/operators/visualizer_icardio/CMakeLists.txt
 @@ -41,6 +41,8 @@ endif()
@@ -326,7 +326,7 @@ index 8af6d5ec..acab477c 100644
  if(BUILD_TESTING)
    # To get the environment path
 diff --git a/applications/object_detection_torch/CMakeLists.txt b/applications/object_detection_torch/CMakeLists.txt
-index 163c6a00..6d9e685d 100644
+index ae8f5ca7..8eb0cd49 100644
 --- a/applications/object_detection_torch/CMakeLists.txt
 +++ b/applications/object_detection_torch/CMakeLists.txt
 @@ -129,6 +129,15 @@ add_custom_target(object_detection_torch_yaml
@@ -399,7 +399,7 @@ index 07312a9b..9858353e 100644
 +  DESTINATION ${install_path}
 +)
 diff --git a/applications/volume_rendering/python/CMakeLists.txt b/applications/volume_rendering/python/CMakeLists.txt
-index 4a313608..bf531857 100644
+index c1f82dc2..40a45d8b 100644
 --- a/applications/volume_rendering/python/CMakeLists.txt
 +++ b/applications/volume_rendering/python/CMakeLists.txt
 @@ -51,3 +51,10 @@ if(BUILD_TESTING)
@@ -438,7 +438,7 @@ index 68ded45c..fc3fa6b4 100644
 +
 +install(TARGETS gxf_emergent_source_lib gxf_emergent_source)
 diff --git a/operators/aja_source/CMakeLists.txt b/operators/aja_source/CMakeLists.txt
-index 4388d3dc..6bdb1baf 100644
+index 52ea2635..83af79ff 100644
 --- a/operators/aja_source/CMakeLists.txt
 +++ b/operators/aja_source/CMakeLists.txt
 @@ -63,6 +63,8 @@ target_link_libraries(aja_source
@@ -500,5 +500,5 @@ index 1c9a5097..bc3d11d3 100644
 +
 +install(TARGETS video_encoder)
 -- 
-2.34.1
+2.43.0
 

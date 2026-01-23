@@ -1,6 +1,6 @@
-From 425e9ee0173cf2fdf508ef4020572f99d9031e16 Mon Sep 17 00:00:00 2001
+From 8c8ef4ee01c9cf6dd6d926e25da53f0baa3e6abb Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 9 Dec 2025 20:12:29 +0000
+Date: Thu, 22 Jan 2026 12:40:25 -0800
 Subject: [PATCH 4/9] Enable Emergent apps
 
 Upstream-Status: Inappropriate [OE-specific]
@@ -12,7 +12,7 @@ Signed-off-by: Ian Stewart <istewart@nvidia.com>
  3 files changed, 9 insertions(+), 2 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 300c6acd..b59fb58a 100644
+index 05996be4..d651421a 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -48,6 +48,7 @@ include(CTest)
@@ -24,10 +24,10 @@ index 300c6acd..b59fb58a 100644
  # Enable flow benchmarking
  option(FLOW_BENCHMARKING "Enable Flow Benchmarking" OFF)
 diff --git a/applications/CMakeLists.txt b/applications/CMakeLists.txt
-index 4300aaff..bc32301f 100644
+index 526dec73..ba624585 100644
 --- a/applications/CMakeLists.txt
 +++ b/applications/CMakeLists.txt
-@@ -60,8 +60,10 @@ add_subdirectory(h264)
+@@ -69,8 +69,10 @@ add_subdirectory(h264)
  
  add_holohub_application(isaac_sim_holoscan_bridge)
  
@@ -69,5 +69,5 @@ index fc3fa6b4..11f8103e 100644
  
  # Create extension
 -- 
-2.34.1
+2.43.0
 
