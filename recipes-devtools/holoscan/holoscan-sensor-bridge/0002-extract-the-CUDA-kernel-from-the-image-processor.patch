@@ -1,0 +1,778 @@
+From fd5c50e9c2df1f76a2ff60ee6a9c971bc6c1f392 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 26 Jan 2026 16:49:44 -0800
+Subject: [PATCH 2/3] extract the CUDA kernel from the image processor
+
+- Use .cu file that contains the CUDA kernel
+- Ajust the Cmake file to build the .cu file
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ .../operators/image_processor/CMakeLists.txt  |   6 +-
+ .../image_processor/image_processor.cpp       | 268 +++---------------
+ .../image_processor/image_processor.hpp       |   8 +-
+ .../image_processor_kernels.cu                | 246 ++++++++++++++++
+ .../image_processor_kernels.cuh               | 104 +++++++
+ 5 files changed, 404 insertions(+), 228 deletions(-)
+ create mode 100644 src/hololink/operators/image_processor/image_processor_kernels.cu
+ create mode 100644 src/hololink/operators/image_processor/image_processor_kernels.cuh
+
+diff --git a/src/hololink/operators/image_processor/CMakeLists.txt b/src/hololink/operators/image_processor/CMakeLists.txt
+index a8efaa6..c1d24ce 100644
+--- a/src/hololink/operators/image_processor/CMakeLists.txt
++++ b/src/hololink/operators/image_processor/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # SPDX-License-Identifier: Apache-2.0
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -17,10 +17,14 @@
+ # statically
+ add_library(image_processor STATIC
+   image_processor.cpp
++  image_processor_kernels.cu
+   )
+ 
+ set_property(TARGET image_processor PROPERTY POSITION_INDEPENDENT_CODE ON)
+ 
++# Set CUDA properties for the kernels
++set_source_files_properties(image_processor_kernels.cu PROPERTIES LANGUAGE CUDA)
++
+ add_library(hololink::operators::image_processor ALIAS image_processor)
+ 
+ target_include_directories(image_processor
+diff --git a/src/hololink/operators/image_processor/image_processor.cpp b/src/hololink/operators/image_processor/image_processor.cpp
+index d8facac..14388db 100644
+--- a/src/hololink/operators/image_processor/image_processor.cpp
++++ b/src/hololink/operators/image_processor/image_processor.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * SPDX-License-Identifier: Apache-2.0
+  *
+  * Licensed under the Apache License, Version 2.0 (the "License");
+@@ -16,6 +16,7 @@
+  */
+ 
+ #include "image_processor.hpp"
++#include "image_processor_kernels.cuh"
+ 
+ #include <hololink/common/cuda_helper.hpp>
+ #include <hololink/core/logging_internal.hpp>
+@@ -23,192 +24,6 @@
+ 
+ namespace {
+ 
+-const char* source = R"(
+-#include <device_atomic_functions.h>
+-#include <cooperative_groups.h>
+-
+-extern "C" {
+-
+-// bayer component offsets
+-__inline__ __device__ unsigned int getBayerOffset(unsigned int x, unsigned int y)
+-{
+-    const unsigned int offsets[2][2]{{X0Y0_OFFSET, X1Y0_OFFSET}, {X0Y1_OFFSET, X1Y1_OFFSET}};
+-    return offsets[y & 1][x & 1];
+-}
+-
+-/**
+- * Apply black level correction.
+- *
+- * @param image [in] pointer to input image
+- * @param components_per_line [in] components per input image line (width * 3 for RGB)
+- * @param height [in] height of the input image
+- */
+-__global__ void applyBlackLevel(unsigned short *image,
+-                                int components_per_line,
+-                                int height)
+-{
+-    int idx_x = blockIdx.x * blockDim.x + threadIdx.x;
+-    int idx_y = blockIdx.y * blockDim.y + threadIdx.y;
+-
+-    if ((idx_x >= components_per_line) || (idx_y >= height))
+-        return;
+-
+-    const int index = idx_y * components_per_line + idx_x;
+-
+-    // subtract optical black and clamp
+-    float value = max(float(image[index]) - OPTICAL_BLACK, 0.f);
+-    // fix white level
+-    const float range = (1 << (sizeof(unsigned short) * 8)) - 1;
+-    value *= range / (range - float(OPTICAL_BLACK));
+-    image[index] = (unsigned short)(value + 0.5f);
+-}
+-
+-/**
+- * Calculate the histogram of an image.
+- *
+- * Based on the Cuda SDK histogram256 sample.
+- *
+- * First each warp of a thread builds a sub-histogram in shared memory. Then the per-warp
+- * sub-histograms are merged per block and written to global memory using atomics.
+- *
+- * Note, this kernel needs HISTOGRAM_THREADBLOCK_MEMORY bytes of shared
+- * memory.
+- *
+- * @param in [in] pointer to image data
+- * @param histogram [in] pointer to the histogram data (must be able to hold HISTOGRAM_BIN_COUNT values)
+- * @param width [in] width of the image
+- * @param height [in] height of the image
+- */
+-__global__ void histogram(const unsigned short *in,
+-                          unsigned int *histogram,
+-                          unsigned int width,
+-                          unsigned int height)
+-{
+-    uint2 index = make_uint2(blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y);
+-    if (index.y >= height)
+-    {
+-        return;
+-    }
+-
+-    // per-warp subhistogram storage
+-    __shared__ unsigned int s_hist[HISTOGRAM_THREADBLOCK_MEMORY / sizeof(unsigned int)];
+-
+-    // clear shared memory storage for current threadblock before processing
+-    if (threadIdx.y == 0)
+-    {
+-#pragma unroll
+-        for (int i = 0; i < ((HISTOGRAM_THREADBLOCK_MEMORY / sizeof(unsigned int)) / HISTOGRAM_THREADBLOCK_SIZE); ++i)
+-        {
+-            s_hist[threadIdx.x + i * HISTOGRAM_THREADBLOCK_SIZE] = 0;
+-        }
+-    }
+-
+-    // handle to thread block group
+-    cooperative_groups::thread_block cta = cooperative_groups::this_thread_block();
+-
+-    cooperative_groups::sync(cta);
+-
+-    // cycle through the entire data set, update subhistograms for each warp
+-    unsigned int *const s_warp_hist = s_hist + (threadIdx.x >> LOG2_WARP_SIZE) * HISTOGRAM_BIN_COUNT * CHANNELS;
+-    while (index.x < width)
+-    {
+-        // take the upper 8 bits
+-        const unsigned char bin = ((unsigned char*)&in[index.y * width + index.x])[1];
+-        atomicAdd(s_warp_hist + bin + getBayerOffset(index.x, index.y) * HISTOGRAM_BIN_COUNT, 1u);
+-        index.x += blockDim.x * gridDim.x;
+-    }
+-
+-    // Merge per-warp histograms into per-block and write to global memory
+-    cooperative_groups::sync(cta);
+-
+-    if (threadIdx.y == 0)
+-    {
+-        for (int bin = threadIdx.x; bin < HISTOGRAM_BIN_COUNT * CHANNELS; bin += HISTOGRAM_THREADBLOCK_SIZE)
+-        {
+-            unsigned int sum = 0;
+-
+-#pragma unroll
+-            for (int i = 0; i < HISTOGRAM_WARP_COUNT; ++i)
+-            {
+-                sum += s_hist[bin + i * HISTOGRAM_BIN_COUNT * CHANNELS];
+-            }
+-
+-            atomicAdd(&histogram[bin], sum);
+-        }
+-    }
+-}
+-
+-/**
+- * Calculate the white balance gains using the per channel histograms
+- *
+- * @param histogram [in] pointer to histogram data (HISTOGRAM_BIN_COUNT * CHANNELS values)
+- * @param gains [in] pointer to the white balance gains (CHANNELS values)
+- */
+-__global__ void calcWBGains(const unsigned int *histogram,
+-                            float *gains)
+-{
+-    unsigned long long int average[CHANNELS];
+-    unsigned long long int max_gain = 0;
+-    for (int channel = 0; channel < CHANNELS; ++channel)
+-    {
+-        unsigned long long int value = 0.f;
+-        for (int bin = 1; bin < HISTOGRAM_BIN_COUNT; ++bin)
+-        {
+-            value += histogram[channel * HISTOGRAM_BIN_COUNT + bin] * bin;
+-        }
+-        if (channel == 1)
+-        {
+-            // there are two green channels in the image which both are counted
+-            // in one histogram therefore divide green channel by 2
+-            value /= 2;
+-        }
+-        max_gain = max(max_gain, value);
+-        average[channel] = max(value, 1ull);
+-    }
+-
+-    for (int channel = 0; channel < CHANNELS; ++channel)
+-    {
+-        gains[channel] = float(max_gain) / float(average[channel]);
+-    }
+-}
+-
+-/**
+- * Apply white balance gains.
+- *
+- * @param in [in] pointer to image
+- * @param width [in] width of the image
+- * @param height [in] height of the image
+- * @param gains [in] pointer to the white balance gains (CHANNELS values)
+- */
+-__global__ void applyOperations(unsigned short *image,
+-                             int width,
+-                             int height,
+-                             const float *gains)
+-{
+-    int idx_x = blockIdx.x * blockDim.x + threadIdx.x;
+-    int idx_y = blockIdx.y * blockDim.y + threadIdx.y;
+-
+-    if ((idx_x >= width) || (idx_y >= height))
+-        return;
+-
+-    const int index = idx_y * width + idx_x;
+-
+-    float value = (float)(image[index]);
+-
+-    // apply gain
+-    const unsigned int channel = getBayerOffset(idx_x, idx_y);
+-    value *= gains[channel];
+-
+-    const float range = (1 << (sizeof(unsigned short) * 8)) - 1;
+-
+-    // clamp
+-    value = max(min(value, range), 0.f);
+-
+-    image[index] = (unsigned short)(value + 0.5f);
+-}
+-
+-})";
+-
+ // 3 channels (RGB)
+ constexpr auto CHANNELS = 3;
+ // histogram bin's
+@@ -218,6 +33,8 @@ constexpr auto HISTOGRAM_BIN_COUNT = 256;
+ 
+ namespace hololink::operators {
+ 
++ImageProcessorOp::~ImageProcessorOp() = default;
++
+ void ImageProcessorOp::setup(holoscan::OperatorSpec& spec)
+ {
+     spec.input<holoscan::gxf::Entity>("input");
+@@ -304,19 +121,20 @@ void ImageProcessorOp::start()
+         throw std::runtime_error(fmt::format("Camera bayer format {} not supported.", int(bayer_format_.get())));
+     }
+ 
+-    cuda_function_launcher_.reset(new hololink::common::CudaFunctionLauncher(
+-        source, { "applyBlackLevel", "histogram", "calcWBGains", "applyOperations" },
+-        { fmt::format("-D CHANNELS={}", CHANNELS),
+-            fmt::format("-D X0Y0_OFFSET={}", x0y0_offset),
+-            fmt::format("-D X1Y0_OFFSET={}", x1y0_offset),
+-            fmt::format("-D X0Y1_OFFSET={}", x0y1_offset),
+-            fmt::format("-D X1Y1_OFFSET={}", x1y1_offset),
+-            fmt::format("-D HISTOGRAM_BIN_COUNT={}", HISTOGRAM_BIN_COUNT),
+-            fmt::format("-D LOG2_WARP_SIZE={}", log2_warp_size),
+-            fmt::format("-D HISTOGRAM_WARP_COUNT={}", histogram_warp_count),
+-            fmt::format("-D HISTOGRAM_THREADBLOCK_SIZE={}", histogram_threadblock_size_),
+-            fmt::format("-D HISTOGRAM_THREADBLOCK_MEMORY={}", histogram_threadblock_memory),
+-            fmt::format("-D OPTICAL_BLACK={}", optical_black_.get() * (1 << least_significant_bit)) }));
++    // Initialize kernel configuration
++    kernel_config_.reset(new hololink::operators::kernels::KernelConfig{
++        x0y0_offset,
++        x1y0_offset,
++        x0y1_offset,
++        x1y1_offset,
++        static_cast<unsigned int>(optical_black_.get() * (1 << least_significant_bit)),
++        HISTOGRAM_BIN_COUNT,
++        histogram_threadblock_size_,
++        static_cast<unsigned int>(histogram_threadblock_memory),
++        log2_warp_size,
++        static_cast<unsigned int>(histogram_warp_count),
++        CHANNELS
++    });
+ 
+     white_balance_gains_memory_.reset([] {
+         CUdeviceptr mem = 0;
+@@ -329,8 +147,9 @@ void ImageProcessorOp::stop()
+ {
+     hololink::common::CudaContextScopedPush cur_cuda_context(cuda_context_);
+ 
+-    cuda_function_launcher_.reset();
++    kernel_config_.reset();
+     histogram_memory_.reset();
++    white_balance_gains_memory_.reset();
+ 
+     CudaCheck(cuDevicePrimaryCtxRelease(cuda_device_));
+     cuda_context_ = nullptr;
+@@ -389,35 +208,36 @@ void ImageProcessorOp::compute(holoscan::InputContext& input, holoscan::OutputCo
+ 
+     // apply optical black if set
+     if (optical_black_ != 0.f) {
+-        cuda_function_launcher_->launch(
+-            "applyBlackLevel",
+-            { width, height, 1 },
+-            cuda_stream,
+-            input_tensor->pointer(), width, height);
++        hololink::operators::kernels::launchApplyBlackLevel(
++            reinterpret_cast<unsigned short*>(input_tensor->pointer()),
++            width, height,
++            kernel_config_->optical_black,
++            *kernel_config_,
++            cuda_stream);
+     }
+ 
+     // apply Grey World White Balance algorithm
+     CudaCheck(cuMemsetD32Async(histogram_memory_.get(), 0, CHANNELS * HISTOGRAM_BIN_COUNT, cuda_stream));
+-    cuda_function_launcher_->launch(
+-        "histogram",
+-        { width, height, 1 },
+-        { histogram_threadblock_size_, 2, 1 },
+-        cuda_stream,
+-        input_tensor->pointer(), histogram_memory_.get(), width, height);
++    hololink::operators::kernels::launchHistogram(
++        reinterpret_cast<const unsigned short*>(input_tensor->pointer()),
++        reinterpret_cast<unsigned int*>(static_cast<CUdeviceptr>(histogram_memory_.get())),
++        width, height,
++        *kernel_config_,
++        cuda_stream);
+ 
+     // calculate white balance gains
+-    cuda_function_launcher_->launch(
+-        "calcWBGains",
+-        { 1, 1, 1 },
+-        { 1, 1, 1 },
+-        cuda_stream,
+-        histogram_memory_.get(), white_balance_gains_memory_.get());
+-
+-    cuda_function_launcher_->launch(
+-        "applyOperations",
+-        { width, height, 1 },
+-        cuda_stream,
+-        input_tensor->pointer(), width, height, white_balance_gains_memory_.get());
++    hololink::operators::kernels::launchCalcWBGains(
++        reinterpret_cast<unsigned int*>(static_cast<CUdeviceptr>(histogram_memory_.get())),
++        reinterpret_cast<float*>(static_cast<CUdeviceptr>(white_balance_gains_memory_.get())),
++        *kernel_config_,
++        cuda_stream);
++
++    hololink::operators::kernels::launchApplyOperations(
++        reinterpret_cast<unsigned short*>(input_tensor->pointer()),
++        width, height,
++        reinterpret_cast<const float*>(static_cast<CUdeviceptr>(white_balance_gains_memory_.get())),
++        *kernel_config_,
++        cuda_stream);
+ 
+     // pass the CUDA stream to the output message
+     auto out_message = nvidia::gxf::Expected<nvidia::gxf::Entity>(entity);
+diff --git a/src/hololink/operators/image_processor/image_processor.hpp b/src/hololink/operators/image_processor/image_processor.hpp
+index 67c7538..9202eb1 100644
+--- a/src/hololink/operators/image_processor/image_processor.hpp
++++ b/src/hololink/operators/image_processor/image_processor.hpp
+@@ -1,5 +1,5 @@
+ /*
+- * SPDX-FileCopyrightText: Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * SPDX-License-Identifier: Apache-2.0
+  *
+  * Licensed under the Apache License, Version 2.0 (the "License");
+@@ -21,6 +21,7 @@
+ #include <memory>
+ 
+ #include <hololink/operators/csi_to_bayer/csi_to_bayer.hpp>
++#include <hololink/operators/image_processor/image_processor_kernels.cuh>
+ 
+ #include <holoscan/core/operator.hpp>
+ #include <holoscan/core/parameter.hpp>
+@@ -34,6 +35,8 @@ class ImageProcessorOp : public holoscan::Operator {
+ public:
+     HOLOSCAN_OPERATOR_FORWARD_ARGS(ImageProcessorOp);
+ 
++    ~ImageProcessorOp() override;
++
+     void setup(holoscan::OperatorSpec& spec) override;
+     void start() override;
+     void stop() override;
+@@ -52,12 +55,11 @@ private:
+ 
+     holoscan::CudaStreamHandler cuda_stream_handler_;
+ 
+-    std::shared_ptr<hololink::common::CudaFunctionLauncher> cuda_function_launcher_;
+-
+     hololink::common::UniqueCUdeviceptr histogram_memory_;
+     hololink::common::UniqueCUdeviceptr white_balance_gains_memory_;
+ 
+     uint32_t histogram_threadblock_size_;
++    std::unique_ptr<hololink::operators::kernels::KernelConfig> kernel_config_;
+ };
+ 
+ } // namespace hololink::operators
+diff --git a/src/hololink/operators/image_processor/image_processor_kernels.cu b/src/hololink/operators/image_processor/image_processor_kernels.cu
+new file mode 100644
+index 0000000..9d2d746
+--- /dev/null
++++ b/src/hololink/operators/image_processor/image_processor_kernels.cu
+@@ -0,0 +1,246 @@
++/*
++ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * SPDX-License-Identifier: Apache-2.0
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "image_processor_kernels.cuh"
++#include <device_atomic_functions.h>
++#include <cooperative_groups.h>
++
++namespace hololink::operators::kernels {
++
++// Device-side constant memory for kernel configuration
++__constant__ KernelConfig d_config;
++
++// bayer component offsets
++__inline__ __device__ unsigned int getBayerOffset(unsigned int x, unsigned int y)
++{
++    const unsigned int offsets[2][2]{{d_config.x0y0_offset, d_config.x1y0_offset}, 
++                                     {d_config.x0y1_offset, d_config.x1y1_offset}};
++    return offsets[y & 1][x & 1];
++}
++
++/**
++ * Apply black level correction.
++ */
++__global__ void applyBlackLevel(unsigned short *image,
++                                int components_per_line,
++                                int height)
++{
++    int idx_x = blockIdx.x * blockDim.x + threadIdx.x;
++    int idx_y = blockIdx.y * blockDim.y + threadIdx.y;
++
++    if ((idx_x >= components_per_line) || (idx_y >= height))
++        return;
++
++    const int index = idx_y * components_per_line + idx_x;
++
++    // subtract optical black and clamp
++    float value = max(float(image[index]) - float(d_config.optical_black), 0.f);
++    // fix white level
++    const float range = (1 << (sizeof(unsigned short) * 8)) - 1;
++    value *= range / (range - float(d_config.optical_black));
++    image[index] = (unsigned short)(value + 0.5f);
++}
++
++/**
++ * Calculate the histogram of an image.
++ *
++ * Based on the Cuda SDK histogram256 sample.
++ */
++__global__ void histogram(const unsigned short *in,
++                          unsigned int *histogram,
++                          unsigned int width,
++                          unsigned int height)
++{
++    uint2 index = make_uint2(blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y);
++    if (index.y >= height)
++    {
++        return;
++    }
++
++    // per-warp subhistogram storage
++    extern __shared__ unsigned int s_hist[];
++
++    // clear shared memory storage for current threadblock before processing
++    if (threadIdx.y == 0)
++    {
++        const unsigned int items_per_thread = (d_config.histogram_threadblock_memory / sizeof(unsigned int)) / d_config.histogram_threadblock_size;
++        for (unsigned int i = 0; i < items_per_thread; ++i)
++        {
++            s_hist[threadIdx.x + i * d_config.histogram_threadblock_size] = 0;
++        }
++    }
++
++    // handle to thread block group
++    cooperative_groups::thread_block cta = cooperative_groups::this_thread_block();
++
++    cooperative_groups::sync(cta);
++
++    // cycle through the entire data set, update subhistograms for each warp
++    unsigned int *const s_warp_hist = s_hist + (threadIdx.x >> d_config.log2_warp_size) * d_config.histogram_bin_count * d_config.channels;
++    while (index.x < width)
++    {
++        // take the upper 8 bits
++        const unsigned char bin = ((unsigned char*)&in[index.y * width + index.x])[1];
++        atomicAdd(s_warp_hist + bin + getBayerOffset(index.x, index.y) * d_config.histogram_bin_count, 1u);
++        index.x += blockDim.x * gridDim.x;
++    }
++
++    // Merge per-warp histograms into per-block and write to global memory
++    cooperative_groups::sync(cta);
++
++    if (threadIdx.y == 0)
++    {
++        for (unsigned int bin = threadIdx.x; bin < d_config.histogram_bin_count * d_config.channels; bin += d_config.histogram_threadblock_size)
++        {
++            unsigned int sum = 0;
++
++            for (unsigned int i = 0; i < d_config.histogram_warp_count; ++i)
++            {
++                sum += s_hist[bin + i * d_config.histogram_bin_count * d_config.channels];
++            }
++
++            atomicAdd(&histogram[bin], sum);
++        }
++    }
++}
++
++/**
++ * Calculate the white balance gains using the per channel histograms
++ */
++__global__ void calcWBGains(const unsigned int *histogram,
++                            float *gains)
++{
++    unsigned long long int average[3]; // max 3 channels (RGB)
++    unsigned long long int max_gain = 0;
++    for (unsigned int channel = 0; channel < d_config.channels; ++channel)
++    {
++        unsigned long long int value = 0;
++        for (unsigned int bin = 1; bin < d_config.histogram_bin_count; ++bin)
++        {
++            value += histogram[channel * d_config.histogram_bin_count + bin] * bin;
++        }
++        if (channel == 1)
++        {
++            // there are two green channels in the image which both are counted
++            // in one histogram therefore divide green channel by 2
++            value /= 2;
++        }
++        max_gain = max(max_gain, value);
++        average[channel] = max(value, 1ull);
++    }
++
++    for (unsigned int channel = 0; channel < d_config.channels; ++channel)
++    {
++        gains[channel] = float(max_gain) / float(average[channel]);
++    }
++}
++
++/**
++ * Apply white balance gains.
++ */
++__global__ void applyOperations(unsigned short *image,
++                               int width,
++                               int height,
++                               const float *gains)
++{
++    int idx_x = blockIdx.x * blockDim.x + threadIdx.x;
++    int idx_y = blockIdx.y * blockDim.y + threadIdx.y;
++
++    if ((idx_x >= width) || (idx_y >= height))
++        return;
++
++    const int index = idx_y * width + idx_x;
++
++    float value = (float)(image[index]);
++
++    // apply gain
++    const unsigned int channel = getBayerOffset(idx_x, idx_y);
++    value *= gains[channel];
++
++    const float range = (1 << (sizeof(unsigned short) * 8)) - 1;
++
++    // clamp
++    value = max(min(value, range), 0.f);
++
++    image[index] = (unsigned short)(value + 0.5f);
++}
++
++// Launcher functions
++
++void launchApplyBlackLevel(unsigned short *image,
++                           int components_per_line,
++                           int height,
++                           unsigned int optical_black,
++                           const KernelConfig& config,
++                           cudaStream_t stream)
++{
++    // Update constant memory with config
++    cudaMemcpyToSymbolAsync(d_config, &config, sizeof(KernelConfig), 0, cudaMemcpyHostToDevice, stream);
++
++    dim3 block(16, 16);
++    dim3 grid((components_per_line + block.x - 1) / block.x, (height + block.y - 1) / block.y);
++    
++    applyBlackLevel<<<grid, block, 0, stream>>>(image, components_per_line, height);
++}
++
++void launchHistogram(const unsigned short *in,
++                    unsigned int *histogram_out,
++                    unsigned int width,
++                    unsigned int height,
++                    const KernelConfig& config,
++                    cudaStream_t stream)
++{
++    // Update constant memory with config
++    cudaMemcpyToSymbolAsync(d_config, &config, sizeof(KernelConfig), 0, cudaMemcpyHostToDevice, stream);
++
++    dim3 block(config.histogram_threadblock_size, 2, 1);
++    dim3 grid((width + block.x - 1) / block.x, (height + block.y - 1) / block.y, 1);
++    
++    histogram<<<grid, block, config.histogram_threadblock_memory, stream>>>(in, histogram_out, width, height);
++}
++
++void launchCalcWBGains(const unsigned int *histogram,
++                      float *gains,
++                      const KernelConfig& config,
++                      cudaStream_t stream)
++{
++    // Update constant memory with config
++    cudaMemcpyToSymbolAsync(d_config, &config, sizeof(KernelConfig), 0, cudaMemcpyHostToDevice, stream);
++
++    dim3 block(1, 1, 1);
++    dim3 grid(1, 1, 1);
++    
++    calcWBGains<<<grid, block, 0, stream>>>(histogram, gains);
++}
++
++void launchApplyOperations(unsigned short *image,
++                          int width,
++                          int height,
++                          const float *gains,
++                          const KernelConfig& config,
++                          cudaStream_t stream)
++{
++    // Update constant memory with config
++    cudaMemcpyToSymbolAsync(d_config, &config, sizeof(KernelConfig), 0, cudaMemcpyHostToDevice, stream);
++
++    dim3 block(16, 16);
++    dim3 grid((width + block.x - 1) / block.x, (height + block.y - 1) / block.y);
++    
++    applyOperations<<<grid, block, 0, stream>>>(image, width, height, gains);
++}
++
++} // namespace hololink::operators::kernels
+diff --git a/src/hololink/operators/image_processor/image_processor_kernels.cuh b/src/hololink/operators/image_processor/image_processor_kernels.cuh
+new file mode 100644
+index 0000000..9a7e158
+--- /dev/null
++++ b/src/hololink/operators/image_processor/image_processor_kernels.cuh
+@@ -0,0 +1,104 @@
++/*
++ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * SPDX-License-Identifier: Apache-2.0
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef SRC_HOLOLINK_OPERATORS_IMAGE_PROCESSOR_IMAGE_PROCESSOR_KERNELS_CUH
++#define SRC_HOLOLINK_OPERATORS_IMAGE_PROCESSOR_IMAGE_PROCESSOR_KERNELS_CUH
++
++#include <cuda_runtime.h>
++
++namespace hololink::operators::kernels {
++
++// Kernel configuration structure
++struct KernelConfig {
++    unsigned int x0y0_offset;
++    unsigned int x1y0_offset;
++    unsigned int x0y1_offset;
++    unsigned int x1y1_offset;
++    unsigned int optical_black;
++    unsigned int histogram_bin_count;
++    unsigned int histogram_threadblock_size;
++    unsigned int histogram_threadblock_memory;
++    unsigned int log2_warp_size;
++    unsigned int histogram_warp_count;
++    unsigned int channels;
++};
++
++/**
++ * Apply black level correction.
++ *
++ * @param image [in] pointer to input image
++ * @param components_per_line [in] components per input image line (width * 3 for RGB)
++ * @param height [in] height of the input image
++ * @param optical_black [in] optical black value
++ */
++void launchApplyBlackLevel(unsigned short *image,
++                           int components_per_line,
++                           int height,
++                           unsigned int optical_black,
++                           const KernelConfig& config,
++                           cudaStream_t stream);
++
++/**
++ * Calculate the histogram of an image.
++ *
++ * @param in [in] pointer to image data
++ * @param histogram_out [out] pointer to the histogram data
++ * @param width [in] width of the image
++ * @param height [in] height of the image
++ * @param config [in] kernel configuration
++ * @param stream [in] CUDA stream
++ */
++void launchHistogram(const unsigned short *in,
++                    unsigned int *histogram_out,
++                    unsigned int width,
++                    unsigned int height,
++                    const KernelConfig& config,
++                    cudaStream_t stream);
++
++/**
++ * Calculate the white balance gains using the per channel histograms
++ *
++ * @param histogram [in] pointer to histogram data
++ * @param gains [out] pointer to the white balance gains
++ * @param config [in] kernel configuration
++ * @param stream [in] CUDA stream
++ */
++void launchCalcWBGains(const unsigned int *histogram,
++                      float *gains,
++                      const KernelConfig& config,
++                      cudaStream_t stream);
++
++/**
++ * Apply white balance gains.
++ *
++ * @param image [in/out] pointer to image
++ * @param width [in] width of the image
++ * @param height [in] height of the image
++ * @param gains [in] pointer to the white balance gains
++ * @param config [in] kernel configuration
++ * @param stream [in] CUDA stream
++ */
++void launchApplyOperations(unsigned short *image,
++                          int width,
++                          int height,
++                          const float *gains,
++                          const KernelConfig& config,
++                          cudaStream_t stream);
++
++} // namespace hololink::operators::kernels
++
++#endif /* SRC_HOLOLINK_OPERATORS_IMAGE_PROCESSOR_IMAGE_PROCESSOR_KERNELS_CUH */
+-- 
+2.43.0
+

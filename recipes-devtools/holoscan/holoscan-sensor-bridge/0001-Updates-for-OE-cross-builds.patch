@@ -1,0 +1,589 @@
+From 15f30aafd2835e0250f5b100933e4f8e2de3de6e Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Fri, 23 Jan 2026 16:41:36 -0800
+Subject: [PATCH 1/3] Updates for OE cross builds
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ CMakeLists.txt                           |   7 +
+ cmake/Findibverbs.cmake                  |  24 +-
+ examples/CMakeLists.txt                  | 265 ++++++++++++-----------
+ python/hololink/operators/CMakeLists.txt |   2 +
+ src/hololink/common/CMakeLists.txt       |  72 ++++--
+ src/hololink/core/logging_internal.hpp   |   5 +
+ src/hololink/core/networking.hpp         |   1 +
+ src/hololink/operators/CMakeLists.txt    |   4 +-
+ tests/CMakeLists.txt                     |   2 +
+ 9 files changed, 222 insertions(+), 160 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index f95e951..633da30 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -25,6 +25,9 @@ option(HOLOLINK_BUILD_ARGUS_ISP "Build Argus ISP support" OFF)
+ option(HOLOLINK_BUILD_SIPL "Build NvSIPL capture components" OFF)
+ option(HOLOLINK_BUILD_EMULATOR "Build HSB Emulator components" ON)
+ option(HOLOLINK_BUILD_FUSA "Build NvFusa capture components" OFF)
++option(HOLOLINK_BUILD_ROCE "Build Hololink with RoCE support" OFF)
++option(HOLOLINK_BUILD_COE "Build Hololink with CoE support" ON)
++option(HOLOLINK_BUILD_SOCKET "Build Hololink with Linux Socket support" OFF)
+ 
+ if (HOLOLINK_BUILD_PYTHON AND NOT HOLOLINK_BUILD_EMULATOR)
+   message(FATAL_ERROR "If building Python bindings, HOLOLINK_BUILD_EMULATOR must be ON")
+@@ -50,6 +53,10 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+ include(hololink_deps/fmt)
+ 
+ if (NOT HOLOLINK_BUILD_ONLY_NATIVE)
++  find_package(nvtx3 3.3.0 REQUIRED)
++  find_package(rapids_logger 0.2.0 REQUIRED)
++  find_package(rmm 25.10.0 REQUIRED)
++  find_package(Eigen3 REQUIRED)
+   # Find Holoscan
+   find_package(holoscan 3.6 REQUIRED CONFIG PATHS "/opt/nvidia/holoscan")
+ 
+diff --git a/cmake/Findibverbs.cmake b/cmake/Findibverbs.cmake
+index ac31fd0..20ad3d2 100644
+--- a/cmake/Findibverbs.cmake
++++ b/cmake/Findibverbs.cmake
+@@ -14,18 +14,20 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-include(FindPackageHandleStandardArgs)
++if (HOLOLINK_BUILD_ROCE)
++  include(FindPackageHandleStandardArgs)
+ 
+-find_path(ibverbs_INCLUDE_DIRS
+-  NAMES infiniband/verbs.h
+-  )
++  find_path(ibverbs_INCLUDE_DIRS
++    NAMES infiniband/verbs.h
++    )
+ 
+-find_library(ibverbs_LIBRARIES
+-  NAMES ibverbs
+-  )
++  find_library(ibverbs_LIBRARIES
++    NAMES ibverbs
++    )
+ 
+-find_package_handle_standard_args(ibverbs DEFAULT_MSG
+-  ibverbs_LIBRARIES ibverbs_INCLUDE_DIRS
+-  )
++  find_package_handle_standard_args(ibverbs DEFAULT_MSG
++    ibverbs_LIBRARIES ibverbs_INCLUDE_DIRS
++    )
+ 
+-mark_as_advanced(ibverbs_INCLUDE_DIRS ibverbs_LIBRARIES)
++  mark_as_advanced(ibverbs_INCLUDE_DIRS ibverbs_LIBRARIES)
++endif() # HOLOLINK_BUILD_ROCE
+diff --git a/examples/CMakeLists.txt b/examples/CMakeLists.txt
+index ca64d49..58352d9 100644
+--- a/examples/CMakeLists.txt
++++ b/examples/CMakeLists.txt
+@@ -15,151 +15,161 @@
+ 
+ set(EXAMPLE_INSTALL_TARGETS)
+ if(NOT HOLOLINK_BUILD_ONLY_NATIVE)
+-add_executable(imx274_player
+-  imx274_player.cpp
+-  )
+-
+-add_test(NAME imx274_player_test
+-          COMMAND imx274_player --frame-limit=10 --headless
+-          WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+-set_tests_properties(imx274_player_test PROPERTIES
+-                      FAIL_REGULAR_EXPRESSION "ERROR;\\[error\\]")
+-
+-include(hololink_deps/pybind11)
+-target_link_libraries(imx274_player
+-  PRIVATE
+-    hololink
+-    hololink::operators::csi_to_bayer
+-    hololink::operators::image_processor
+-    hololink::operators::roce_receiver
+-    holoscan::core
+-    holoscan::ops::bayer_demosaic
+-    holoscan::ops::holoviz
+-    holoscan::pybind11
+-    pybind11::embed
+-  )
++if(HOLOLINK_BUILD_ROCE)
++  add_executable(imx274_player
++    imx274_player.cpp
++    )
+ 
+-list(APPEND EXAMPLE_INSTALL_TARGETS imx274_player)
++  add_test(NAME imx274_player_test
++            COMMAND imx274_player --frame-limit=10 --headless
++            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
++  set_tests_properties(imx274_player_test PROPERTIES
++                        FAIL_REGULAR_EXPRESSION "ERROR;\\[error\\]")
+ 
+-add_executable(linux_imx274_player
+-  linux_imx274_player.cpp
+-  )
++  include(hololink_deps/pybind11)
++  target_link_libraries(imx274_player
++    PRIVATE
++      hololink
++      hololink::operators::csi_to_bayer
++      hololink::operators::image_processor
++      hololink::operators::roce_receiver
++      holoscan::core
++      holoscan::ops::bayer_demosaic
++      holoscan::ops::holoviz
++      holoscan::pybind11
++      pybind11::embed
++    )
+ 
+-add_test(NAME linux_imx274_player_test
+-          COMMAND linux_imx274_player --frame-limit=10 --headless
+-          WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+-set_tests_properties(linux_imx274_player_test PROPERTIES
+-                      FAIL_REGULAR_EXPRESSION "ERROR;\\[error\\]")
+-
+-target_link_libraries(linux_imx274_player
+-  PRIVATE
+-    hololink
+-    hololink::operators::csi_to_bayer
+-    hololink::operators::image_processor
+-    hololink::operators::linux_receiver_op
+-    holoscan::core
+-    holoscan::ops::bayer_demosaic
+-    holoscan::ops::holoviz
+-    holoscan::pybind11
+-    pybind11::embed
+-  )
++  list(APPEND EXAMPLE_INSTALL_TARGETS imx274_player)
++endif() # HOLOLINK_BUILD_ROCE
+ 
+-list(APPEND EXAMPLE_INSTALL_TARGETS linux_imx274_player)
++if(HOLOLINK_BUILD_SOCKET)
++  add_executable(linux_imx274_player
++    linux_imx274_player.cpp
++    )
+ 
+-add_executable(vb1940_player
+-  vb1940_player.cpp
+-  )
++  add_test(NAME linux_imx274_player_test
++            COMMAND linux_imx274_player --frame-limit=10 --headless
++            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
++  set_tests_properties(linux_imx274_player_test PROPERTIES
++                        FAIL_REGULAR_EXPRESSION "ERROR;\\[error\\]")
+ 
+-target_link_libraries(vb1940_player
+-  PRIVATE
+-    hololink
+-    hololink::operators::csi_to_bayer
+-    hololink::operators::image_processor
+-    hololink::operators::roce_receiver
+-    hololink::sensors::native_vb1940_camera_sensor
+-    holoscan::core
+-    holoscan::ops::bayer_demosaic
+-    holoscan::ops::holoviz
+-  )
++  target_link_libraries(linux_imx274_player
++    PRIVATE
++      hololink
++      hololink::operators::csi_to_bayer
++      hololink::operators::image_processor
++      hololink::operators::linux_receiver_op
++      holoscan::core
++      holoscan::ops::bayer_demosaic
++      holoscan::ops::holoviz
++      holoscan::pybind11
++      pybind11::embed
++    )
+ 
+-list(APPEND EXAMPLE_INSTALL_TARGETS vb1940_player)
++  list(APPEND EXAMPLE_INSTALL_TARGETS linux_imx274_player)
++endif() # HOLOLINK_BUILD_SOCKET
+ 
+-if(HOLOLINK_BUILD_FUSA)
+-  add_executable(fusa_coe_imx274_player
+-    fusa_coe_imx274_player.cpp
++if(HOLOLINK_BUILD_ROCE)
++  add_executable(vb1940_player
++    vb1940_player.cpp
+     )
+ 
+-  target_link_libraries(fusa_coe_imx274_player
++  target_link_libraries(vb1940_player
+     PRIVATE
+       hololink
+-      hololink::operators::fusa_coe_capture
++      hololink::operators::csi_to_bayer
+       hololink::operators::image_processor
+-      hololink::operators::packed_format_converter
+-      hololink::sensors::native_imx274_camera_sensor
++      hololink::operators::roce_receiver
++      hololink::sensors::native_vb1940_camera_sensor
+       holoscan::core
+       holoscan::ops::bayer_demosaic
+       holoscan::ops::holoviz
+     )
+ 
+-  list(APPEND EXAMPLE_INSTALL_TARGETS fusa_coe_imx274_player)
++  list(APPEND EXAMPLE_INSTALL_TARGETS vb1940_player)
++endif()
++
++if(HOLOLINK_BUILD_FUSA)
++  if(HOLOLINK_BUILD_COE)
++    add_executable(fusa_coe_imx274_player
++      fusa_coe_imx274_player.cpp
++      )
++
++    target_link_libraries(fusa_coe_imx274_player
++      PRIVATE
++        hololink
++        hololink::operators::fusa_coe_capture
++        hololink::operators::image_processor
++        hololink::operators::packed_format_converter
++        hololink::sensors::native_imx274_camera_sensor
++        holoscan::core
++        holoscan::ops::bayer_demosaic
++        holoscan::ops::holoviz
++      )
++
++    list(APPEND EXAMPLE_INSTALL_TARGETS fusa_coe_imx274_player)
++
++    add_executable(fusa_coe_vb1940_player
++      fusa_coe_vb1940_player.cpp
++      )
++
++    target_link_libraries(fusa_coe_vb1940_player
++      PRIVATE
++        hololink
++        hololink::operators::fusa_coe_capture
++        hololink::operators::image_processor
++        hololink::operators::packed_format_converter
++        hololink::sensors::native_vb1940_camera_sensor
++        holoscan::core
++        holoscan::ops::bayer_demosaic
++        holoscan::ops::holoviz
++      )
++
++    list(APPEND EXAMPLE_INSTALL_TARGETS fusa_coe_vb1940_player)
++  endif() # HOLOLINK_BUILD_COE
++endif() # HOLOLINK_BUILD_FUSA
+ 
+-  add_executable(fusa_coe_vb1940_player
+-    fusa_coe_vb1940_player.cpp
++if(HOLOLINK_BUILD_ROCE)
++  add_executable(single_network_stereo_vb1940_player
++    single_network_stereo_vb1940_player.cpp
+     )
+ 
+-  target_link_libraries(fusa_coe_vb1940_player
++  target_link_libraries(single_network_stereo_vb1940_player
+     PRIVATE
+       hololink
+-      hololink::operators::fusa_coe_capture
++      hololink::operators::csi_to_bayer
+       hololink::operators::image_processor
+-      hololink::operators::packed_format_converter
++      hololink::operators::roce_receiver
+       hololink::sensors::native_vb1940_camera_sensor
+       holoscan::core
+       holoscan::ops::bayer_demosaic
+       holoscan::ops::holoviz
+     )
+ 
+-  list(APPEND EXAMPLE_INSTALL_TARGETS fusa_coe_vb1940_player)
+-endif()
++  list(APPEND EXAMPLE_INSTALL_TARGETS single_network_stereo_vb1940_player)
+ 
+-add_executable(single_network_stereo_vb1940_player
+-  single_network_stereo_vb1940_player.cpp
++  # Signal Generator sample app
++  add_executable(signal_generator
++    signal_generator.cpp
+   )
+ 
+-target_link_libraries(single_network_stereo_vb1940_player
+-  PRIVATE
+-    hololink
+-    hololink::operators::csi_to_bayer
+-    hololink::operators::image_processor
+-    hololink::operators::roce_receiver
+-    hololink::sensors::native_vb1940_camera_sensor
+-    holoscan::core
+-    holoscan::ops::bayer_demosaic
+-    holoscan::ops::holoviz
++  target_link_libraries(signal_generator
++    PRIVATE
++      hololink
++      hololink::core
++      hololink::operators::iq_dec
++      hololink::operators::iq_enc
++      hololink::operators::roce_receiver
++      hololink::operators::roce_transmitter
++      hololink::operators::sig_gen
++      hololink::operators::sig_viewer
++      hololink::operators::udp_transmitter
++      holoscan::core
+   )
+ 
+-list(APPEND EXAMPLE_INSTALL_TARGETS single_network_stereo_vb1940_player)
+-
+-# Signal Generator sample app
+-add_executable(signal_generator
+-  signal_generator.cpp
+-)
+-
+-target_link_libraries(signal_generator
+-  PRIVATE
+-    hololink
+-    hololink::core
+-    hololink::operators::iq_dec
+-    hololink::operators::iq_enc
+-    hololink::operators::roce_receiver
+-    hololink::operators::roce_transmitter
+-    hololink::operators::sig_gen
+-    hololink::operators::sig_viewer
+-    hololink::operators::udp_transmitter
+-    holoscan::core
+-)
+-
+-list(APPEND EXAMPLE_INSTALL_TARGETS signal_generator)
++  list(APPEND EXAMPLE_INSTALL_TARGETS signal_generator)
++endif() # HOLOLINK_BUILD_ROCE
+ 
+ if(HOLOLINK_BUILD_SIPL)
+   add_executable(sipl_player
+@@ -181,24 +191,25 @@ if(HOLOLINK_BUILD_SIPL)
+   list(APPEND EXAMPLE_INSTALL_TARGETS sipl_player)
+ endif() # HOLOLINK_BUILD_SIPL
+ 
+-add_executable(linux_single_network_stereo_imx274_player
+-  linux_single_network_stereo_imx274_player.cpp
+-  )
+-
+-target_link_libraries(linux_single_network_stereo_imx274_player
+-  PRIVATE
+-    hololink
+-    hololink::operators::csi_to_bayer
+-    hololink::operators::image_processor
+-    hololink::operators::linux_receiver_op
+-    hololink::sensors::native_imx274_camera_sensor
+-    holoscan::core
+-    holoscan::ops::bayer_demosaic
+-    holoscan::ops::holoviz
+-  )
++if(HOLOLINK_BUILD_ROCE)
++  add_executable(linux_single_network_stereo_imx274_player
++    linux_single_network_stereo_imx274_player.cpp
++    )
+ 
+-list(APPEND EXAMPLE_INSTALL_TARGETS linux_single_network_stereo_imx274_player)
++  target_link_libraries(linux_single_network_stereo_imx274_player
++    PRIVATE
++      hololink
++      hololink::operators::csi_to_bayer
++      hololink::operators::image_processor
++      hololink::operators::linux_receiver_op
++      hololink::sensors::native_imx274_camera_sensor
++      holoscan::core
++      holoscan::ops::bayer_demosaic
++      holoscan::ops::holoviz
++    )
+ 
++  list(APPEND EXAMPLE_INSTALL_TARGETS linux_single_network_stereo_imx274_player)
++endif() # HOLOLINK_BUILD_ROCE
+ 
+ endif() # NOT HOLOLINK_BUILD_ONLY_NATIVE
+ 
+@@ -215,7 +226,7 @@ list(APPEND EXAMPLE_INSTALL_FILES
+      sipl_config/vb1940_single.json)
+ endif()
+ 
+-if(NOT HOLOLINK_BUILD_ONLY_NATIVE)
++if(NOT HOLOLINK_BUILD_ONLY_NATIVE AND HOLOLINK_BUILD_PYTHON)
+ list(APPEND EXAMPLE_INSTALL_FILES
+     body_pose_estimation.py
+     distributed_imx274_player.py
+diff --git a/python/hololink/operators/CMakeLists.txt b/python/hololink/operators/CMakeLists.txt
+index ba8bd94..5d77ea7 100644
+--- a/python/hololink/operators/CMakeLists.txt
++++ b/python/hololink/operators/CMakeLists.txt
+@@ -29,8 +29,10 @@ add_subdirectory(linux_receiver)
+ add_subdirectory(linux_receiver_op)
+ add_subdirectory(linux_coe_receiver)
+ add_subdirectory(packed_format_converter)
++if (HOLOLINK_BUILD_ROCE)
+ add_subdirectory(roce_receiver)
+ add_subdirectory(roce_transmitter)
++endif() # HOLOLINK_BUILD_ROCE
+ add_subdirectory(sig_gen)
+ add_subdirectory(sig_viewer)
+ if(HOLOLINK_BUILD_SIPL)
+diff --git a/src/hololink/common/CMakeLists.txt b/src/hololink/common/CMakeLists.txt
+index e7945b9..6ebbf2d 100644
+--- a/src/hololink/common/CMakeLists.txt
++++ b/src/hololink/common/CMakeLists.txt
+@@ -13,14 +13,22 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-find_package(ibverbs REQUIRED)
++if (HOLOLINK_BUILD_ROCE)
++  find_package(ibverbs REQUIRED)
+ 
+-add_library(hololink STATIC
+-  gui_renderer.cpp
+-  holoargs.cpp
+-  cuda_helper.cpp
+-  tools.cpp
+-  )
++  add_library(hololink STATIC
++    gui_renderer.cpp
++    holoargs.cpp
++    cuda_helper.cpp
++    tools.cpp
++    )
++else()
++  add_library(hololink STATIC
++    gui_renderer.cpp
++    holoargs.cpp
++    cuda_helper.cpp
++    )
++endif() # HOLOLINK_BUILD_ROCE
+ 
+ set_property(TARGET hololink PROPERTY POSITION_INDEPENDENT_CODE ON)
+ 
+@@ -30,27 +38,49 @@ target_include_directories(hololink
+     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+   )
+ 
++target_include_directories(hololink
++  PUBLIC
++    ${IMGUI_SOURCE_DIR}
++)
++
+ if(TARGET CUDA::nvtx3)
+   set(CUDA_NVTX_TARGET CUDA::nvtx3)
+ else()
+   set(CUDA_NVTX_TARGET CUDA::nvToolsExt)
+ endif()
+ 
+-target_link_libraries(hololink
+-  PRIVATE
+-    holoscan::core
++if (HOLOLINK_BUILD_ROCE)
++  target_link_libraries(hololink
++    PRIVATE
++      holoscan::core
+ 
+-    # Required by the gui_renderer
+-    holoscan::viz
+-    holoscan::viz::imgui
+-    ${ibverbs_LIBRARIES}
+-  PUBLIC
+-    hololink::core
+-    CUDA::cuda_driver
+-    CUDA::nvrtc
+-    ${CUDA_NVTX_TARGET}
+-    fmt::fmt-header-only
+-  )
++      # Required by the gui_renderer
++      holoscan::viz
++      holoscan::viz::imgui
++      ${ibverbs_LIBRARIES}
++    PUBLIC
++      hololink::core
++      CUDA::cuda_driver
++      CUDA::nvrtc
++      ${CUDA_NVTX_TARGET}
++      fmt::fmt-header-only
++    )
++else()
++  target_link_libraries(hololink
++    PRIVATE
++      holoscan::core
++
++      # Required by the gui_renderer
++      holoscan::viz
++      holoscan::viz::imgui
++    PUBLIC
++      hololink::core
++      CUDA::cuda_driver
++      CUDA::nvrtc
++      ${CUDA_NVTX_TARGET}
++      fmt::fmt-header-only
++    )
++endif() # HOLOLINK_BUILD_ROCE
+ 
+ # Installation of the hololink library
+ set_target_properties(hololink PROPERTIES EXPORT_NAME common)
+diff --git a/src/hololink/core/logging_internal.hpp b/src/hololink/core/logging_internal.hpp
+index a788729..9049947 100644
+--- a/src/hololink/core/logging_internal.hpp
++++ b/src/hololink/core/logging_internal.hpp
+@@ -77,7 +77,12 @@ template <typename FormatT, typename... ArgsT>
+ static inline void hsb_log_fmt(char const* file, unsigned line, const char* function, HsbLogLevel level, const FormatT& format, ArgsT&&... args)
+ {
+     if (level >= hsb_log_level) {
++// Version number of the fmt library represented as (major * 10000 + minor * 100 + patch)
++#if FMT_VERSION >= 110000
++        auto fmt_args = fmt::make_format_args(args...);
++#else
+         auto fmt_args = fmt::make_format_args<fmt::buffer_context<fmt::char_t<FormatT>>>(args...);
++#endif
+         hsb_logger(file, line, function, level, fmt::vformat(format, fmt_args).c_str());
+     }
+ }
+diff --git a/src/hololink/core/networking.hpp b/src/hololink/core/networking.hpp
+index 64ec2ff..e2efbc4 100644
+--- a/src/hololink/core/networking.hpp
++++ b/src/hololink/core/networking.hpp
+@@ -21,6 +21,7 @@
+ #include <unistd.h> // for close()
+ 
+ #include <array>
++#include <cstdint>
+ #include <memory>
+ #include <stdexcept>
+ #include <string>
+diff --git a/src/hololink/operators/CMakeLists.txt b/src/hololink/operators/CMakeLists.txt
+index eee3a51..f3f90aa 100644
+--- a/src/hololink/operators/CMakeLists.txt
++++ b/src/hololink/operators/CMakeLists.txt
+@@ -58,12 +58,14 @@ add_subdirectory(image_processor)
+ add_subdirectory(iq_dec)
+ add_subdirectory(iq_enc)
+ add_subdirectory(linux_coe_receiver)
+-add_subdirectory(linux_receiver)
+ add_subdirectory(packed_format_converter)
++if (HOLOLINK_BUILD_ROCE)
++add_subdirectory(linux_receiver)
+ add_subdirectory(roce_receiver)
+ add_subdirectory(roce_transmitter)
+ add_subdirectory(sig_gen)
+ add_subdirectory(sig_viewer)
++endif() # HOLOLINK_BUILD_ROCE
+ if(HOLOLINK_BUILD_SIPL)
+   add_subdirectory(sipl_capture)
+ endif()
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index 98d4717..5db4161 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -74,6 +74,7 @@ ConfigureTest(
+     hololink::operators::iq_enc
+ )
+ 
++if (HOLOLINK_BUILD_ROCE)
+ ConfigureTest(
+     signal_generator_test
+   SOURCES
+@@ -89,3 +90,4 @@ ConfigureTest(
+   LINK_LIBRARIES
+     hololink::operators::roce_transmitter
+ )
++endif() # HOLOLINK_BUILD_ROCE
+-- 
+2.43.0
+
