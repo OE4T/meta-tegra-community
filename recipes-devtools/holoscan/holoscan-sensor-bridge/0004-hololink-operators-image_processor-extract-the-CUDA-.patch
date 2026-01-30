@@ -1,7 +1,8 @@
-From fd5c50e9c2df1f76a2ff60ee6a9c971bc6c1f392 Mon Sep 17 00:00:00 2001
+From de930c75454e44abb711a5e3103471a07b1706c6 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Mon, 26 Jan 2026 16:49:44 -0800
-Subject: [PATCH 2/3] extract the CUDA kernel from the image processor
+Date: Thu, 29 Jan 2026 15:18:31 -0800
+Subject: [PATCH 4/6] hololink:operators: image_processor: extract the CUDA
+ kernel from the image processor
 
 - Use .cu file that contains the CUDA kernel
 - Ajust the Cmake file to build the .cu file
@@ -774,5 +775,5 @@ index 0000000..9a7e158
 +
 +#endif /* SRC_HOLOLINK_OPERATORS_IMAGE_PROCESSOR_IMAGE_PROCESSOR_KERNELS_CUH */
 -- 
-2.43.0
+2.34.1
 

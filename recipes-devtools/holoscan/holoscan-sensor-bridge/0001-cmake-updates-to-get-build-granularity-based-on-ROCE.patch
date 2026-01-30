@@ -1,26 +1,35 @@
-From 15f30aafd2835e0250f5b100933e4f8e2de3de6e Mon Sep 17 00:00:00 2001
+From 0644c8937939fb31a534f3a3de11911b4609b2a6 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Fri, 23 Jan 2026 16:41:36 -0800
-Subject: [PATCH 1/3] Updates for OE cross builds
+Date: Thu, 29 Jan 2026 15:11:24 -0800
+Subject: [PATCH 1/6] cmake: updates to get build granularity based on ROCE,
+ COE and Linux Socket
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt                           |   7 +
- cmake/Findibverbs.cmake                  |  24 +-
- examples/CMakeLists.txt                  | 265 ++++++++++++-----------
- python/hololink/operators/CMakeLists.txt |   2 +
- src/hololink/common/CMakeLists.txt       |  72 ++++--
- src/hololink/core/logging_internal.hpp   |   5 +
- src/hololink/core/networking.hpp         |   1 +
- src/hololink/operators/CMakeLists.txt    |   4 +-
- tests/CMakeLists.txt                     |   2 +
- 9 files changed, 222 insertions(+), 160 deletions(-)
+ CMakeLists.txt                                |   9 +-
+ cmake/Findibverbs.cmake                       |  26 +-
+ cmake/hololink_deps/fmt.cmake                 |   2 +-
+ cmake/hololink_deps/pybind11.cmake            |   2 +-
+ examples/CMakeLists.txt                       | 268 +++++++++---------
+ python/hololink/operators/CMakeLists.txt      |   8 +-
+ src/hololink/CMakeLists.txt                   |   2 +
+ src/hololink/common/CMakeLists.txt            |  74 +++--
+ src/hololink/operators/CMakeLists.txt         |   8 +-
+ .../operators/linux_receiver/CMakeLists.txt   |  20 +-
+ tests/CMakeLists.txt                          |   4 +-
+ 11 files changed, 245 insertions(+), 178 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index f95e951..633da30 100644
+index f95e951..6ec433e 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # SPDX-License-Identifier: Apache-2.0
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
 @@ -25,6 +25,9 @@ option(HOLOLINK_BUILD_ARGUS_ISP "Build Argus ISP support" OFF)
  option(HOLOLINK_BUILD_SIPL "Build NvSIPL capture components" OFF)
  option(HOLOLINK_BUILD_EMULATOR "Build HSB Emulator components" ON)
@@ -43,9 +52,16 @@ index f95e951..633da30 100644
    find_package(holoscan 3.6 REQUIRED CONFIG PATHS "/opt/nvidia/holoscan")
  
 diff --git a/cmake/Findibverbs.cmake b/cmake/Findibverbs.cmake
-index ac31fd0..20ad3d2 100644
+index ac31fd0..130095c 100644
 --- a/cmake/Findibverbs.cmake
 +++ b/cmake/Findibverbs.cmake
+@@ -1,5 +1,5 @@
+ 
+-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # SPDX-License-Identifier: Apache-2.0
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
 @@ -14,18 +14,20 @@
  # See the License for the specific language governing permissions and
  # limitations under the License.
@@ -78,11 +94,43 @@ index ac31fd0..20ad3d2 100644
 -mark_as_advanced(ibverbs_INCLUDE_DIRS ibverbs_LIBRARIES)
 +  mark_as_advanced(ibverbs_INCLUDE_DIRS ibverbs_LIBRARIES)
 +endif() # HOLOLINK_BUILD_ROCE
+diff --git a/cmake/hololink_deps/fmt.cmake b/cmake/hololink_deps/fmt.cmake
+index 9d6e676..d6bae1b 100644
+--- a/cmake/hololink_deps/fmt.cmake
++++ b/cmake/hololink_deps/fmt.cmake
+@@ -4,7 +4,7 @@
+ # version (either via CMake config or header discovery).
+ 
+ include_guard(GLOBAL)
+-set(HOLOLINK_FMT_VERSION "10.1.1")
++set(HOLOLINK_FMT_VERSION "12.1.0")
+ 
+ # Already exists?
+ if(TARGET fmt::fmt-header-only)
+diff --git a/cmake/hololink_deps/pybind11.cmake b/cmake/hololink_deps/pybind11.cmake
+index ca48242..f582e19 100644
+--- a/cmake/hololink_deps/pybind11.cmake
++++ b/cmake/hololink_deps/pybind11.cmake
+@@ -4,7 +4,7 @@
+ # pre-installed version or fetching it via FetchContent.
+ 
+ include_guard(GLOBAL)
+-set(HOLOLINK_PYBIND11_VERSION "2.13.6")
++set(HOLOLINK_PYBIND11_VERSION "3.0.1")
+ 
+ # Already exists?
+ if(TARGET pybind11::pybind11)
 diff --git a/examples/CMakeLists.txt b/examples/CMakeLists.txt
-index ca64d49..58352d9 100644
+index ca64d49..2361b2b 100644
 --- a/examples/CMakeLists.txt
 +++ b/examples/CMakeLists.txt
-@@ -15,151 +15,161 @@
+@@ -1,4 +1,4 @@
+-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # SPDX-License-Identifier: Apache-2.0
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -15,151 +15,162 @@
  
  set(EXAMPLE_INSTALL_TARGETS)
  if(NOT HOLOLINK_BUILD_ONLY_NATIVE)
@@ -185,6 +233,7 @@ index ca64d49..58352d9 100644
 -    holoscan::ops::bayer_demosaic
 -    holoscan::ops::holoviz
 -  )
++  include(hololink_deps/pybind11)
 +  target_link_libraries(linux_imx274_player
 +    PRIVATE
 +      hololink
@@ -354,7 +403,7 @@ index ca64d49..58352d9 100644
  
  if(HOLOLINK_BUILD_SIPL)
    add_executable(sipl_player
-@@ -181,24 +191,25 @@ if(HOLOLINK_BUILD_SIPL)
+@@ -181,24 +192,25 @@ if(HOLOLINK_BUILD_SIPL)
    list(APPEND EXAMPLE_INSTALL_TARGETS sipl_player)
  endif() # HOLOLINK_BUILD_SIPL
  
@@ -396,7 +445,7 @@ index ca64d49..58352d9 100644
  
  endif() # NOT HOLOLINK_BUILD_ONLY_NATIVE
  
-@@ -215,7 +226,7 @@ list(APPEND EXAMPLE_INSTALL_FILES
+@@ -215,7 +227,7 @@ list(APPEND EXAMPLE_INSTALL_FILES
       sipl_config/vb1940_single.json)
  endif()
  
@@ -406,24 +455,60 @@ index ca64d49..58352d9 100644
      body_pose_estimation.py
      distributed_imx274_player.py
 diff --git a/python/hololink/operators/CMakeLists.txt b/python/hololink/operators/CMakeLists.txt
-index ba8bd94..5d77ea7 100644
+index ba8bd94..f8412ab 100644
 --- a/python/hololink/operators/CMakeLists.txt
 +++ b/python/hololink/operators/CMakeLists.txt
-@@ -29,8 +29,10 @@ add_subdirectory(linux_receiver)
+@@ -1,4 +1,4 @@
+-# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # SPDX-License-Identifier: Apache-2.0
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -23,16 +23,18 @@ if(HOLOLINK_BUILD_FUSA)
+   add_subdirectory(fusa_coe_capture)
+ endif()
+ add_subdirectory(image_processor)
+-add_subdirectory(iq_dec)
+-add_subdirectory(iq_enc)
+ add_subdirectory(linux_receiver)
  add_subdirectory(linux_receiver_op)
  add_subdirectory(linux_coe_receiver)
  add_subdirectory(packed_format_converter)
 +if (HOLOLINK_BUILD_ROCE)
++add_subdirectory(iq_dec)
++add_subdirectory(iq_enc)
  add_subdirectory(roce_receiver)
  add_subdirectory(roce_transmitter)
-+endif() # HOLOLINK_BUILD_ROCE
  add_subdirectory(sig_gen)
  add_subdirectory(sig_viewer)
++endif() # HOLOLINK_BUILD_ROCE
  if(HOLOLINK_BUILD_SIPL)
+   add_subdirectory(sipl_capture)
+ endif()
+diff --git a/src/hololink/CMakeLists.txt b/src/hololink/CMakeLists.txt
+index d38cb5d..6218783 100644
+--- a/src/hololink/CMakeLists.txt
++++ b/src/hololink/CMakeLists.txt
+@@ -17,7 +17,9 @@ add_subdirectory(core)
+ add_subdirectory(sensors)
+ if (NOT HOLOLINK_BUILD_ONLY_NATIVE)
+ add_subdirectory(common)
++if (HOLOLINK_BUILD_ROCE)
+ add_subdirectory(expr_eval)
++endif() # HOLOLINK_BUILD_ROCE
+ add_subdirectory(operators)
+ add_subdirectory(emulation)
+ endif()
 diff --git a/src/hololink/common/CMakeLists.txt b/src/hololink/common/CMakeLists.txt
-index e7945b9..6ebbf2d 100644
+index e7945b9..d7053fe 100644
 --- a/src/hololink/common/CMakeLists.txt
 +++ b/src/hololink/common/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # SPDX-License-Identifier: Apache-2.0
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
 @@ -13,14 +13,22 @@
  # See the License for the specific language governing permissions and
  # limitations under the License.
@@ -518,47 +603,28 @@ index e7945b9..6ebbf2d 100644
  
  # Installation of the hololink library
  set_target_properties(hololink PROPERTIES EXPORT_NAME common)
-diff --git a/src/hololink/core/logging_internal.hpp b/src/hololink/core/logging_internal.hpp
-index a788729..9049947 100644
---- a/src/hololink/core/logging_internal.hpp
-+++ b/src/hololink/core/logging_internal.hpp
-@@ -77,7 +77,12 @@ template <typename FormatT, typename... ArgsT>
- static inline void hsb_log_fmt(char const* file, unsigned line, const char* function, HsbLogLevel level, const FormatT& format, ArgsT&&... args)
- {
-     if (level >= hsb_log_level) {
-+// Version number of the fmt library represented as (major * 10000 + minor * 100 + patch)
-+#if FMT_VERSION >= 110000
-+        auto fmt_args = fmt::make_format_args(args...);
-+#else
-         auto fmt_args = fmt::make_format_args<fmt::buffer_context<fmt::char_t<FormatT>>>(args...);
-+#endif
-         hsb_logger(file, line, function, level, fmt::vformat(format, fmt_args).c_str());
-     }
- }
-diff --git a/src/hololink/core/networking.hpp b/src/hololink/core/networking.hpp
-index 64ec2ff..e2efbc4 100644
---- a/src/hololink/core/networking.hpp
-+++ b/src/hololink/core/networking.hpp
-@@ -21,6 +21,7 @@
- #include <unistd.h> // for close()
- 
- #include <array>
-+#include <cstdint>
- #include <memory>
- #include <stdexcept>
- #include <string>
 diff --git a/src/hololink/operators/CMakeLists.txt b/src/hololink/operators/CMakeLists.txt
-index eee3a51..f3f90aa 100644
+index eee3a51..71deabd 100644
 --- a/src/hololink/operators/CMakeLists.txt
 +++ b/src/hololink/operators/CMakeLists.txt
-@@ -58,12 +58,14 @@ add_subdirectory(image_processor)
- add_subdirectory(iq_dec)
- add_subdirectory(iq_enc)
+@@ -1,4 +1,4 @@
+-# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # SPDX-License-Identifier: Apache-2.0
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -55,15 +55,17 @@ if(HOLOLINK_BUILD_FUSA)
+ add_subdirectory(fusa_coe_capture)
+ endif()
+ add_subdirectory(image_processor)
+-add_subdirectory(iq_dec)
+-add_subdirectory(iq_enc)
  add_subdirectory(linux_coe_receiver)
--add_subdirectory(linux_receiver)
+ add_subdirectory(linux_receiver)
  add_subdirectory(packed_format_converter)
 +if (HOLOLINK_BUILD_ROCE)
-+add_subdirectory(linux_receiver)
++add_subdirectory(iq_dec)
++add_subdirectory(iq_enc)
  add_subdirectory(roce_receiver)
  add_subdirectory(roce_transmitter)
  add_subdirectory(sig_gen)
@@ -567,17 +633,54 @@ index eee3a51..f3f90aa 100644
  if(HOLOLINK_BUILD_SIPL)
    add_subdirectory(sipl_capture)
  endif()
+diff --git a/src/hololink/operators/linux_receiver/CMakeLists.txt b/src/hololink/operators/linux_receiver/CMakeLists.txt
+index 9da9284..105b0c1 100644
+--- a/src/hololink/operators/linux_receiver/CMakeLists.txt
++++ b/src/hololink/operators/linux_receiver/CMakeLists.txt
+@@ -27,12 +27,20 @@ set_property(TARGET linux_receiver_op PROPERTY POSITION_INDEPENDENT_CODE ON)
+ add_library(hololink::operators::linux_receiver ALIAS linux_receiver)
+ add_library(hololink::operators::linux_receiver_op ALIAS linux_receiver_op)
+ 
+-target_include_directories(linux_receiver
+-  INTERFACE
+-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../..>
+-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+-    ${ibverbs_INCLUDE_DIRS}
+-  )
++if (HOLOLINK_BUILD_ROCE)
++  target_include_directories(linux_receiver
++    INTERFACE
++        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../..>
++        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
++        ${ibverbs_INCLUDE_DIRS}
++    )
++else()
++  target_include_directories(linux_receiver
++    INTERFACE
++      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../..>
++      $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
++    )
++endif() # HOLOLINK_BUILD_ROCE
+ 
+ target_include_directories(linux_receiver_op
+   INTERFACE
 diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
-index 98d4717..5db4161 100644
+index 98d4717..4e07d86 100644
 --- a/tests/CMakeLists.txt
 +++ b/tests/CMakeLists.txt
-@@ -74,6 +74,7 @@ ConfigureTest(
-     hololink::operators::iq_enc
- )
+@@ -1,4 +1,4 @@
+-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # SPDX-License-Identifier: Apache-2.0
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+@@ -65,6 +65,7 @@ endfunction()
  
+ # ##################################################################################################
+ # * core tests ----------------------------------------------------------------------------------
 +if (HOLOLINK_BUILD_ROCE)
  ConfigureTest(
-     signal_generator_test
+     iq_encoder_decoder_test
    SOURCES
 @@ -89,3 +90,4 @@ ConfigureTest(
    LINK_LIBRARIES
@@ -585,5 +688,5 @@ index 98d4717..5db4161 100644
  )
 +endif() # HOLOLINK_BUILD_ROCE
 -- 
-2.43.0
+2.34.1
 

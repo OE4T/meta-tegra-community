@@ -1,0 +1,38 @@
+From b37bd601bf2dd06d0336782cc2f6e1baff279c3f Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Thu, 29 Jan 2026 15:13:18 -0800
+Subject: [PATCH 2/6] logging: fix build issue when using recent FMT version
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ src/hololink/core/logging_internal.hpp | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/src/hololink/core/logging_internal.hpp b/src/hololink/core/logging_internal.hpp
+index a788729..1ab12ff 100644
+--- a/src/hololink/core/logging_internal.hpp
++++ b/src/hololink/core/logging_internal.hpp
+@@ -1,5 +1,5 @@
+ /**
+- * SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * SPDX-License-Identifier: Apache-2.0
+  *
+  * Licensed under the Apache License, Version 2.0 (the "License");
+@@ -77,7 +77,12 @@ template <typename FormatT, typename... ArgsT>
+ static inline void hsb_log_fmt(char const* file, unsigned line, const char* function, HsbLogLevel level, const FormatT& format, ArgsT&&... args)
+ {
+     if (level >= hsb_log_level) {
++// Version number of the fmt library represented as (major * 10000 + minor * 100 + patch)
++#if FMT_VERSION >= 110000
++        auto fmt_args = fmt::make_format_args(args...);
++#else
+         auto fmt_args = fmt::make_format_args<fmt::buffer_context<fmt::char_t<FormatT>>>(args...);
++#endif
+         hsb_logger(file, line, function, level, fmt::vformat(format, fmt_args).c_str());
+     }
+ }
+-- 
+2.34.1
+

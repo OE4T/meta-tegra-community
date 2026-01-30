@@ -1,0 +1,33 @@
+From 0b1c666018265c3fe6edabb6c640e8b77573eb47 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Thu, 29 Jan 2026 15:15:14 -0800
+Subject: [PATCH 3/6] hololink: core: networking: fix build issue with GCC 15.2
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ src/hololink/core/networking.hpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/hololink/core/networking.hpp b/src/hololink/core/networking.hpp
+index 64ec2ff..20dc0d8 100644
+--- a/src/hololink/core/networking.hpp
++++ b/src/hololink/core/networking.hpp
+@@ -1,5 +1,5 @@
+ /*
+- * SPDX-FileCopyrightText: Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * SPDX-License-Identifier: Apache-2.0
+  *
+  * Licensed under the Apache License, Version 2.0 (the "License");
+@@ -21,6 +21,7 @@
+ #include <unistd.h> // for close()
+ 
+ #include <array>
++#include <cstdint>
+ #include <memory>
+ #include <stdexcept>
+ #include <string>
+-- 
+2.34.1
+

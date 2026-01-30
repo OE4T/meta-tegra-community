@@ -1,0 +1,44 @@
+From 3e6f7946c959bd62d1779b95ed8c81622e4f6293 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Thu, 29 Jan 2026 15:23:17 -0800
+Subject: [PATCH 5/6] docs: user_guide: improve IP settings without Network
+ Manager
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ docs/user_guide/setup.md | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/docs/user_guide/setup.md b/docs/user_guide/setup.md
+index b24d29c..03a18e6 100644
+--- a/docs/user_guide/setup.md
++++ b/docs/user_guide/setup.md
+@@ -480,6 +480,8 @@ which is the RJ45 connector on the AGX Orin.
+ 
+ - Enable the network interface and ensure that the camera enumerates (assumes camera IP address 192.168.0.2):
+ 
++  - with Network Manager:
++
+   ```none
+   EN0=mgbe0_0
+   sudo nmcli con add con-name hololink-$EN0 ifname $EN0 type ethernet ip4 192.168.0.101/24
+@@ -487,6 +489,15 @@ which is the RJ45 connector on the AGX Orin.
+   sudo nmcli connection up hololink-$EN0
+   ```
+ 
++  - Without Network manager
++
++  ```none
++  EN0=mgbe0_0
++  sudo ip link set dev $EN0 up
++  sudo ip addr add 192.168.0.101/24 dev $EN0
++  sudo ip route add 192.168.0.2/32 dev $EN0
++  ```
++
+ - Obtain and build holoscan sensor bridge:
+ 
+   holoscan sensor bridge release v2.5 supports running C++ Li VB1940 accelerated networking [SIPL](https://docs.nvidia.com/jetson/archives/r38.2.1/DeveloperGuide/SD/CameraDevelopment/CoECameraDevelopment/SIPL-for-L4T/Introduction-to-SIPL.html) based examples 
+-- 
+2.34.1
+
