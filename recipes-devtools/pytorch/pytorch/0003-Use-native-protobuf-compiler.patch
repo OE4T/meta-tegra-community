@@ -13,7 +13,7 @@ index 77ec3622b..e64f92bca 100644
 @@ -6,12 +6,19 @@ if(NOT Protobuf_FOUND)
    find_package(Protobuf MODULE QUIET)
  endif()
- 
+
 -if((TARGET protobuf::libprotobuf OR TARGET protobuf::libprotobuf-lite) AND TARGET protobuf::protoc)
 +if(TARGET protobuf::libprotobuf OR TARGET protobuf::libprotobuf-lite)
    # Hooray. This is the most ideal situation, meaning that you either have a
@@ -31,6 +31,6 @@ index 77ec3622b..e64f92bca 100644
  elseif(Protobuf_FOUND OR PROTOBUF_FOUND)
    # If the modern targets are not present, we will generate them for you for
    # backward compatibility. This is backported from CMake's new FindProtobuf.cmake
--- 
+--
 2.34.1
 
