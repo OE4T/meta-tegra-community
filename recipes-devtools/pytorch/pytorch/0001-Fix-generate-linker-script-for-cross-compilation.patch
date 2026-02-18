@@ -1,0 +1,41 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Peter Bergin <peter@berginkonsult.se>
+Date: Mon, 17 Feb 2026 00:00:00 +0000
+Subject: [PATCH] Fix generate_linker_script for cross compilation
+
+The LD environment variable in cross-compilation environments like
+OpenEmbedded contains both the linker executable and flags such as
+--sysroot. The script was passing the entire string as a single
+executable name to subprocess, causing a FileNotFoundError. Use
+shlex.split() to properly tokenize the LD variable.
+
+Upstream-Status: Inappropriate [OE-specific]
+
+AI-Generated: Uses Claude
+
+Signed-off-by: Peter Bergin <peter@berginkonsult.se>
+Signed-off-by: Peter Bergin <peter.bergin@1x.tech>
+---
+ tools/setup_helpers/generate_linker_script.py | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/tools/setup_helpers/generate_linker_script.py b/tools/setup_helpers/generate_linker_script.py
+index 1234567..abcdefg 100644
+--- a/tools/setup_helpers/generate_linker_script.py
++++ b/tools/setup_helpers/generate_linker_script.py
+@@ -1,5 +1,6 @@
+ import argparse
+ import os
++import shlex
+ import subprocess
+ from pathlib import Path
+
+@@ -13,7 +14,7 @@ def gen_linker_script(
+             line.replace("\n", "") for line in prioritized_text if line != "\n"
+         ]
+     ld = os.environ.get("LD", "ld")
+-    linker_script_lines = subprocess.check_output([ld, "-verbose"], text=True).split(
++    linker_script_lines = subprocess.check_output(shlex.split(ld) + ["-verbose"], text=True).split(
+         "\n"
+     )
+
