@@ -1,6 +1,6 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 33966d1694a137a9363ee42632379b7ac413fe80 Mon Sep 17 00:00:00 2001
 From: Peter Bergin <peter@berginkonsult.se>
-Date: Mon, 17 Feb 2026 00:00:00 +0000
+Date: Tue, 17 Feb 2026 00:00:00 +0000
 Subject: [PATCH] Fix CUDA build rules for cross compilation
 
 Remove CMAKE_CUDA_FLAGS appends that occur before enable_language(CUDA).
@@ -34,32 +34,34 @@ Signed-off-by: Peter Bergin <peter.bergin@1x.tech>
  5 files changed, 9 insertions(+), 4 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 5304d054e..858f60f82 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -67,10 +67,8 @@ endif()
-
+@@ -67,8 +67,6 @@ endif()
  # This define is needed to preserve behavior given anticpated changes to
  # cccl/thrust
  # https://nvidia.github.io/cccl/libcudacxx/standard_api/numerics_library/complex.html
 -string(APPEND CMAKE_CUDA_FLAGS
 -       " -DLIBCUDACXX_ENABLE_SIMPLIFIED_COMPLEX_OPERATIONS")
-
+ 
  if(LINUX)
    set(CXX_STANDARD_REQUIRED ON)
- endif()
 @@ -674,8 +672,6 @@ if(MSVC)
    string(APPEND CMAKE_CUDA_FLAGS " -Xcompiler /FS")
  endif(MSVC)
-
+ 
 -string(APPEND CMAKE_CUDA_FLAGS " -Xfatbin -compress-all")
 -
  # Set linker max-page-size to 64KiB on AArch64 Linux
  if(LINUX AND CPU_AARCH64)
    add_link_options_if_supported("-z,max-page-size=0x10000")
 diff --git a/aten/src/ATen/CMakeLists.txt b/aten/src/ATen/CMakeLists.txt
+index a3e841ca2..ea8713c89 100644
 --- a/aten/src/ATen/CMakeLists.txt
 +++ b/aten/src/ATen/CMakeLists.txt
-@@ -449,4 +449,6 @@ if(USE_CUDA)
+@@ -447,6 +447,8 @@ endif()
+ 
+ if(USE_CUDA)
    list(APPEND ATen_CUDA_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
 +  # Add target-sysroot CUDA headers for cross compilation
 +  list(APPEND ATen_CUDA_INCLUDE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
@@ -67,12 +69,13 @@ diff --git a/aten/src/ATen/CMakeLists.txt b/aten/src/ATen/CMakeLists.txt
    list(APPEND ATen_CUDA_INCLUDE $<TARGET_PROPERTY:fmt::fmt-header-only,INTERFACE_INCLUDE_DIRECTORIES>)
    list(APPEND ATen_CUDA_DEPENDENCY_LIBS fmt::fmt-header-only)
 diff --git a/c10/cuda/CMakeLists.txt b/c10/cuda/CMakeLists.txt
+index 2604f6778..882435cb4 100644
 --- a/c10/cuda/CMakeLists.txt
 +++ b/c10/cuda/CMakeLists.txt
-@@ -79,6 +79,9 @@ else()
+@@ -79,6 +79,9 @@ if(NOT BUILD_LIBTORCHLESS)
        $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
        $<INSTALL_INTERFACE:include>)
-
+ 
 +  target_include_directories(
 +      c10_cuda PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 +
@@ -80,14 +83,18 @@ diff --git a/c10/cuda/CMakeLists.txt b/c10/cuda/CMakeLists.txt
  # Note: for now, we will put all export path into one single Caffe2Targets group
  # to deal with the cmake deployment need. Inside the Caffe2Targets set, the
 diff --git a/caffe2/CMakeLists.txt b/caffe2/CMakeLists.txt
+index 6cbaecc5d..d7d6b9656 100644
 --- a/caffe2/CMakeLists.txt
 +++ b/caffe2/CMakeLists.txt
-@@ -577,3 +577,4 @@ if(USE_CUDA)
+@@ -575,6 +575,7 @@ if(USE_CUDA)
+   endif()
+ 
    target_link_libraries(caffe2_nvrtc PRIVATE caffe2::nvrtc ${DELAY_LOAD_FLAGS})
 +  target_include_directories(caffe2_nvrtc PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
    install(TARGETS caffe2_nvrtc DESTINATION "${TORCH_INSTALL_LIB_DIR}")
    if(USE_NCCL)
-@@ -1089,6 +1090,7 @@ if(USE_CUDA)
+     list(APPEND Caffe2_GPU_SRCS
+@@ -1088,6 +1089,7 @@ elseif(USE_CUDA)
    if(BUILD_LAZY_CUDA_LINALG)
      add_library(torch_cuda_linalg ${ATen_CUDA_LINALG_SRCS})
      target_compile_definitions(torch_cuda_linalg PRIVATE USE_CUDA BUILD_LAZY_CUDA_LINALG)
@@ -96,9 +103,12 @@ diff --git a/caffe2/CMakeLists.txt b/caffe2/CMakeLists.txt
      # `torch::magma` should be mentioned before other CUDA
      # to transitively include all symbols present in torch_cuda/torch_cpu
 diff --git a/torch/CMakeLists.txt b/torch/CMakeLists.txt
+index 3a3ca0f12..1515836b7 100644
 --- a/torch/CMakeLists.txt
 +++ b/torch/CMakeLists.txt
-@@ -137,4 +137,6 @@ if(USE_CUDA)
+@@ -135,6 +135,8 @@ if(USE_CUDA)
+     list(APPEND TORCH_PYTHON_SRCS ${GENERATED_THNN_CXX_CUDA})
+ 
      list(APPEND TORCH_PYTHON_COMPILE_DEFINITIONS USE_CUDA)
 +    # Add target-sysroot CUDA headers for cross compilation
 +    list(APPEND TORCH_PYTHON_INCLUDE_DIRECTORIES ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})

@@ -24,6 +24,7 @@ SRC_URI += " \
     file://0001-Fix-generate-linker-script-for-cross-compilation.patch \
     file://0002-Fix-CUDA-build-rules-for-cross-compilation.patch \
     file://0003-Use-native-protobuf-compiler.patch \
+    file://0004-Prepend-Modules_CUDA_fix-to-CMAKE_MODULE_PATH.patch \
 "
 
 S = "${UNPACKDIR}/${PN}-v${PV}"
@@ -47,7 +48,7 @@ EXTRA_OECMAKE += " \
     -DPROTOBUF_PROTOC_EXECUTABLE=${STAGING_BINDIR_NATIVE}/protoc \
     -DUSE_SYSTEM_ONNX=ON \
     -DUSE_SYSTEM_PYBIND11=ON \
-    -DTORCH_CUDA_ARCH_LIST=${@'.'.join(list(d.getVar('CUDA_ARCHITECTURES')))} \
+    -DTORCH_CUDA_ARCH_LIST=${@' '.join(['%s.%s' % (a[:-1], a[-1]) for a in d.getVar('CUDA_ARCHITECTURES').split()])} \
 "
 
 # Disable installing the fmt third-party library, which may cause conflicts
