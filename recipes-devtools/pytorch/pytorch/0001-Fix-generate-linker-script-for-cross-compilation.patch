@@ -1,6 +1,6 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 0954b099e329ef14c392d6ec9ecfb52e4bedd32d Mon Sep 17 00:00:00 2001
 From: Peter Bergin <peter@berginkonsult.se>
-Date: Mon, 17 Feb 2026 00:00:00 +0000
+Date: Tue, 17 Feb 2026 00:00:00 +0000
 Subject: [PATCH] Fix generate_linker_script for cross compilation
 
 The LD environment variable in cross-compilation environments like
@@ -20,7 +20,7 @@ Signed-off-by: Peter Bergin <peter.bergin@1x.tech>
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/tools/setup_helpers/generate_linker_script.py b/tools/setup_helpers/generate_linker_script.py
-index 1234567..abcdefg 100644
+index 39eab3145..b5768659b 100644
 --- a/tools/setup_helpers/generate_linker_script.py
 +++ b/tools/setup_helpers/generate_linker_script.py
 @@ -1,5 +1,6 @@
@@ -29,7 +29,7 @@ index 1234567..abcdefg 100644
 +import shlex
  import subprocess
  from pathlib import Path
-
+ 
 @@ -13,7 +14,7 @@ def gen_linker_script(
              line.replace("\n", "") for line in prioritized_text if line != "\n"
          ]
@@ -38,4 +38,4 @@ index 1234567..abcdefg 100644
 +    linker_script_lines = subprocess.check_output(shlex.split(ld) + ["-verbose"], text=True).split(
          "\n"
      )
-
+ 
