@@ -13,7 +13,7 @@ inherit cmake cuda
 EXTRA_OECMAKE = " \
     -DWITH_CUDA=1 \
     -DCMAKE_SKIP_RPATH=TRUE \
-    -DTORCH_CUDA_ARCH_LIST=${@'.'.join(list(d.getVar('CUDA_ARCHITECTURES')))} \
+    -DTORCH_CUDA_ARCH_LIST=${@' '.join(['%s.%s' % (a[:-1], a[-1]) for a in d.getVar('CUDA_ARCHITECTURES').split()])} \
 "
 
 DEPENDS += " \
