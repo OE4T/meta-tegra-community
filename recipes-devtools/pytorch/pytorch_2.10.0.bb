@@ -33,8 +33,8 @@ COMPATIBLE_MACHINE = "(cuda)"
 
 inherit cmake cuda python3native python3-dir
 
-PACKAGECONFIG ??= ""
-PACKAGECONFIG[python] = "-DBUILD_PYTHON=1, -DBUILD_PYTHON=0, cuda-profiler-api, pytorch"
+PACKAGECONFIG ??= "python"
+PACKAGECONFIG[python] = "-DBUILD_PYTHON=1, -DBUILD_PYTHON=0, cuda-profiler-api, pytorch python3-typing-extensions"
 
 EXTRA_OECMAKE += " \
     -DGLIBCXX_USE_CXX11_ABI=1 \
