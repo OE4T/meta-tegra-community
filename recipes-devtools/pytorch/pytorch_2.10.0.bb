@@ -25,6 +25,7 @@ SRC_URI += " \
     file://0002-Fix-CUDA-build-rules-for-cross-compilation.patch \
     file://0003-Use-native-protobuf-compiler.patch \
     file://0004-Prepend-Modules_CUDA_fix-to-CMAKE_MODULE_PATH.patch \
+    file://0005-Fix-FMT-installation.patch \
 "
 
 S = "${UNPACKDIR}/${PN}-v${PV}"
