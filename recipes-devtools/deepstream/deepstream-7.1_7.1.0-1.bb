@@ -33,7 +33,7 @@ PACKAGECONFIG[realsense] = ""
 
 DEPENDS = "glib-2.0 gstreamer1.0 gstreamer1.0-plugins-base gstreamer1.0-rtsp-server \
     tensorrt-core tensorrt-plugins libnvvpi3 libcufft libcublas libnpp json-glib \
-    openssl111 tegra-libraries-multimedia-ds tegra-libraries-multimedia yaml-cpp-070 \
+    openssl tegra-libraries-multimedia-ds tegra-libraries-multimedia yaml-cpp-070 \
     grpc protobuf tegra-libraries-nvdsseimeta libgstnvcustomhelper mosquitto jsoncpp cuda-nvrtc \
 "
 # XXX--- see hack in do_install
