@@ -8,6 +8,7 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=8763b57f0092c337eb12c354870a324a"
 SRC_URI += "file://0001-fix-installation-process-issue-and-cleanup.patch \
             file://0002-fix-paths-to-match-with-OE-and-getting-the-right-ver.patch \
             file://0001-Fix-Python-3.14-multiprocessing-compatibility.patch \
+            file://0001-jtop-add-L4T-36.5.0-support.patch \
            "
 SRC_URI[sha256sum] = "38b11fcb6a27d59a194bc587e7665bccfc0c658979171969974550013e62afeb"
 
