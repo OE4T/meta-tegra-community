@@ -4,17 +4,11 @@ LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE.txt;md5=3b83ef96387f14655fc854ddc3c6bd57"
 
 SRC_URI = "git://github.com/nvidia-holoscan/holoscan-sdk.git;protocol=https;nobranch=1;tag=v${PV}"
-SRCREV = "e7cd7d15c4fa39d4c57985992486bbf75d147f47"
+SRCREV = "c5d33270eb23a9de12b24001ca70dc7f2309f6b2"
 
 SRC_URI += " \
     file://desktop-icons \
-    file://0001-Fix-GXF-TypenameAsString-error.patch \
-    file://0002-Use-external-library-dependencies.patch \
-    file://0003-Build-python-libs-with-install-RPATH.patch \
-    file://0004-Fix-TensorRT-include-interface.patch \
-    file://0005-Disable-various-warnings-as-errors.patch \
-    file://0006-Remove-GXF-python-modules-install.patch \
-    file://0007-Updates-for-OE-cross-builds.patch \
+    file://0001-Updates-for-OE-cross-builds.patch \
 "
 
 HOLOSCAN_INSTALL_PATH = "/opt/nvidia/holoscan"
@@ -29,6 +23,7 @@ do_compile[network] = "1"
 
 # Add extra build paths.
 EXTRA_OECMAKE:append = " \
+    -DHOLOSCAN_BUILD_DEPENDENCIES=OFF \
     -DCMAKE_INSTALL_PREFIX=${HOLOSCAN_INSTALL_PATH} \
     -DGXF_DIR=${RECIPE_SYSROOT}/opt/nvidia/gxf/lib/cmake/GXF \
     -DIMGUI_SOURCE_DIR=${RECIPE_SYSROOT}/opt/nvidia/imgui \
