@@ -1,6 +1,6 @@
-From 474f4d641b3ef149701a1389770b4ca7a08c8110 Mon Sep 17 00:00:00 2001
+From 4cef57e2113311f7273d026cb40938b6a9184d2c Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 22 Jan 2026 12:43:24 -0800
+Date: Tue, 3 Mar 2026 09:04:09 -0800
 Subject: [PATCH 9/9] Updates for OE cross builds
 
 Upstream-Status: Inappropriate [OE-specific]
@@ -103,7 +103,7 @@ index 021243b9..551c4ea5 100644
               PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
  
 diff --git a/applications/object_detection_torch/CMakeLists.txt b/applications/object_detection_torch/CMakeLists.txt
-index 515d6a10..7c2677ae 100644
+index 82ac0143..daa522d1 100644
 --- a/applications/object_detection_torch/CMakeLists.txt
 +++ b/applications/object_detection_torch/CMakeLists.txt
 @@ -16,6 +16,10 @@

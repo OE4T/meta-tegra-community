@@ -1,6 +1,6 @@
-From 2d3fceb333b36c5a51b36701fbc3ac2f5c1c2e9b Mon Sep 17 00:00:00 2001
+From ccecd7752b388959bb18caf9431fd31b2a58b814 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 22 Jan 2026 12:32:24 -0800
+Date: Tue, 3 Mar 2026 09:00:48 -0800
 Subject: [PATCH 1/9] Add install rules
 
 Upstream-Status: Inappropriate [OE-specific]
@@ -36,7 +36,7 @@ Signed-off-by: Ian Stewart <istewart@nvidia.com>
  27 files changed, 181 insertions(+)
 
 diff --git a/applications/colonoscopy_segmentation/CMakeLists.txt b/applications/colonoscopy_segmentation/CMakeLists.txt
-index e128bd2a..cd573ba1 100644
+index aee71228..b96014bd 100644
 --- a/applications/colonoscopy_segmentation/CMakeLists.txt
 +++ b/applications/colonoscopy_segmentation/CMakeLists.txt
 @@ -34,6 +34,14 @@ if(HOLOHUB_DOWNLOAD_DATASETS)
@@ -326,10 +326,10 @@ index 8af6d5ec..acab477c 100644
  if(BUILD_TESTING)
    # To get the environment path
 diff --git a/applications/object_detection_torch/CMakeLists.txt b/applications/object_detection_torch/CMakeLists.txt
-index ae8f5ca7..8eb0cd49 100644
+index 962230e7..9df6d7f2 100644
 --- a/applications/object_detection_torch/CMakeLists.txt
 +++ b/applications/object_detection_torch/CMakeLists.txt
-@@ -129,6 +129,15 @@ add_custom_target(object_detection_torch_yaml
+@@ -134,6 +134,15 @@ add_custom_target(object_detection_torch_yaml
  )
  add_dependencies(object_detection_torch object_detection_torch_yaml)
  
