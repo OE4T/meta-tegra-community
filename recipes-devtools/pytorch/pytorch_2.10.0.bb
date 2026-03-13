@@ -34,13 +34,14 @@ COMPATIBLE_MACHINE = "(cuda)"
 
 inherit cmake cuda python3native python3-dir
 
-PACKAGECONFIG ??= "python"
+PACKAGECONFIG ??= "numpy openmp python"
+PACKAGECONFIG[numpy] = "-DUSE_NUMPY=1, -DUSE_NUMPY=0, python3-numpy python3-numpy-native, python3-numpy"
+PACKAGECONFIG[openmp] = "-DUSE_OPENMP=ON, -DUSE_OPENMP=OFF"
 PACKAGECONFIG[python] = "-DBUILD_PYTHON=1, -DBUILD_PYTHON=0, cuda-profiler-api, pytorch python3-typing-extensions"
 
 EXTRA_OECMAKE += " \
     -DGLIBCXX_USE_CXX11_ABI=1 \
     -DBUILD_CUSTOM_PROTOBUF=0 \
-    -DUSE_OPENMP=OFF \
     -DUSE_XNNPACK=OFF \
     -DUSE_NCCL=OFF \
     -DUSE_CUSPARSELT=OFF \
