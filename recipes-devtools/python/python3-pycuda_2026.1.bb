@@ -5,7 +5,7 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=8dd9e67c46dbe605fba6aeb236b48c8a"
 
 DEPENDS = "python3-setuptools-native python3-cython-native python3-cython python3-numpy-native cuda-profiler-api"
 
-SRC_URI[sha256sum] = "d50d23ff6371482cff7d4b953ef40ab81c9df038ecb614484f9fd5347327327e"
+SRC_URI[sha256sum] = "759516160628ba06f32ce7e563e3f5b9214691dc9528a03ea99ea1073f4e14ba"
 SRC_URI:append = " file://0001-add-nvcc-flag-allow-unsupported-compiler-to-allow-cu.patch"
 
 COMPATIBLE_MACHINE = "(tegra)"
@@ -15,7 +15,7 @@ S = "${UNPACKDIR}/pycuda-${PV}"
 inherit pypi cuda setuptools3
 
 CUDA_PATH = "/usr/local/cuda-${CUDA_VERSION}"
-CFLAGS += "-I=${CUDA_PATH}/include"
+CXXFLAGS += "-I=${CUDA_PATH}/include"
 
 do_configure() {
     # special configururation
