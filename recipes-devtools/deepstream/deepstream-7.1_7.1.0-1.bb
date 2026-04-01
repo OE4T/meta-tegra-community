@@ -117,8 +117,10 @@ do_install() {
     patchelf --replace-needed libprotobuf.so.3.19.4.0 $protobuf_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_riva_audio_proto.so
     patchelf --replace-needed libnppial.so libnppial.so.12 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
     patchelf --replace-needed libnppist.so libnppist.so.12 ${D}${DEEPSTREAM_PATH}/lib/libnvds_vpicanmatch.so
-    patchelf --replace-needed libjsoncpp.so.25 libjsoncpp.so.26 ${D}${DEEPSTREAM_PATH}/lib/libnvds_rest_server.so
-    patchelf --replace-needed libjsoncpp.so.25 libjsoncpp.so.26 ${D}${libdir}/gstreamer-1.0/deepstream/libnvdsgst_nvmultiurisrcbin.so
+    jsoncpp_soname=$(${OBJDUMP} -p ${STAGING_LIBDIR}/libjsoncpp.so | grep SONAME | awk '{print $2}')
+    bbnote "Patching libjsoncpp NEEDED to $jsoncpp_soname"
+    patchelf --replace-needed libjsoncpp.so.25 $jsoncpp_soname ${D}${DEEPSTREAM_PATH}/lib/libnvds_rest_server.so
+    patchelf --replace-needed libjsoncpp.so.25 $jsoncpp_soname ${D}${libdir}/gstreamer-1.0/deepstream/libnvdsgst_nvmultiurisrcbin.so
     # ---XXX
     cd ${D}${DEEPSTREAM_BASEDIR}
     ln -s deepstream-7.1 deepstream
