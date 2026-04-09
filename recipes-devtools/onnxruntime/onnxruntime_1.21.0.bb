@@ -49,6 +49,11 @@ RDEPENDS:${PN} += " \
     cuda-nvrtc \
 "
 
+PYTHON_EXTRA_OECMAKE = " \
+    -Donnxruntime_ENABLE_PYTHON=ON \
+    -DPython_NumPy_INCLUDE_DIR=${RECIPE_SYSROOT}${PYTHON_SITEPACKAGES_DIR}/numpy/_core/include \
+"
+
 EXTRA_OECMAKE = " \
     -DONNX_CUSTOM_PROTOC_EXECUTABLE=${STAGING_BINDIR_NATIVE}/protoc \
     -Donnxruntime_BUILD_SHARED_LIB=ON \
@@ -65,14 +70,14 @@ EXTRA_OECMAKE = " \
     -Donnxruntime_USE_PREINSTALLED_EIGEN=OFF \
     -DCMAKE_SKIP_RPATH=ON \
     -DCMAKE_CXX_STANDARD=17 \
-    ${@bb.utils.contains('PACKAGECONFIG', 'python', '-Donnxruntime_ENABLE_PYTHON=ON', '', d)} \
+    ${@bb.utils.contains('PACKAGECONFIG', 'python', '${PYTHON_EXTRA_OECMAKE}', '', d)} \
 "
 
 OECMAKE_CXX_FLAGS:append = " -Wno-array-bounds -Wno-deprecated-declarations -Wno-unused-variable -Wno-template-id-cdtor -Wno-range-loop-construct -Wno-maybe-uninitialized -Wno-error=cpp -Wno-error=uninitialized"
 OECMAKE_SOURCEPATH = "${S}/cmake"
 
 PACKAGECONFIG ?= "python"
-PACKAGECONFIG[python] = ",,python3-numpy-native,python3-coloredlogs python3-flatbuffers python3-numpy python3-protobuf python3-sympy"
+PACKAGECONFIG[python] = ",,python3-numpy python3-numpy-native,python3-coloredlogs python3-flatbuffers python3-numpy python3-protobuf python3-sympy"
 
 do_configure() {
     cmake_do_configure
@@ -104,27 +109,7 @@ FILES:${PN}-dev = " \
 "
 FILES:python3-${PN} = "${PYTHON_SITEPACKAGES_DIR}"
 RDEPENDS:python3-${PN} = "${PN}"
-
-PACKAGECONFIG ?= "python"
-PACKAGECONFIG[python] = ",,python3-numpy-native,python3-coloredlogs python3-flatbuffers python3-numpy python3-protobuf python3-sympy"
-
-do_configure() {
-    cmake_do_configure
-}
-
-do_compile() {
-    cmake_do_compile
-    if "${@bb.utils.contains('PACKAGECONFIG', 'python', 'true', 'false', d)}"; then
-        setuptools3_do_compile
-    fi
-}
-
-do_install() {
-    cmake_do_install
-    if "${@bb.utils.contains('PACKAGECONFIG', 'python', 'true', 'false', d)}"; then
-        setuptools3_do_install
-    fi
-}
+RRECOMMENDS:${PN} += "${@bb.utils.contains('PACKAGECONFIG', 'python', 'python3-${PN}', '', d)}"
 
 INSANE_SKIP:${PN} = "buildpaths dev-so"
 INSANE_SKIP:python3-${PN} = "buildpaths"
