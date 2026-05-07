@@ -1,0 +1,77 @@
+From b5b8c6488764c74e42a37aec3c50810c539246f5 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Wed, 6 May 2026 15:59:49 -0700
+Subject: [PATCH] setup.py: support OE cross builds (interpreter + sysroot)
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ setup.py | 45 +++++++++++++++++++++++++++++++--------------
+ 1 file changed, 31 insertions(+), 14 deletions(-)
+
+diff --git a/setup.py b/setup.py
+index 2b60ff68a..d99c05dd0 100644
+--- a/setup.py
++++ b/setup.py
+@@ -95,20 +95,8 @@ def cd(path):
+ 
+ 
+ def get_python_execute():
+-    if WINDOWS:
+-        return sys.executable
+-    # Try to search more accurate path, because sys.executable may return a wrong one,
+-    # as discussed in https://github.com/python/cpython/issues/84399
+-    python_dir = os.path.abspath(
+-        os.path.join(sysconfig.get_path("include"), "..", "..")
+-    )
+-    if os.path.isdir(python_dir):
+-        python_bin = os.path.join(python_dir, "bin", "python3")
+-        if os.path.isfile(python_bin):
+-            return python_bin
+-        python_bin = os.path.join(python_dir, "bin", "python")
+-        if os.path.isfile(python_bin):
+-            return python_bin
++    # In cross builds, sysconfig points at target paths while sys.executable
++    # is the host-runnable native interpreter — trust it.
+     return sys.executable
+ 
+ 
+@@ -175,6 +163,35 @@ class CmakeBuild(setuptools.Command):
+                 "-DONNX_BUILD_PYTHON=ON",
+                 f"-DONNX_NAMESPACE={ONNX_NAMESPACE}",
+             ]
++            # Forward cross-build sysroot from CC/CXX so find_package can locate
++            # headers/libs in the staged sysroot rather than the build host's /.
++            import re as _re
++            _sysroot = ""
++            for _v in ("CC", "CXX"):
++                _m = _re.search(r"--sysroot=(\S+)", os.environ.get(_v, ""))
++                if _m:
++                    _sysroot = _m.group(1)
++                    break
++            if _sysroot:
++                _roots = [_sysroot]
++                _native = os.path.join(
++                    os.path.dirname(_sysroot), "recipe-sysroot-native"
++                )
++                if os.path.isdir(_native):
++                    _roots.append(_native)
++                cmake_args += [
++                    f"-DCMAKE_SYSROOT={_sysroot}",
++                    "-DCMAKE_FIND_ROOT_PATH=" + ";".join(_roots),
++                    "-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY",
++                    "-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY",
++                    "-DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY",
++                    "-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER",
++                ]
++                # Pin protobuf to the target sysroot — otherwise FindProtobuf
++                # may resolve through protobuf-native (wrong arch).
++                _proto = os.path.join(_sysroot, "usr/lib/libprotobuf.so")
++                if os.path.isfile(_proto):
++                    cmake_args.append(f"-DProtobuf_LIBRARY={_proto}")
+             if USE_NINJA and not WINDOWS and shutil.which("ninja"):
+                 cmake_args.append("-DCMAKE_GENERATOR=Ninja")
+ 
+-- 
+2.43.0
+
