@@ -1,0 +1,77 @@
+From de916f8ca1e1a80ecc58e4cf9603ef2384442097 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Wed, 6 May 2026 15:06:47 -0700
+Subject: [PATCH] Find Python and nanobind for cross builds
+
+When cross-compiling, the Python interpreter and the compiling/linking
+steps must use different packages (see
+https://gitlab.kitware.com/cmake/cmake/-/issues/25145). nanobind needs
+the Python::Module target, so reuse the interpreter Python3 resolved to
+(typically a *-native build matching the target's Python version) so
+Development.Module headers and SOABI line up with the target Python
+rather than whichever build-host Python find_package(Python) would
+otherwise pick up via PATH.
+
+Additionally, nanobind computes NB_DIR by ascending two directories from
+its own config file, expecting to live next to the nanobind source tree
+(cmake/, include/, src/, ext/). When find_package(nanobind) loads a
+config copied to a detached install location, NB_DIR resolves to the
+wrong directory and every ${NB_DIR}/include and
+${NB_DIR}/ext/robin_map/include path it constructs is broken. Ask the
+(native) Python interpreter for nanobind's in-tree CMake directory
+(site-packages/nanobind/cmake) and use it as nanobind_ROOT so the config
+is loaded from the real source tree, where NB_DIR resolves correctly.
+This is the discovery method documented by nanobind.
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ CMakeLists.txt | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index f7edfbd6e..272f92a00 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -163,9 +163,19 @@ if(CMAKE_CROSSCOMPILING)
+   # must use a different package. See the discussion about this at
+   # https://gitlab.kitware.com/cmake/cmake/-/issues/25145
+   if(ONNX_BUILD_PYTHON)
+-    find_package(Python3 REQUIRED COMPONENTS ${python_dev_component})
++    find_package(Python3 REQUIRED COMPONENTS Interpreter ${python_dev_component})
++  endif()
++  if(ONNX_BUILD_PYTHON)
++    # nanobind requires the Python::Module target. Reuse the interpreter
++    # Python3 resolved to (typically a *-native build matching the target's
++    # Python version) so Development.Module headers and SOABI line up with
++    # the target Python rather than whichever build-host Python
++    # find_package(Python) would otherwise pick up via PATH.
++    set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
++    find_package(Python REQUIRED COMPONENTS Interpreter ${python_dev_component})
++  else()
++    find_package(Python REQUIRED COMPONENTS Interpreter)
+   endif()
+-  find_package(Python REQUIRED COMPONENTS Interpreter)
+   set(ONNX_PYTHON_INTERPRETER Python::Interpreter)
+ else()
+   find_package(Python3 REQUIRED COMPONENTS Interpreter ${python_dev_component})
+@@ -457,7 +467,15 @@ add_onnx_global_defines(onnx)
+ 
+ if(ONNX_BUILD_PYTHON)
+   # find system nanobind
+-  find_package(nanobind)
++  # Resolve nanobind's in-tree CMake config via the (native) Python
++  # interpreter. nanobind derives NB_DIR by ascending two directories
++  # from its config file, so it must be loaded from its real source
++  # tree (site-packages/nanobind/cmake); a detached install copy makes
++  # NB_DIR -- and every ${NB_DIR}/include path -- point to the wrong place.
++  execute_process(
++    COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
++    OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT)
++  find_package(nanobind CONFIG)
+   if(NOT nanobind_FOUND)
+     include(FetchContent)
+ 
+-- 
+2.43.0
+
