@@ -1,21 +1,53 @@
-From b5b8c6488764c74e42a37aec3c50810c539246f5 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Wed, 6 May 2026 15:59:49 -0700
 Subject: [PATCH] setup.py: support OE cross builds (interpreter + sysroot)
+
+Four OE-specific tweaks to setup.py's CmakeBuild:
+
+  1. Trust sys.executable for the build interpreter -- upstream's
+     get_python_execute() walks sysconfig include paths which, in a
+     cross build, point at the *target* Python rather than the
+     native one we want to run during the build.
+
+  2. Forward the sysroot from --sysroot= in CC/CXX so find_package
+     resolves headers/libs against the staged sysroot, not the
+     build host's /. Also pin Protobuf_LIBRARY to the target
+     sysroot to avoid FindProtobuf picking up the native protobuf.
+
+  3. Pass -DBUILD_SHARED_LIBS=ON to setup.py's CMake invocation.
+     setup.py's CmakeBuild runs an independent cmake build in
+     ${ONNX_ROOT}/.setuptools-cmake-build/ that produces the
+     onnx_cpp2py_export.abi3.so packaged in the Python wheel.
+     Without this flag, BUILD_SHARED_LIBS defaults OFF and libonnx
+     is built as a static archive; target_link_libraries(
+     onnx_cpp2py_export PRIVATE onnx) then pulls the whole static
+     onnx archive -- including the protoc-generated
+     descriptor_table_* objects -- into the Python C extension.
+     The duplicate descriptors are registered twice at load time
+     (once by libonnx.so, once by onnx_cpp2py_export.abi3.so) and
+     libprotobuf aborts with "File already exists in database:
+     onnx/onnx-ml.proto" whenever a process imports both onnx and
+     onnxruntime.
+
+  4. Pass -DCMAKE_SKIP_BUILD_RPATH=ON. With BUILD_SHARED_LIBS=ON the
+     cpp2py_export.cc dynamic-links the just-built libonnx.so in
+     .setuptools-cmake-build/, so CMake records that path in the
+     binary's RPATH for build-tree-run-time usage. setuptools then
+     copies the .so straight into the wheel without an install step
+     that would have stripped that RPATH, and OE's package_qa fails
+     on the buildpath leak. Skipping the build RPATH leaves the .so
+     with no embedded path; at runtime on the target, the dynamic
+     linker resolves libonnx.so.1.20 from the default search paths
+     (/usr/lib is in DT_RUNPATH-less default search).
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
----
- setup.py | 45 +++++++++++++++++++++++++++++++--------------
- 1 file changed, 31 insertions(+), 14 deletions(-)
 
 diff --git a/setup.py b/setup.py
-index 2b60ff68a..d99c05dd0 100644
 --- a/setup.py
 +++ b/setup.py
-@@ -95,20 +95,8 @@ def cd(path):
- 
- 
+@@ -95,20 +95,8 @@
+
+
  def get_python_execute():
 -    if WINDOWS:
 -        return sys.executable
@@ -34,11 +66,32 @@ index 2b60ff68a..d99c05dd0 100644
 +    # In cross builds, sysconfig points at target paths while sys.executable
 +    # is the host-runnable native interpreter — trust it.
      return sys.executable
- 
- 
-@@ -175,6 +163,35 @@ class CmakeBuild(setuptools.Command):
+
+
+@@ -174,7 +162,56 @@
+                 f"-DPython3_EXECUTABLE={get_python_execute()}",
                  "-DONNX_BUILD_PYTHON=ON",
                  f"-DONNX_NAMESPACE={ONNX_NAMESPACE}",
++                # Build libonnx as SHARED so onnx_cpp2py_export dynamic-links
++                # against it. Without this, BUILD_SHARED_LIBS defaults OFF and
++                # target_link_libraries(onnx_cpp2py_export PRIVATE onnx) pulls
++                # the entire static onnx archive -- including the protoc-
++                # generated descriptor_table_* objects -- into the Python C
++                # extension. The duplicate static initializers then abort
++                # libprotobuf with "File already exists in database:
++                # onnx/onnx-ml.proto" when a process loads both libonnx.so
++                # (e.g. via onnxruntime) and onnx_cpp2py_export.abi3.so.
++                "-DBUILD_SHARED_LIBS=ON",
++                # Don't bake the build-tree libonnx.so path into the C
++                # extension's RPATH. CMake otherwise records the
++                # .setuptools-cmake-build directory so the binary can find
++                # libonnx.so at build-tree-run-time; setuptools then copies
++                # the .so straight into the wheel without an install step
++                # that would have stripped it. OE's package_qa fails on
++                # the resulting buildpath leak. The dynamic linker will
++                # still find /usr/lib/libonnx.so.1.20 via default search
++                # paths at runtime on the target.
++                "-DCMAKE_SKIP_BUILD_RPATH=ON",
              ]
 +            # Forward cross-build sysroot from CC/CXX so find_package can locate
 +            # headers/libs in the staged sysroot rather than the build host's /.
@@ -71,7 +124,4 @@ index 2b60ff68a..d99c05dd0 100644
 +                    cmake_args.append(f"-DProtobuf_LIBRARY={_proto}")
              if USE_NINJA and not WINDOWS and shutil.which("ninja"):
                  cmake_args.append("-DCMAKE_GENERATOR=Ninja")
- 
--- 
-2.43.0
 
