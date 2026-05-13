@@ -1,16 +1,15 @@
-From 382ef22e7fc5dc55a23b8bcdf31c66d69053b842 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Wed, 6 May 2026 14:41:16 -0700
 Subject: [PATCH] Updates for OE cross builds
+
+Extract ONNX_VERSION from VERSION_NUMBER so it's available before
+project() is called; build libonnx and libonnx_proto as versioned
+SHARED libraries when BUILD_SHARED_LIBS is on, with SOVERSION matching
+the upstream library policy.
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
----
- CMakeLists.txt | 41 ++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 38 insertions(+), 3 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 584c0419a..f7edfbd6e 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -1,7 +1,32 @@
@@ -44,7 +43,7 @@ index 584c0419a..f7edfbd6e 100644
  # Project
 -project(onnx LANGUAGES CXX)
 +project(onnx VERSION ${ONNX_VERSION} LANGUAGES C CXX)
- 
+
  include(cmake/Utils.cmake)
  # Honor visibility properties for all target types.
 @@ -412,10 +437,20 @@ if(ONNX_USE_LITE_PROTO)
@@ -59,7 +58,7 @@ index 584c0419a..f7edfbd6e 100644
 +endif()
 +set_target_properties(onnx_proto PROPERTIES VERSION ${ONNX_VERSION} SOVERSION ${ONNX_VERSION_MAJOR}.${ONNX_VERSION_MINOR})
  add_onnx_global_defines(onnx_proto)
- 
+
 -add_library(onnx ${ONNX_SRCS} ${ONNX_PROTO_SRCS})
 +if (BUILD_SHARED_LIBS)
 +  add_library(onnx SHARED ${ONNX_SRCS} ${ONNX_PROTO_SRCS})
@@ -70,6 +69,3 @@ index 584c0419a..f7edfbd6e 100644
  add_dependencies(onnx onnx_proto)
  set_source_files_properties(${ONNX_SRCS} PROPERTIES CXX_VISIBILITY_PRESET hidden)
  add_onnx_global_defines(onnx)
--- 
-2.43.0
-
