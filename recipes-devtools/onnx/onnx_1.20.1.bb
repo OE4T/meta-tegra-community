@@ -8,10 +8,12 @@ SRC_URI = " \
     file://0001-Updates-for-OE-cross-builds.patch \
     file://0002-Find-Python-with-Development.Module-for-nanobind-in-.patch \
     file://0003-setup.py-support-OE-cross-builds-interpreter-sysroot.patch \
+    file://0004-Serialize-gen_proto-invocations-to-avoid-parallel-ra.patch \
+    file://0005-Avoid-embedding-proto-sources-in-libonnx-prevents-du.patch \
 "
 SRCREV = "d3f6b795aedb48eaecc881bf5e8f5dd6efbe25b3"
 
-inherit cmake setuptools3
+inherit cmake python_setuptools_build_meta
 
 DEPENDS += " \
     protobuf \
@@ -25,12 +27,11 @@ EXTRA_OECMAKE = " \
     -DONNX_VERIFY_PROTO3=ON \
     -DONNX_USE_PROTOBUF_SHARED_LIBS=ON \
     -DProtobuf_LIBRARY=${STAGING_LIBDIR}/libprotobuf.so \
-    -DONNX_DISABLE_STATIC_REGISTRATION=ON \
     ${@bb.utils.contains('PACKAGECONFIG', 'python', '-DONNX_BUILD_PYTHON=ON -DPython3_EXECUTABLE=${PYTHON} -DPython_EXECUTABLE=${PYTHON}', '', d)} \
 "
 
 PACKAGECONFIG ?= "python"
-PACKAGECONFIG[python] = ",,python3-nanobind-native python3-numpy-native tsl-robin-map-native,python3-numpy python3-protobuf python3-typing-extensions python3-ml-dtypes"
+PACKAGECONFIG[python] = ",,python3-nanobind-native python3-numpy-native python3-protobuf-native tsl-robin-map-native,python3-numpy python3-protobuf python3-typing-extensions python3-ml-dtypes"
 
 do_configure() {
     cmake_do_configure
@@ -39,14 +40,14 @@ do_configure() {
 do_compile() {
     cmake_do_compile
     if "${@bb.utils.contains('PACKAGECONFIG', 'python', 'true', 'false', d)}"; then
-        setuptools3_do_compile
+        python_pep517_do_compile
     fi
 }
 
 do_install() {
     cmake_do_install
     if "${@bb.utils.contains('PACKAGECONFIG', 'python', 'true', 'false', d)}"; then
-        setuptools3_do_install
+        python_pep517_do_install
     fi
     # remove tmpdir refs, harmful for downstream builds
     sed -i '/CMAKE_PREFIX_PATH/d' ${D}${libdir}/cmake/ONNX/ONNXConfig.cmake
