@@ -1,0 +1,73 @@
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Subject: [PATCH] Consolidate proto descriptors and op schemas into single
+ loadable units
+
+Upstream compiles ${ONNX_PROTO_SRCS} (the protoc-generated *.pb.cc files)
+into THREE targets: onnx_proto, onnx, and onnx_cpp2py_export. Similarly,
+${ONNX_SRCS} is compiled into BOTH onnx and onnx_cpp2py_export. Each .pb.cc
+emits a static initializer that calls
+protobuf::internal::AddDescriptors() to register its .proto file with
+the process-global descriptor pool; each .cc that uses the
+ONNX_OPERATOR_SET_SCHEMA macro family produces template specializations
+that the lazy SchemasRegisterer in libonnx.so dereferences via pointer
+identity.
+
+When a Python process imports both onnx and onnxruntime (or torch), the
+three independent copies of proto static initializers abort libprotobuf
+with:
+
+  F descriptor.cc:2523] Check failed: GeneratedDatabase()->Add(...)
+  File already exists in database: onnx/onnx-ml.proto
+
+and even when registration "succeeds" the second registration overwrites
+the registered type-constraint string pointers
+(unordered_set<const std::string*>) with pointers into the wrong .so,
+so the checker later rejects valid models with messages like:
+
+  Type 'tensor(float)' of input parameter (x) of operator (Add) ...
+  is invalid
+
+Fix: drop ${ONNX_PROTO_SRCS} from libonnx and instead PUBLIC-link the
+onnx_proto target, and drop *both* ${ONNX_PROTO_SRCS} and ${ONNX_SRCS}
+from onnx_cpp2py_export, linking it against the onnx target. This leaves
+exactly one copy of the proto descriptors (in libonnx_proto.so) and one
+copy of the op-schema implementations (in libonnx.so) on the device; all
+other consumers resolve those symbols dynamically.
+
+Public APIs are decorated with ONNX_API which expands to default
+visibility, so they remain reachable in libonnx.so even with
+CXX_VISIBILITY_PRESET hidden on ${ONNX_SRCS}.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -446,12 +446,13 @@
+ add_onnx_global_defines(onnx_proto)
+
+ if (BUILD_SHARED_LIBS)
+-  add_library(onnx SHARED ${ONNX_SRCS} ${ONNX_PROTO_SRCS})
++  add_library(onnx SHARED ${ONNX_SRCS})
+ else()
+-  add_library(onnx STATIC ${ONNX_SRCS} ${ONNX_PROTO_SRCS})
++  add_library(onnx STATIC ${ONNX_SRCS})
+ endif()
+ set_target_properties(onnx PROPERTIES VERSION ${ONNX_VERSION} SOVERSION ${ONNX_VERSION_MAJOR}.${ONNX_VERSION_MINOR})
+ add_dependencies(onnx onnx_proto)
++target_link_libraries(onnx PUBLIC onnx_proto)
+ set_source_files_properties(${ONNX_SRCS} PROPERTIES CXX_VISIBILITY_PRESET hidden)
+ add_onnx_global_defines(onnx)
+
+@@ -474,8 +475,9 @@
+   nanobind_add_module(
+     onnx_cpp2py_export
+     NB_STATIC NB_DOMAIN onnx STABLE_ABI FREE_THREADED LTO
+-    "${ONNX_ROOT}/onnx/cpp2py_export.cc" ${ONNX_SRCS} ${ONNX_PROTO_SRCS})
++    "${ONNX_ROOT}/onnx/cpp2py_export.cc")
+   add_dependencies(onnx_cpp2py_export onnx)
++  target_link_libraries(onnx_cpp2py_export PRIVATE onnx)
+ endif()
+
+ add_onnx_compile_options(onnx_proto)
