@@ -35,7 +35,6 @@ RDEPENDS:${PN} += "\
     python3-math \
     python3-numbers \
     python3-numpy \
-    python3-pkg-resources \
     python3-py \
     python3-six \
     cuda-nvcc \
