@@ -1,0 +1,29 @@
+From dd3d3562c37d5f0727446e8a6147c7d53505a38a Mon Sep 17 00:00:00 2001
+From: Meng Li <Meng.Li@windriver.com>
+Date: Thu, 5 Mar 2026 10:20:18 +0800
+Subject: [PATCH] jtop: add L4T 36.5.0 support
+
+Add L4T 36.5.0 to NVIDIA_JETPACK dictionary for Jetpack detection.
+
+Upstream-Status: Pending
+
+Signed-off-by: Meng Li <Meng.Li@windriver.com>
+---
+ jtop/core/jetson_variables.py | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/jtop/core/jetson_variables.py b/jtop/core/jetson_variables.py
+index 120b7b8..c955252 100644
+--- a/jtop/core/jetson_variables.py
++++ b/jtop/core/jetson_variables.py
+@@ -42,6 +42,7 @@ if not sys.warnoptions:
+ # https://developer.nvidia.com/embedded/jetpack-archive
+ NVIDIA_JETPACK = {
+     # -------- JP6 --------
++    "36.5.0": "6.2.2",
+     "36.4.3": "6.2",
+     "36.4.2": "6.1 (rev1)",
+     "36.4.0": "6.1",
+-- 
+2.34.1
+
