@@ -26,12 +26,21 @@ run_video_decode() {
 
 generate_yuv_sample_vid() {
     echo "Converting sample video to YUV, please wait"
-    video_dec_cuda "$SAMPLEVID" H264 --disable-rendering -o "$SAMPLEYUV" -f 2
+    # video_dec_cuda creates the output file before decoding, so an
+    # interrupted or failed run leaves an empty file behind. Remove any
+    # stale copy first and discard the output if the decode fails, so we
+    # never cache a truncated/empty YUV that later poisons the encoders.
+    rm -f "$SAMPLEYUV"
+    if ! video_dec_cuda "$SAMPLEVID" H264 --disable-rendering -o "$SAMPLEYUV" -f 2; then
+	echo "Error: failed to generate $SAMPLEYUV"
+	rm -f "$SAMPLEYUV"
+	return 1
+    fi
 }
 
 run_video_encode() {
     local rc=0
-    [ -e "$SAMPLEYUV" ] || generate_yuv_sample_vid
+    [ -s "$SAMPLEYUV" ] || generate_yuv_sample_vid || return 1
     echo "Running 01_video_encode"
     rm -f samplevid.h264
     video_encode "$SAMPLEYUV" 1920 1080 H264 samplevid.h264 || rc=1
@@ -52,7 +61,7 @@ run_video_dec_cuda() {
 
 run_video_cuda_enc() {
     local rc=0
-    [ -e "$SAMPLEYUV" ] || generate_yuv_sample_vid
+    [ -s "$SAMPLEYUV" ] || generate_yuv_sample_vid || return 1
     echo "Running 03_video_cuda_enc"
     rm -f samplevid.h264
     video_cuda_enc "$SAMPLEYUV" 1920 1080 H264 samplevid.h264 || rc=1
@@ -82,7 +91,7 @@ run_video_dec_trt() {
 
 run_jpeg_encode() {
     local rc=0
-    [ -e "$SAMPLEYUVPIC" ] || run_jpeg_decode
+    [ -s "$SAMPLEYUVPIC" ] || run_jpeg_decode || return 1
     echo "Running 05_jpeg_encode"
     jpeg_encode "$SAMPLEYUVPIC" 1920 1080 "sample-encoded.jpg" || rc=1
     rm -f sample-encoded.jpg
@@ -98,7 +107,7 @@ run_jpeg_decode() {
 
 run_video_convert() {
     local rc=0
-    [ -e "$SAMPLEYUVPIC" ] || run_jpeg_decode
+    [ -s "$SAMPLEYUVPIC" ] || run_jpeg_decode || return 1
     video_convert "$SAMPLEYUVPIC" 1920 1080 YUV420 sample.yuyv 1920 1080 YUYV || rc=1
     rm -f sample.yuyv
     return $rc
@@ -208,7 +217,7 @@ run_decode_sample() {
 
 run_encode_sample() {
     local rc=0
-    [ -e "$SAMPLEYUV" ] || generate_yuv_sample_vid
+    [ -s "$SAMPLEYUV" ] || generate_yuv_sample_vid || return 1
     echo "Running encode_sample"
     rm -f ut-samplevid.h264
     encode_sample "$SAMPLEYUV" 1920 1080 ut-samplevid.h264 || rc=1
@@ -219,7 +228,7 @@ run_encode_sample() {
 
 run_transform_sample() {
     local rc=0
-    [ -e "$SAMPLEYUV" ] || generate_yuv_sample_vid
+    [ -s "$SAMPLEYUV" ] || generate_yuv_sample_vid || return 1
     echo "Running transform_sample"
     transform_sample "$SAMPLEYUV" yuv420 1920 1080 nv12-sample.yuv nv12 || rc=1
     rm -f nv12-sample.yuv
