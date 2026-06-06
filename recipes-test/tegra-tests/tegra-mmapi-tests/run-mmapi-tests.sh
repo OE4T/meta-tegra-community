@@ -68,7 +68,11 @@ run_video_dec_trt() {
     fi
     local rc=0
     echo "Running 04_video_dec_trt"
-    /usr/src/tensorrt/bin/trtexec --onnx="$SAMPLEMODELS/resnet10/resnet10_dynamic_batch.onnx" --saveEngine=resnet10.trt
+    /usr/src/tensorrt/bin/trtexec --onnx="$SAMPLEMODELS/resnet10/resnet10_dynamic_batch.onnx" \
+        --minShapes=data:1x3x368x640 \
+        --optShapes=data:2x3x368x640 \
+        --maxShapes=data:2x3x368x640 \
+        --saveEngine=resnet10.trt
     video_dec_trt 2 "$SAMPLEVID" "$SAMPLEVID" H264 --trt-engine resnet10.trt || rc=1
     [ $rc -ne 0 ] || run_video_dec_cuda "$SAMPLEVID" "result0.txt" || rc=1
     [ $rc -ne 0 ] || run_video_dec_cuda "$SAMPLEVID" "result1.txt" || rc=1
