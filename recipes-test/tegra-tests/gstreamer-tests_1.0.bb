@@ -39,4 +39,5 @@ PACKAGE_ARCH = "${MACHINE_ARCH}"
 RDEPENDS:${PN} = "gst-player gstreamer1.0 gstreamer1.0-plugins-nveglgles gstreamer1.0-plugins-base-videotestsrc \
                   gstreamer1.0-plugins-nvvideo4linux2 gstreamer1.0-plugins-nvvideosinks gstreamer1.0-plugins-nvjpeg \
                   gstreamer1.0-plugins-nvvidconv gstreamer1.0-plugins-good-imagefreeze gstreamer1.0-plugins-bad-waylandsink \
-                  gstreamer1.0-plugins-good-video4linux2 gstreamer1.0-plugins-nvdrmvideosink gstreamer1.0-plugins-nvarguscamerasrc"
+                  gstreamer1.0-plugins-good-video4linux2 gstreamer1.0-plugins-nvdrmvideosink gstreamer1.0-plugins-nvarguscamerasrc \
+                  gstreamer1.0-plugins-nvsiplcamerasrc"
