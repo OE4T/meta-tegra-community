@@ -5,14 +5,12 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=0f7e3b1308cb5c00b372a6e78835732d"
 
 SRC_URI = " \
     git://github.com/microsoft/onnxruntime.git;protocol=https;nobranch=1;tag=v${PV} \
-    git://gitlab.com/libeigen/eigen.git;protocol=https;nobranch=1;name=libeigen;destsuffix=${BPN}-${PV}/_deps/eigen-src \
     git://github.com/NVIDIA/cudnn-frontend.git;protocol=https;nobranch=1;name=cudnn_frontend;destsuffix=${BPN}-${PV}/_deps/cudnn_frontend-src \
 "
-SRCREV = "e0b66cad282043d4377cea5269083f17771b6dfc"
-SRCREV_libeigen = "1d8b82b0740839c0de7f1242a3585e3390ff5f33"
-SRCREV_cudnn_frontend = "de355c7094af70467f2b264f531ab5c5f4401c42"
+SRCREV = "058787ceead760166e3c50a0a4cba8a833a6f53f"
+SRCREV_cudnn_frontend = "666996fe3960f27170d1527e5579ba24c8d3380a"
 
-SRCREV_FORMAT = "onnxruntime_libeigen_cudnn_frontend"
+SRCREV_FORMAT = "onnxruntime_cudnn_frontend"
 
 SRC_URI += " \
     file://0001-Use-external-library-dependencies.patch \
@@ -42,16 +40,13 @@ DEPENDS += " \
     tensorrt-plugins \
     cutlass \
     dlpack \
+    libeigen \
+    python3-pybind11 \
 "
 
 RDEPENDS:${PN} += " \
     cuda-cudart \
     cuda-nvrtc \
-"
-
-PYTHON_EXTRA_OECMAKE = " \
-    -Donnxruntime_ENABLE_PYTHON=ON \
-    -DPython_NumPy_INCLUDE_DIR=${RECIPE_SYSROOT}${PYTHON_SITEPACKAGES_DIR}/numpy/_core/include \
 "
 
 EXTRA_OECMAKE = " \
@@ -70,14 +65,15 @@ EXTRA_OECMAKE = " \
     -Donnxruntime_USE_PREINSTALLED_EIGEN=OFF \
     -DCMAKE_SKIP_RPATH=ON \
     -DCMAKE_CXX_STANDARD=17 \
-    ${@bb.utils.contains('PACKAGECONFIG', 'python', '${PYTHON_EXTRA_OECMAKE}', '', d)} \
+    ${@bb.utils.contains('PACKAGECONFIG', 'python', '-Donnxruntime_ENABLE_PYTHON=ON', '', d)} \
+    -DCMAKE_CUDA_COMPILER_FORCED=TRUE \
 "
 
-OECMAKE_CXX_FLAGS:append = " -Wno-array-bounds -Wno-deprecated-declarations -Wno-unused-variable -Wno-template-id-cdtor -Wno-range-loop-construct -Wno-maybe-uninitialized -Wno-error=cpp -Wno-error=uninitialized"
+OECMAKE_CXX_FLAGS:append = " -Wno-array-bounds -Wno-deprecated-declarations -Wno-unused-variable -Wno-template-id-cdtor -Wno-range-loop-construct -Wno-maybe-uninitialized -Wno-error=cpp -Wno-error=uninitialized -Wno-error=sfinae-incomplete -Wno-error=unused-but-set-parameter"
 OECMAKE_SOURCEPATH = "${S}/cmake"
 
 PACKAGECONFIG ?= "python"
-PACKAGECONFIG[python] = ",,python3-numpy python3-numpy-native,python3-coloredlogs python3-flatbuffers python3-numpy python3-protobuf python3-sympy"
+PACKAGECONFIG[python] = ",,python3-numpy-native,python3-coloredlogs python3-flatbuffers python3-numpy python3-protobuf python3-sympy"
 
 do_configure() {
     cmake_do_configure
@@ -101,7 +97,7 @@ SOLIBS = ".so"
 FILES_SOLIBSDEV = ""
 
 PACKAGES += "python3-${PN}"
-FILES:${PN} = "${bindir} ${libdir}/libonnxruntime*.so* ${libdir}/libonnxruntime_providers*so"
+FILES:${PN} = "${bindir} ${libdir}/libonnxruntime*.so*"
 FILES:${PN}-dev = " \
     ${includedir}/onnxruntime \
     ${libdir}/pkgconfig \
@@ -109,9 +105,29 @@ FILES:${PN}-dev = " \
 "
 FILES:python3-${PN} = "${PYTHON_SITEPACKAGES_DIR}"
 RDEPENDS:python3-${PN} = "${PN}"
-RRECOMMENDS:${PN} += "${@bb.utils.contains('PACKAGECONFIG', 'python', 'python3-${PN}', '', d)}"
+
+PACKAGECONFIG ?= "python"
+PACKAGECONFIG[python] = ",,python3-numpy-native,python3-coloredlogs python3-flatbuffers python3-numpy python3-protobuf python3-sympy"
+
+do_configure() {
+    cmake_do_configure
+}
+
+do_compile() {
+    cmake_do_compile
+    if "${@bb.utils.contains('PACKAGECONFIG', 'python', 'true', 'false', d)}"; then
+        setuptools3_do_compile
+    fi
+}
+
+do_install() {
+    cmake_do_install
+    if "${@bb.utils.contains('PACKAGECONFIG', 'python', 'true', 'false', d)}"; then
+        setuptools3_do_install
+    fi
+}
 
 INSANE_SKIP:${PN} = "buildpaths dev-so"
 INSANE_SKIP:python3-${PN} = "buildpaths"
-INSANE_SKIP:${PN}-dev = "dev-elf buildpaths"
+INSANE_SKIP:${PN}-dev = "buildpaths"
 INSANE_SKIP:${PN}-dbg = "buildpaths"
