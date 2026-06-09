@@ -1,6 +1,6 @@
-From c9941abc4adb38b2e9037f432b3aa46696e3c732 Mon Sep 17 00:00:00 2001
+From 382ef22e7fc5dc55a23b8bcdf31c66d69053b842 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Mon, 28 Apr 2025 15:39:47 +0100
+Date: Wed, 6 May 2026 14:41:16 -0700
 Subject: [PATCH] Updates for OE cross builds
 
 Upstream-Status: Inappropriate [OE-specific]
@@ -10,13 +10,13 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  1 file changed, 38 insertions(+), 3 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d15d97ed..a0e098ff 100644
+index 584c0419a..f7edfbd6e 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -14,8 +14,32 @@ endif()
- cmake_policy(SET CMP0063 NEW)
- cmake_policy(SET CMP0074 NEW)
- 
+@@ -1,7 +1,32 @@
+ # Minimum CMake required
+ cmake_minimum_required(VERSION 3.26)
++
 +function(onnx_extract_version)
 +    file(READ "${CMAKE_SOURCE_DIR}/VERSION_NUMBER" ONNX_VERSION)
 +    string(STRIP "${ONNX_VERSION}" ONNX_VERSION)
@@ -42,40 +42,34 @@ index d15d97ed..a0e098ff 100644
 +onnx_extract_version()
 +
  # Project
--project(onnx C CXX)
+-project(onnx LANGUAGES CXX)
 +project(onnx VERSION ${ONNX_VERSION} LANGUAGES C CXX)
- option(ONNX_USE_PROTOBUF_SHARED_LIBS "Build ONNX using protobuf shared library. Sets PROTOBUF_USE_DLLS CMAKE Flag and Protobuf_USE_STATIC_LIBS. " OFF)
  
- option(BUILD_ONNX_PYTHON "Build Python binaries" OFF)
-@@ -466,7 +490,13 @@ list(REMOVE_ITEM __tmp_srcs "${ONNX_ROOT}/onnx/cpp2py_export.cc")
- list(REMOVE_ITEM __tmp_srcs ${onnx_gtests_src})
- list(APPEND ONNX_SRCS ${__tmp_srcs})
- 
--add_library(onnx_proto ${ONNX_PROTO_SRCS} ${ONNX_PROTO_HDRS})
+ include(cmake/Utils.cmake)
+ # Honor visibility properties for all target types.
+@@ -412,10 +437,20 @@ if(ONNX_USE_LITE_PROTO)
+     set(LINKED_PROTOBUF_TARGET protobuf::libprotobuf-lite)
+   endif()
+ endif()
+-add_library(onnx_proto ${ONNX_PROTO_SRCS})
 +if (BUILD_SHARED_LIBS)
-+  add_library(onnx_proto SHARED ${ONNX_PROTO_SRCS} ${ONNX_PROTO_HDRS})
++  add_library(onnx_proto SHARED ${ONNX_PROTO_SRCS})
 +else()
-+  add_library(onnx_proto STATIC ${ONNX_PROTO_SRCS} ${ONNX_PROTO_HDRS})
++  add_library(onnx_proto STATIC ${ONNX_PROTO_SRCS})
 +endif()
 +set_target_properties(onnx_proto PROPERTIES VERSION ${ONNX_VERSION} SOVERSION ${ONNX_VERSION_MAJOR}.${ONNX_VERSION_MINOR})
-+
- add_dependencies(onnx_proto gen_onnx_operators_proto gen_onnx_data_proto)
- target_include_directories(onnx_proto PUBLIC
-   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
-@@ -522,7 +552,12 @@ if(CMAKE_SYSTEM_NAME STREQUAL "AIX")
-   # So, create a object library
-   add_library(onnx OBJECT ${ONNX_SRCS})
- else()
--  add_library(onnx ${ONNX_SRCS})
-+  if (BUILD_SHARED_LIBS)
-+    add_library(onnx SHARED ${ONNX_SRCS})
-+  else()
-+    add_library(onnx STATIC ${ONNX_SRCS})
-+  endif()
-+  set_target_properties(onnx PROPERTIES VERSION ${ONNX_VERSION} SOVERSION ${ONNX_VERSION_MAJOR}.${ONNX_VERSION_MINOR})
- endif()
+ add_onnx_global_defines(onnx_proto)
  
- target_include_directories(onnx PUBLIC
+-add_library(onnx ${ONNX_SRCS} ${ONNX_PROTO_SRCS})
++if (BUILD_SHARED_LIBS)
++  add_library(onnx SHARED ${ONNX_SRCS} ${ONNX_PROTO_SRCS})
++else()
++  add_library(onnx STATIC ${ONNX_SRCS} ${ONNX_PROTO_SRCS})
++endif()
++set_target_properties(onnx PROPERTIES VERSION ${ONNX_VERSION} SOVERSION ${ONNX_VERSION_MAJOR}.${ONNX_VERSION_MINOR})
+ add_dependencies(onnx onnx_proto)
+ set_source_files_properties(${ONNX_SRCS} PROPERTIES CXX_VISIBILITY_PRESET hidden)
+ add_onnx_global_defines(onnx)
 -- 
-2.34.1
+2.43.0
 
