@@ -18,7 +18,7 @@ DEPENDS += " \
 "
 
 SRC_URI = "https://github.com/pytorch/pytorch/releases/download/v${PV}/pytorch-v${PV}.tar.gz"
-SRC_URI[sha256sum] = "fa8ccbe87f83f48735505371c1c313b4aa6db400b0ae4f8a02844d1e150c695f"
+SRC_URI[sha256sum] = "ab3fde9e7e382f45ac942be6ea2c2ef362c5ccd6f55ed6d5f35e6ea81d3ab88e"
 
 SRC_URI += " \
     file://0001-Fix-generate-linker-script-for-cross-compilation.patch \
