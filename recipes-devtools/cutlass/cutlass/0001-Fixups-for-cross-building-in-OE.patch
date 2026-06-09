@@ -1,38 +1,62 @@
-From dfc2e61a0ff83a6abf3e6db69903a1ff2d79d6ea Mon Sep 17 00:00:00 2001
+From 2bd357fc40ff14a5c5b01aa7b6c8e85e8c814bf4 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Mon, 28 Apr 2025 10:55:04 +0100
+Date: Fri, 8 May 2026 14:20:05 -0700
 Subject: [PATCH] Fixups for cross building in OE
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt                 | 23 -----------------------
- cmake/googletest.cmake         | 24 +-----------------------
- python/cutlass/emit/pytorch.py |  5 -----
- 3 files changed, 1 insertion(+), 51 deletions(-)
+ CMakeLists.txt                                | 46 -------------------
+ cmake/googletest.cmake                        | 25 +---------
+ .../CMakeLists.txt                            |  7 +++
+ include/cutlass/platform/platform.h           |  6 +--
+ 4 files changed, 11 insertions(+), 73 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 7419bdf5..5fd29087 100755
+index 23be6991..af02bf1b 100755
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -146,16 +146,6 @@ endif()
+@@ -163,39 +163,6 @@ set(CUTLASS_ENABLE_SELF_CONTAINED_INCLUDES_CHECK ON CACHE BOOL "Enable CUTLASS c
  
  ################################################################################
  
 -set(CUTLASS_NVCC_ARCHS_SUPPORTED "")
--if (CUDA_VERSION VERSION_GREATER_EQUAL 11.4 AND NOT CUDA_COMPILER MATCHES "[Cc]lang")
+-if (CUDA_VERSION VERSION_GREATER_EQUAL 11.4)
 -  list(APPEND CUTLASS_NVCC_ARCHS_SUPPORTED 70 72 75 80 86 87)
 -endif()
--if (CUDA_VERSION VERSION_GREATER_EQUAL 11.8 AND NOT CUDA_COMPILER MATCHES "[Cc]lang")
+-if (CUDA_VERSION VERSION_GREATER_EQUAL 11.8)
 -  list(APPEND CUTLASS_NVCC_ARCHS_SUPPORTED 89 90)
 -endif()
--if (CUDA_VERSION VERSION_GREATER_EQUAL 12.0 AND NOT CUDA_COMPILER MATCHES "[Cc]lang")
+-if (CUDA_VERSION VERSION_GREATER_EQUAL 12.0)
 -  list(APPEND CUTLASS_NVCC_ARCHS_SUPPORTED 90a)
 -endif()
+-
+-if (CUDA_VERSION VERSION_GREATER_EQUAL 12.8)
+-  list(APPEND CUTLASS_NVCC_ARCHS_SUPPORTED 100 100a 120 120a 121 121a)
+-  if (CUDA_VERSION VERSION_LESS 13.0)
+-    list(APPEND CUTLASS_NVCC_ARCHS_SUPPORTED 101 101a)
+-  else()
+-    list(APPEND CUTLASS_NVCC_ARCHS_SUPPORTED 110 110a)
+-  endif()
+-endif()
+-
+-if (CUDA_VERSION VERSION_GREATER_EQUAL 12.9)
+-  list(APPEND CUTLASS_NVCC_ARCHS_SUPPORTED 100f 120f 121f 103a 103f)
+-  if (CUDA_VERSION VERSION_LESS 13.0)
+-    list(APPEND CUTLASS_NVCC_ARCHS_SUPPORTED 101f)
+-  else()
+-    list(APPEND CUTLASS_NVCC_ARCHS_SUPPORTED 110f)
+-  endif()
+-endif()
+-
+-if (CUDA_VERSION VERSION_GREATER_EQUAL 13.0)
+-  list(APPEND CUTLASS_NVCC_ARCHS_SUPPORTED 110 110a)
+-endif()
+-
  set(CUTLASS_NVCC_ARCHS ${CUTLASS_NVCC_ARCHS_SUPPORTED} CACHE STRING "The SM architectures requested.")
  set(CUTLASS_NVCC_ARCHS_ENABLED ${CUTLASS_NVCC_ARCHS} CACHE STRING "The SM architectures to build code for.")
  
-@@ -716,19 +706,6 @@ if (DOXYGEN_FOUND)
+@@ -800,19 +767,6 @@ if (DOXYGEN_FOUND)
      )
  endif()
  
@@ -53,10 +77,10 @@ index 7419bdf5..5fd29087 100755
  
  include(CTest)
 diff --git a/cmake/googletest.cmake b/cmake/googletest.cmake
-index 0350fb2d..f675eb03 100644
+index 4983d46c..6908fc52 100644
 --- a/cmake/googletest.cmake
 +++ b/cmake/googletest.cmake
-@@ -26,26 +26,4 @@
+@@ -26,27 +26,4 @@
  # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  
@@ -68,9 +92,10 @@ index 0350fb2d..f675eb03 100644
 -  set(FETCHCONTENT_SOURCE_DIR_GOOGLETEST ${GOOGLETEST_DIR} CACHE STRING "GoogleTest source directory override")
 -endif()
 -
+-set(GTEST_REPOSITORY "https://github.com/google/googletest.git" CACHE STRING "GoogleTest repo to fetch")
 -FetchContent_Declare(
 -  googletest
--  GIT_REPOSITORY https://github.com/google/googletest.git
+-  GIT_REPOSITORY ${GTEST_REPOSITORY}
 -  GIT_TAG        v1.14.0
 -  )
 -
@@ -83,23 +108,45 @@ index 0350fb2d..f675eb03 100644
 -  endif()
 -  add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR} EXCLUDE_FROM_ALL)
 -endif()
-+find_package(GTest 1.16.0 REQUIRED)
-diff --git a/python/cutlass/emit/pytorch.py b/python/cutlass/emit/pytorch.py
-index ac13e866..75acfb6c 100644
---- a/python/cutlass/emit/pytorch.py
-+++ b/python/cutlass/emit/pytorch.py
-@@ -766,11 +766,6 @@ def _pytorch_gemm(op, name: str, cc: int, jit: bool = False, sourcedir: str = ""
-     with open(cpp_file, "w") as outfile:
-         outfile.write(cpp_source)
++find_package(GTest REQUIRED)
+diff --git a/examples/63_hopper_gemm_with_weight_prefetch/CMakeLists.txt b/examples/63_hopper_gemm_with_weight_prefetch/CMakeLists.txt
+index 72f59476..6aff3f17 100644
+--- a/examples/63_hopper_gemm_with_weight_prefetch/CMakeLists.txt
++++ b/examples/63_hopper_gemm_with_weight_prefetch/CMakeLists.txt
+@@ -36,3 +36,10 @@ cutlass_example_add_executable(
+ )
  
--    extra_compile_args = ""
--    if cc == 90:
--        extra_compile_args = "'--generate-code=arch=compute_90a,code=[sm_90a]'"
--    _generate_setup(name, sourcedir, extra_compile_args)
--
-     if jit:
-         return _jit(name, cc, cpp_file, cuda_file)
+ target_include_directories(63_hopper_gemm_with_weight_prefetch PUBLIC .)
++
++# This example uses non-type template parameters of class type (cute::Int<...>),
++# which require C++20.
++set_target_properties(63_hopper_gemm_with_weight_prefetch PROPERTIES
++  CXX_STANDARD 20
++  CUDA_STANDARD 20
++)
+diff --git a/include/cutlass/platform/platform.h b/include/cutlass/platform/platform.h
+index 86ba43a4..7dc37ad5 100644
+--- a/include/cutlass/platform/platform.h
++++ b/include/cutlass/platform/platform.h
+@@ -662,15 +662,15 @@ struct alignment_of<ulong4> {
+   enum { value = 16 };
+ };
+ template <>
+-struct alignment_of<longlong4> {
++struct alignment_of<longlong4_32a> {
+   enum { value = 16 };
+ };
+ template <>
+-struct alignment_of<ulonglong4> {
++struct alignment_of<ulonglong4_32a> {
+   enum { value = 16 };
+ };
+ template <>
+-struct alignment_of<double4> {
++struct alignment_of<double4_32a> {
+   enum { value = 16 };
+ };
  
 -- 
-2.34.1
+2.43.0
 
