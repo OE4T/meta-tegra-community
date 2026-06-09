@@ -1,7 +1,7 @@
-From 0954b099e329ef14c392d6ec9ecfb52e4bedd32d Mon Sep 17 00:00:00 2001
+From 142570a25a5529ad307fbcdefded2c5f9e825dda Mon Sep 17 00:00:00 2001
 From: Peter Bergin <peter@berginkonsult.se>
 Date: Tue, 17 Feb 2026 00:00:00 +0000
-Subject: [PATCH] Fix generate_linker_script for cross compilation
+Subject: [PATCH 1/5] Fix generate_linker_script for cross compilation
 
 The LD environment variable in cross-compilation environments like
 OpenEmbedded contains both the linker executable and flags such as
@@ -20,7 +20,7 @@ Signed-off-by: Peter Bergin <peter.bergin@1x.tech>
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/tools/setup_helpers/generate_linker_script.py b/tools/setup_helpers/generate_linker_script.py
-index 39eab3145..b5768659b 100644
+index d6b95c782..8d142785b 100644
 --- a/tools/setup_helpers/generate_linker_script.py
 +++ b/tools/setup_helpers/generate_linker_script.py
 @@ -1,5 +1,6 @@
@@ -39,3 +39,6 @@ index 39eab3145..b5768659b 100644
          "\n"
      )
  
+-- 
+2.43.0
+
