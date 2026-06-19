@@ -1,44 +1,45 @@
-From fcc6c2b7974a42ac8f9466e1cd8e29bb4734c9c6 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Matt Madison <matt@madison.systems>
 Date: Sat, 19 Oct 2024 08:02:15 -0700
 Subject: [PATCH] OE cross-build fixups
 
+Drop the host native-python include/library directories injected by the
+build backend (the cross sysroot must not pull in the host /usr/include),
+and leave the built extensions unstripped so OE packaging owns the debug
+split.
+
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Matt Madison <matt@madison.systems>
 ---
- cuda/setup.py | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+ cuda_bindings/build_hooks.py | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/cuda/setup.py b/cuda/setup.py
-index ec52362..12565e5 100644
---- a/cuda/setup.py
-+++ b/cuda/setup.py
-@@ -155,26 +155,15 @@ for file in input_files:
- # Prepare compile arguments
+diff --git a/cuda_bindings/build_hooks.py b/cuda_bindings/build_hooks.py
+index b2d3029..5ea73a1 100644
+--- a/cuda_bindings/build_hooks.py
++++ b/cuda_bindings/build_hooks.py
+@@ -342,10 +342,10 @@ def _build_cuda_bindings(strip=False):
+         _generate_output(file, template_vars)
  
- # For Cython
--include_dirs = [
--    os.path.dirname(sysconfig.get_path("include")),
--] + include_path_list
--library_dirs = [sysconfig.get_path("platlib"), os.path.join(os.sys.prefix, "lib")]
-+include_dirs = []
-+library_dirs = []
+     # Prepare compile/link arguments
+-    include_dirs = [
+-        os.path.dirname(sysconfig.get_path("include")),
+-    ] + include_path_list
+-    library_dirs = [sysconfig.get_path("platlib"), os.path.join(os.sys.prefix, "lib")]
++    # drop host native-python include/lib seeds (they poison the cross sysroot);
++    # keep the CUDA include/lib paths derived from CUDA_HOME below
++    include_dirs = list(include_path_list)
++    library_dirs = []
+     cudalib_subdirs = [r"lib\x64"] if sys.platform == "win32" else ["lib64", "lib"]
+     library_dirs.extend(os.path.join(prefix, subdir) for prefix in cuda_paths for subdir in cudalib_subdirs)
  
- extra_compile_args = []
- extra_cythonize_kwargs = {}
- if sys.platform != 'win32':
-     extra_compile_args += [
--        '-std=c++14',
-         '-fpermissive',
--        '-Wno-deprecated-declarations',
--        '-D _GLIBCXX_ASSERTIONS',
--        '-fno-var-tracking-assignments'
-     ]
--    if '--debug' in sys.argv:
--        extra_cythonize_kwargs['gdb_debug'] = True
--        extra_compile_args += ['-g', '-O0']
--    else:
--        extra_compile_args += ['-O3']
+@@ -426,7 +426,8 @@ def _build_cuda_bindings(strip=False):
  
- # For Setup
- extensions = []
+ 
+ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
+-    _build_cuda_bindings(strip=True)
++    # leave the extensions unstripped so OE packaging can split debug symbols
++    _build_cuda_bindings(strip=False)
+     return _build_meta.build_wheel(wheel_directory, config_settings, metadata_directory)
+ 
+ 

@@ -5,13 +5,12 @@ SECTION = "devel"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=6a8aaf0595c2efc1a9c2e0913e9c1a2c"
 
-# yaml-cpp releases are stored as archive files in github.
-# download the exact revision of release
-SRC_URI = "git://github.com/jbeder/yaml-cpp.git;branch=master;protocol=https"
-SRCREV = "28f93bdec6387d42332220afa9558060c8016795"
-PV .= "+git"
-
+SRC_URI = "git://github.com/jbeder/yaml-cpp.git;branch=master;protocol=https;tag=${PV}"
+SRCREV = "f7320141120f720aecc4c32be25586e7da9eb978"
 
 inherit cmake
 
-EXTRA_OECMAKE = "-DYAML_CPP_BUILD_TESTS=OFF -DYAML_BUILD_SHARED_LIBS=OFF -DYAML_CPP_BUILD_TOOLS=OFF"
+EXTRA_OECMAKE = "-DYAML_CPP_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=ON -DYAML_CPP_BUILD_TOOLS=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+
+# 0.8.0 predates gcc 13's stricter transitive includes; uint*_t need <cstdint>
+CXXFLAGS:append = " -include cstdint"
