@@ -192,6 +192,12 @@ find_test() {
 
 jetson_clocks
 
+
+# Orin Nano does not have PVA
+pva_supported=
+if [ -c /dev/nvhost-ctrl-pva0 ]; then
+    pva_supported="yes"
+fi
 testcount=0
 testpass=0
 testfail=0
@@ -208,6 +214,9 @@ for cand in $tests_to_run; do
     else
         declare -n backendList=$t
         for backend in ${backendList[@]}; do
+	    if echo "$backend" | grep -q "pva" && [ -z "$pva_supported" ]; then
+		continue
+	    fi
             testcount=$((testcount+1))
             echo "=== BEGIN: $t ==="
             if run_$t $backend; then
