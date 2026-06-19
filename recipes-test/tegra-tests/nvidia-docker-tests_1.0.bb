@@ -44,6 +44,7 @@ FILES:${PN} = " \
 "
 RDEPENDS:${PN} = " \
     bash \
-    nvidia-docker \
+    docker-moby \
+    nvidia-container-toolkit \
     nv-tegra-release \
 "
