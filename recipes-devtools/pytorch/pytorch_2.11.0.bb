@@ -186,6 +186,22 @@ FILES:python3-torch = " \
     ${PYTHON_SITEPACKAGES_DIR}/torch \
     ${PYTHON_SITEPACKAGES_DIR}/torchgen \
 "
+# Python runtime dependencies. The base `import torch` works without these, but
+# the torch.export/dynamo-based ONNX exporter (default since torch 2.9) and
+# torch._dynamo pull them in: filelock/fsspec/jinja2/networkx/sympy/typing-
+# extensions are torch's declared install_requires, and python3-modules provides
+# the full stdlib (cProfile, getpass, ...) that torch._dynamo imports but which
+# the minimal python3 split would otherwise omit.
+RDEPENDS:python3-torch += " \
+    python3-modules \
+    python3-filelock \
+    python3-fsspec \
+    python3-jinja2 \
+    python3-networkx \
+    python3-sympy \
+    python3-typing-extensions \
+"
+
 FILES:${PN}-staticdev += "${libdir}/mimalloc-2.2"
 
 # The build flags (including local build paths) are recorded within the
