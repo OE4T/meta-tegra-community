@@ -1,21 +1,20 @@
-From 3541cb203eb20e83bc8c2784fb66e9f54664d2ae Mon Sep 17 00:00:00 2001
+From 561fb1688e855e900d5e2aa2e096b49843b59c13 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 27 May 2025 12:51:56 +0100
-Subject: [PATCH 2/4] Add option to enable NVML
+Date: Thu, 11 Sep 2025 12:03:58 +0100
+Subject: [PATCH] add option to enable NVML
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
 ---
  config/m4/cuda.m4                      | 34 ++++++++++++++++----------
- src/uct/cuda/base/cuda_iface.h         |  4 +++
- src/uct/cuda/cuda_ipc/cuda_ipc_iface.c |  9 +++++++
- 3 files changed, 34 insertions(+), 13 deletions(-)
+ src/uct/cuda/cuda_ipc/cuda_ipc_iface.c |  7 ++++++
+ 2 files changed, 28 insertions(+), 13 deletions(-)
 
 diff --git a/config/m4/cuda.m4 b/config/m4/cuda.m4
-index ede221e9a..465de276d 100644
+index 0194c8a47..7082f8c8d 100644
 --- a/config/m4/cuda.m4
 +++ b/config/m4/cuda.m4
-@@ -11,6 +11,11 @@ AS_IF([test "x$cuda_checked" != "xyes"],
+@@ -124,6 +124,11 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                  [AS_HELP_STRING([--with-cuda=(DIR)], [Enable the use of CUDA (default is guess).])],
                  [], [with_cuda=guess])
  
@@ -27,7 +26,7 @@ index ede221e9a..465de276d 100644
      AS_IF([test "x$with_cuda" = "xno"],
          [
           cuda_happy=no
-@@ -57,21 +62,24 @@ AS_IF([test "x$cuda_checked" != "xyes"],
+@@ -173,21 +178,24 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                  AC_CHECK_DECLS([CU_MEM_LOCATION_TYPE_HOST],
                                 [], [], [[#include <cuda.h>]])])
  
@@ -63,59 +62,21 @@ index ede221e9a..465de276d 100644
 +             AC_DEFINE([ENABLE_NVML], , [Enable NVML])
 +         fi
  
-          # Check for nvmlDeviceGetGpuFabricInfo
-          AC_CHECK_DECLS([nvmlDeviceGetGpuFabricInfo],
-diff --git a/src/uct/cuda/base/cuda_iface.h b/src/uct/cuda/base/cuda_iface.h
-index 0cf3cd67a..f7f8e79e1 100644
---- a/src/uct/cuda/base/cuda_iface.h
-+++ b/src/uct/cuda/base/cuda_iface.h
-@@ -11,12 +11,15 @@
- #include <ucs/profile/profile.h>
- #include <ucs/async/eventfd.h>
- #include <cuda.h>
-+#ifdef ENABLE_NVML
- #include <nvml.h>
-+#endif
- 
- 
- const char *uct_cuda_base_cu_get_error_string(CUresult result);
- 
- 
-+#ifdef ENABLE_NVML
- #define UCT_NVML_FUNC(_func, _log_level) \
-     ({ \
-         ucs_status_t _status = UCS_OK; \
-@@ -37,6 +40,7 @@ const char *uct_cuda_base_cu_get_error_string(CUresult result);
- 
- #define UCT_NVML_FUNC_LOG_ERR(_func) \
-     UCT_NVML_FUNC(_func, UCS_LOG_LEVEL_ERROR)
-+#endif // ENABLE_NVML
- 
- #define UCT_CUDADRV_FUNC(_func, _log_level) \
-     ({ \
+          # Check for nvmlDeviceGetGpuFabricInfoV
+          AC_CHECK_DECLS([nvmlDeviceGetGpuFabricInfoV],
 diff --git a/src/uct/cuda/cuda_ipc/cuda_ipc_iface.c b/src/uct/cuda/cuda_ipc/cuda_ipc_iface.c
-index ad6845624..83dd04839 100644
+index 116f3791f..3f1e67c66 100644
 --- a/src/uct/cuda/cuda_ipc/cuda_ipc_iface.c
 +++ b/src/uct/cuda/cuda_ipc/cuda_ipc_iface.c
-@@ -18,7 +18,9 @@
- #include <ucs/debug/assert.h>
- #include <ucs/async/eventfd.h>
- #include <pthread.h>
-+#ifdef ENABLE_NVML
- #include <nvml.h>
-+#endif
- 
- 
- typedef enum {
-@@ -184,6 +186,7 @@ static double uct_cuda_ipc_iface_get_bw()
+@@ -199,6 +199,7 @@ static double uct_cuda_ipc_iface_get_bw()
      }
  }
  
 +#ifdef ENABLE_NVML
- /* calls nvmlInit_v2 and nvmlShutdown which are expensive but
-  * get_device_nvlinks should be outside critical path */
  static int uct_cuda_ipc_get_device_nvlinks(int ordinal)
-@@ -237,6 +240,12 @@ err_sd:
+ {
+     static int num_nvlinks = -1;
+@@ -241,6 +242,12 @@ static int uct_cuda_ipc_get_device_nvlinks(int ordinal)
  err:
      return 0;
  }
@@ -129,5 +90,5 @@ index ad6845624..83dd04839 100644
  static size_t uct_cuda_ipc_iface_get_max_get_zcopy(uct_cuda_ipc_iface_t *iface)
  {
 -- 
-2.34.1
+2.43.0
 

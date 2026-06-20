@@ -1,0 +1,42 @@
+From 818a1214aa903a5aca5d394f67e7f1993908913e Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 2 Mar 2026 14:46:01 -0800
+Subject: [PATCH] Remove cross-compile CUDA test
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Julien Jomier <jjomier@nvidia.com>
+---
+ test/apps/Makefile.am | 17 -----------------
+ 1 file changed, 17 deletions(-)
+
+diff --git a/test/apps/Makefile.am b/test/apps/Makefile.am
+index dbd98ba60..668cde216 100644
+--- a/test/apps/Makefile.am
++++ b/test/apps/Makefile.am
+@@ -98,23 +98,6 @@ test_cuda_hook_static_LDADD     = $(top_builddir)/src/ucp/libucp.la \
+                                   $(CUDART_STATIC_LIBS) $(CUDA_LIBS)
+ endif
+ 
+-if HAVE_NVCC
+-
+-include $(top_srcdir)/config/cuda.am
+-
+-# Could be simply added as .cu to _SOURCES if there was no specific CPPFLAGS
+-$(eval $(call nvcc-source, custom-test_cuda_get_symbol_address.o, \
+-	test_cuda_get_symbol_address.cu,CUDA_CPPFLAGS))
+-
+-noinst_PROGRAMS                      += test_cuda_get_symbol_address
+-test_cuda_get_symbol_address_SOURCES  =
+-test_cuda_get_symbol_address_LDFLAGS  = $(CUDA_LDFLAGS)
+-test_cuda_get_symbol_address_LDADD    = $(CUDART_LIBS) custom-test_cuda_get_symbol_address.o \
+-                                        $(top_builddir)/src/ucp/libucp.la \
+-                                        $(top_builddir)/src/ucm/libucm.la
+-
+-endif
+-
+ endif
+ 
+ if HAVE_TCMALLOC
+-- 
+2.43.0
+
