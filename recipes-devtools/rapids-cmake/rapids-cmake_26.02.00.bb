@@ -3,11 +3,8 @@ HOMEPAGE = "https://github.com/rapidsai/rapids-cmake"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=3ced5b165b4647193d419f133b7461c2"
 
-SRC_URI = " \
-    git://github.com/rapidsai/rapids-cmake.git;protocol=https;nobranch=1;tag=v${PV} \
-    file://0001-Update-cmake-required-version.patch \
-"
-SRCREV = "b435ca821fbc08162937071a4b5ac41d4cdb5af3"
+SRC_URI = "git://github.com/rapidsai/rapids-cmake.git;protocol=https;nobranch=1;tag=v${PV}"
+SRCREV = "3f454a5b8d05f1e28dc6def90dfd09a6180c7d2f"
 
 do_configure[noexec] = "1"
 do_compile[noexec] = "1"
