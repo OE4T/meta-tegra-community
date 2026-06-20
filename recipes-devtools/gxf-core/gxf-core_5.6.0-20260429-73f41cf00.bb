@@ -1,17 +1,14 @@
 SUMMARY = "NVIDIA GXF Core"
+HOMEPAGE = "https://docs.nvidia.com/holoscan/sdk-user-guide/gxf/doc/index.html"
 LICENSE = "Apache-2.0"
-LIC_FILES_CHKSUM = "file://gxf-install/include/gxf/core/gxf.h;endline=16;md5=ffcd9e991308047ac45f73c0d6b7dea0"
+LIC_FILES_CHKSUM = "file://gxf-install/include/gxf/core/gxf.h;endline=16;md5=f3ad46af80e57edcddfce5c9aaedd6c5"
 
 COMPATIBLE_MACHINE = "(cuda)"
 
 GXF_VERSION = "${@d.getVar('PV').replace('-', '_')}"
-GXF_PACKAGE = "gxf_${GXF_VERSION}_holoscan-sdk-cu12_${TARGET_ARCH}"
+GXF_PACKAGE = "gxf_${GXF_VERSION}_holoscan-sdk-cu13_${TARGET_ARCH}"
 SRC_URI = "https://edge.urm.nvidia.com/artifactory/sw-holoscan-thirdparty-generic-local/gxf/${GXF_PACKAGE}.tar.gz;subdir=${GXF_PACKAGE}"
-SRC_URI[sha256sum] = "d17c24ce32c4a65d5b06a52f9b61916c2585824ea6fb663fe8905ebe7efa09f6"
-
-SRC_URI += " \
-    file://0001-OE-cross-build-fixups.patch \
-"
+SRC_URI[sha256sum] = "852fb8ba876888b5e2fa37e894187f30366358f62ae3af3da4a381f1c150dcbd"
 
 S = "${UNPACKDIR}/${GXF_PACKAGE}"
 
