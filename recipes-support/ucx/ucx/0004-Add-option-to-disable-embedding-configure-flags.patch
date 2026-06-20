@@ -1,0 +1,44 @@
+From 609a2df0cb4e8c2c026f9d7ddc7d66ec2ab1e2a4 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Wed, 6 May 2026 11:53:04 -0700
+Subject: [PATCH] Add option to disable embedding configure flags
+
+Embedding the full configure command line into binaries via
+UCX_CONFIGURE_FLAGS leaks build-host paths (cross-compile sysroots,
+TMPDIR) into shipped binaries, which fails OE/Yocto buildpaths QA.
+
+Add --disable-config-flags-record so distributions can opt out.
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ configure.ac | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index c1816b116..719afdc53 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -114,9 +114,17 @@ AS_IF([${LN_S} --relative symlinktest 2>/dev/null],
+ 
+ 
+ #
+-# Save config flags for version dump tool
++# Save config flags for version dump tool. Embedding the full flag string can
++# leak build-host paths (e.g. cross-compile sysroots) into shipped binaries,
++# so allow distributions to opt out.
+ #
+-AC_DEFINE_UNQUOTED([UCX_CONFIGURE_FLAGS], ["$config_flags"], [UCX configure flags])
++AC_ARG_ENABLE([config-flags-record],
++              AS_HELP_STRING([--disable-config-flags-record],
++                             [Don't embed configure flags into binaries]),
++              [], [enable_config_flags_record=yes])
++AS_IF([test "x$enable_config_flags_record" = "xyes"],
++      [AC_DEFINE_UNQUOTED([UCX_CONFIGURE_FLAGS], ["$config_flags"], [UCX configure flags])],
++      [AC_DEFINE([UCX_CONFIGURE_FLAGS], ["(not recorded)"], [UCX configure flags])])
+ 
+ #
+ # Define path of ucx.conf configuration file
+-- 
+2.43.0
+

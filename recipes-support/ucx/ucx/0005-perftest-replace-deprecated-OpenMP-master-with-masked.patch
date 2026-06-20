@@ -1,0 +1,58 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Fri, 19 Jun 2026 19:43:00 -0700
+Subject: [PATCH] perftest: replace deprecated OpenMP 'master' with 'masked'
+
+The 'master' construct was deprecated in OpenMP 5.1 in favor of
+'masked'. GCC 14+ emits -Wdeprecated-openmp for it, which becomes a
+hard error under UCX's -Werror build, breaking the build of
+ucx_perftest:
+
+    src/tools/perf/perftest.c:261:11: error: 'master' construct
+        deprecated since OpenMP 5.1, use 'masked'
+        [-Werror=deprecated-openmp]
+
+Use 'masked filter(0)' when the implementation advertises OpenMP
+>= 5.1 (_OPENMP >= 202011), and keep 'master' for older OpenMP
+runtimes so we do not break GCC/Clang versions that don't know
+the 'masked' directive yet. Both occurrences in perftest.c are
+patched (sock_rte_barrier and the HAVE_MPI mpi_rte_barrier path).
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ src/tools/perf/perftest.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/src/tools/perf/perftest.c b/src/tools/perf/perftest.c
+--- a/src/tools/perf/perftest.c
++++ b/src/tools/perf/perftest.c
+@@ -258,7 +258,11 @@ static void sock_rte_barrier(void *rte_group, void (*progress)(void *arg),
+ {
+ #if _OPENMP
+ #  pragma omp barrier
+-#  pragma omp master
++#  if _OPENMP >= 202011
++#    pragma omp masked filter(0)
++#  else
++#    pragma omp master
++#  endif
+ #endif
+   {
+     sock_rte_group_t *group = rte_group;
+@@ -592,7 +596,11 @@ static void mpi_rte_barrier(void *rte_group, void (*progress)(void *arg),
+ 
+ #pragma omp barrier
+ 
+-#pragma omp master
++#if defined(_OPENMP) && _OPENMP >= 202011
++#  pragma omp masked filter(0)
++#else
++#  pragma omp master
++#endif
+   {
+     /*
+      * Naive non-blocking barrier implementation over send/recv, to call user
+-- 
+2.43.0
+
