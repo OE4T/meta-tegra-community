@@ -7,7 +7,7 @@ SRC_URI = " \
     git://github.com/cpm-cmake/CPM.cmake.git;protocol=https;nobranch=1;tag=v${PV} \
     file://0001-update-CPM-version.patch \
 "
-SRCREV = "0bc73f41cedb561efe5643826891dcb705c680de"
+SRCREV = "d9364ce284d92f4e18a96a7ca27e2c5deecf6700"
 
 do_configure[noexec] = "1"
 do_compile[noexec] = "1"
