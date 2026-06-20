@@ -14,6 +14,7 @@ SRCREV_FORMAT = "onnxruntime_cudnn_frontend"
 
 SRC_URI += " \
     file://0001-Use-external-library-dependencies.patch \
+    file://0002-Skip-redundant-ONNX-opset-registration-when-static-r.patch \
 "
 
 COMPATIBLE_MACHINE = "(cuda)"
@@ -31,7 +32,7 @@ DEPENDS += " \
     flatbuffers-native \
     nlohmann-json \
     nsync \
-    onnx \
+    onnx-ort \
     microsoft-gsl \
     protobuf \
     protobuf-native \
@@ -68,6 +69,12 @@ EXTRA_OECMAKE = " \
     ${@bb.utils.contains('PACKAGECONFIG', 'python', '-Donnxruntime_ENABLE_PYTHON=ON', '', d)} \
     -DCMAKE_CUDA_COMPILER_FORCED=TRUE \
 "
+
+# onnx-ort installs its private, static, registration-disabled ONNX under
+# ${prefix}/onnx-ort. Add that prefix to CMAKE_FIND_ROOT_PATH so ORT's
+# find_package(ONNX) (FETCHCONTENT_TRY_FIND_PACKAGE_MODE=ALWAYS) resolves to it
+# instead of building ONNX from source or finding the shared system onnx.
+OECMAKE_EXTRA_ROOT_PATH = "${RECIPE_SYSROOT}${prefix}/onnx-ort"
 
 OECMAKE_CXX_FLAGS:append = " -Wno-array-bounds -Wno-deprecated-declarations -Wno-unused-variable -Wno-template-id-cdtor -Wno-range-loop-construct -Wno-maybe-uninitialized -Wno-error=cpp -Wno-error=uninitialized -Wno-error=sfinae-incomplete -Wno-error=unused-but-set-parameter"
 OECMAKE_SOURCEPATH = "${S}/cmake"
