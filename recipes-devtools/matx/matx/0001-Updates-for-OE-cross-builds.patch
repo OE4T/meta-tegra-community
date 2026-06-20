@@ -1,6 +1,6 @@
-From efca2056a911a44dc9396b8ca65e72592c33b925 Mon Sep 17 00:00:00 2001
+From f75a888b57e8a956a7343d5ad8e506407f273cad Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Fri, 21 Nov 2025 17:55:23 +0000
+Date: Fri, 8 May 2026 18:04:03 -0700
 Subject: [PATCH] Updates for OE cross builds
 
 Upstream-Status: Inappropriate [OE-specific]
@@ -10,7 +10,7 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  1 file changed, 23 insertions(+), 33 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 08dc1d60..8d0a7944 100644
+index 3c67ee0f..f33e69aa 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -9,25 +9,31 @@ else()
@@ -38,7 +38,7 @@ index 08dc1d60..8d0a7944 100644
 +find_package(Thrust REQUIRED)
 +
 +
-+set(CPM_DOWNLOAD_VERSION 0.40.2)
++set(CPM_DOWNLOAD_VERSION 0.42.0)
 +set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
 +message(STATUS "CPM download location: ${CPM_DOWNLOAD_LOCATION}")
 +
@@ -50,10 +50,10 @@ index 08dc1d60..8d0a7944 100644
 -include(${rapids-cmake-dir}/cpm/nvbench.cmake)
 +set(rapids-cmake_POPULATED "TRUE")
 +if(NOT rapids-cmake-version)
-+  set(rapids-cmake-version "25.10")
++  set(rapids-cmake-version "26.02")
 +endif()
 +if(NOT rapids-cmake-branch)
-+  set(rapids-cmake-branch "branch-25.10")
++  set(rapids-cmake-branch "branch-26.02")
 +endif()
 +set(rapids-cmake-dir "${RAPIDS_CMAKE_DIR}/rapids-cmake")
 +message(STATUS "Rapids cmake DIR: ${rapids-cmake-dir}")
@@ -86,7 +86,7 @@ index 08dc1d60..8d0a7944 100644
  message(STATUS "Using GPU architectures ${CMAKE_CUDA_ARCHITECTURES}")
  
  rapids_cmake_write_version_file(include/matx/version_config.h)
-@@ -130,12 +126,6 @@ if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)
+@@ -131,12 +127,6 @@ if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)
      message(FATAL_ERROR "MatX requires CUDA 11.5 or higher. Please update before using.")
  endif()
  
@@ -100,5 +100,5 @@ index 08dc1d60..8d0a7944 100644
  
  # Set flags for compiling tests faster (only for nvcc)
 -- 
-2.34.1
+2.43.0
 
