@@ -1,25 +1,23 @@
-From a9f592e26badc49a39fb6a032d156ececa46d2ef Mon Sep 17 00:00:00 2001
+From 10c96a759aa12390d4e727877abcb6fdad891134 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 20 Nov 2025 20:08:10 +0000
+Date: Wed, 6 May 2026 13:13:34 -0700
 Subject: [PATCH] Updates for OE cross builds
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt      | 173 ++++----------------------------------------
- rapids_config.cmake |  14 +++-
- 2 files changed, 26 insertions(+), 161 deletions(-)
+ CMakeLists.txt      | 169 ++++----------------------------------------
+ rapids_config.cmake |  16 ++++-
+ 2 files changed, 26 insertions(+), 159 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index f5a878e..c842290 100644
+index 27752af..ffa2ba4 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -12,140 +12,7 @@
- # the License.
- # =============================================================================
+@@ -14,137 +14,6 @@
  
--cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
--
+ cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
+ 
 -include(rapids_config.cmake)
 -include(rapids-cmake)
 -include(rapids-cpm)
@@ -28,8 +26,10 @@ index f5a878e..c842290 100644
 -# Fetch fmt
 -function(get_fmt)
 -  set(to_install OFF)
+-  set(exclude_from_all ON)
 -  if(INSTALL_EXPORT_SET IN_LIST ARGN)
 -    set(to_install ON)
+-    set(exclude_from_all OFF)
 -  endif()
 -
 -  include("${rapids-cmake-dir}/cpm/find.cmake")
@@ -39,9 +39,9 @@ index f5a878e..c842290 100644
 -    GLOBAL_TARGETS fmt::fmt fmt::fmt-header-only
 -    CPM_ARGS
 -    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
--    GIT_TAG "v${version}"
+-    GIT_TAG "${version}"
 -    GIT_SHALLOW ON
--    EXCLUDE_FROM_ALL ON
+-    EXCLUDE_FROM_ALL ${exclude_from_all}
 -    OPTIONS "FMT_INSTALL ${to_install}" "CMAKE_POSITION_INDEPENDENT_CODE ON"
 -  )
 -
@@ -81,8 +81,10 @@ index f5a878e..c842290 100644
 -  endif()
 -
 -  set(to_install OFF)
+-  set(exclude_from_all ON)
 -  if(_RAPIDS_INSTALL_EXPORT_SET)
 -    set(to_install ON)
+-    set(exclude_from_all OFF)
 -  endif()
 -
 -  # If the option wasn't passed to the command, default to header only fmt
@@ -108,12 +110,6 @@ index f5a878e..c842290 100644
 -  endif()
 -
 -  if(_RAPIDS_FMT_OPTION STREQUAL "EXTERNAL_FMT" OR _RAPIDS_FMT_OPTION STREQUAL "EXTERNAL_FMT_HO")
--    include("${rapids-cmake-dir}/cpm/fmt.cmake")
--
--    # Using `spdlog_ROOT` needs to cause any internal find calls in `spdlog-config.cmake` to first
--    # search beside it before looking globally.
--    list(APPEND fmt_ROOT ${spdlog_ROOT})
--
 -    get_fmt(${_RAPIDS_UNPARSED_ARGUMENTS})
 -  endif()
 -
@@ -126,7 +122,7 @@ index f5a878e..c842290 100644
 -    GIT_REPOSITORY https://github.com/gabime/spdlog.git
 -    GIT_TAG "v${version}"
 -    GIT_SHALLOW ON
--    EXCLUDE_FROM_ALL ON
+-    EXCLUDE_FROM_ALL ${exclude_from_all}
 -    OPTIONS "SPDLOG_INSTALL ${to_install}" "${spdlog_fmt_option}"
 -  )
 -
@@ -152,11 +148,11 @@ index f5a878e..c842290 100644
 -      PARENT_SCOPE
 -  )
 -endfunction()
-+cmake_minimum_required(VERSION 3.28.3 FATAL_ERROR)
- 
+-
  file(READ "${CMAKE_CURRENT_LIST_DIR}/VERSION" _version)
  string(STRIP "${_version}" _version)
-@@ -157,6 +24,18 @@ project(
+ string(REGEX MATCH "[0-9]+\.[0-9]+\.[0-9]+" _version "${_version}")
+@@ -155,6 +24,18 @@ project(
    LANGUAGES CXX
  )
  
@@ -167,15 +163,15 @@ index f5a878e..c842290 100644
 +
 +# Fetch fmt
 +find_package(PkgConfig)
-+pkg_check_modules(FMT REQUIRED IMPORTED_TARGET GLOBAL fmt>=11.0.2)
++pkg_check_modules(FMT REQUIRED IMPORTED_TARGET GLOBAL fmt>=12.1.0)
 +
 +# Fetch spdlog
-+find_package(spdlog 1.16.0 REQUIRED)
++find_package(spdlog 1.17.0 REQUIRED)
 +
  rapids_cmake_build_type(Release)
  
  rapids_cpm_init()
-@@ -197,32 +76,6 @@ set_target_properties(
+@@ -195,32 +76,6 @@ set_target_properties(
               POSITION_INDEPENDENT_CODE ON
  )
  
@@ -209,14 +205,14 @@ index f5a878e..c842290 100644
  
  if(BUILD_TESTS)
 diff --git a/rapids_config.cmake b/rapids_config.cmake
-index 75f5624..535ab5f 100644
+index 75f5624..f72f59f 100644
 --- a/rapids_config.cmake
 +++ b/rapids_config.cmake
 @@ -26,10 +26,22 @@ else()
    )
  endif()
  
-+set(CPM_DOWNLOAD_VERSION 0.40.2)
++set(CPM_DOWNLOAD_VERSION 0.42.0)
 +set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
 +message(STATUS "CPM download location: ${CPM_DOWNLOAD_LOCATION}")
 +
@@ -229,7 +225,8 @@ index 75f5624..535ab5f 100644
    set(rapids-cmake-version "${RAPIDS_VERSION_MAJOR_MINOR}")
  endif()
  if(NOT rapids-cmake-branch)
-   set(rapids-cmake-branch "branch-25.10")
+-  set(rapids-cmake-branch "branch-25.10")
++  set(rapids-cmake-branch "branch-26.02")
  endif()
 -include("${CMAKE_CURRENT_LIST_DIR}/cmake/RAPIDS.cmake")
 +set(rapids-cmake-dir "${RAPIDS_CMAKE_DIR}/rapids-cmake")
@@ -237,5 +234,5 @@ index 75f5624..535ab5f 100644
 +list(APPEND CMAKE_MODULE_PATH "${rapids-cmake-dir}")
 +include("${RAPIDS_CMAKE_DIR}/RAPIDS.cmake")
 -- 
-2.34.1
+2.43.0
 
