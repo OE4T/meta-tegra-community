@@ -1,44 +1,29 @@
-From fcc6c2b7974a42ac8f9466e1cd8e29bb4734c9c6 Mon Sep 17 00:00:00 2001
-From: Matt Madison <matt@madison.systems>
-Date: Sat, 19 Oct 2024 08:02:15 -0700
-Subject: [PATCH] OE cross-build fixups
+From c81ff9e9cba4fc1be4c77c9b99214a83846fdba6 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 11 May 2026 11:18:33 -0700
+Subject: [PATCH] OE cross build fixups
 
 Upstream-Status: Inappropriate [OE-specific]
-Signed-off-by: Matt Madison <matt@madison.systems>
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- cuda/setup.py | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+ cuda_bindings/build_hooks.py | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/cuda/setup.py b/cuda/setup.py
-index ec52362..12565e5 100644
---- a/cuda/setup.py
-+++ b/cuda/setup.py
-@@ -155,26 +155,15 @@ for file in input_files:
- # Prepare compile arguments
+diff --git a/cuda_bindings/build_hooks.py b/cuda_bindings/build_hooks.py
+index b2d3029c69..d348fa4144 100644
+--- a/cuda_bindings/build_hooks.py
++++ b/cuda_bindings/build_hooks.py
+@@ -342,9 +342,7 @@ def _build_cuda_bindings(strip=False):
+         _generate_output(file, template_vars)
  
- # For Cython
--include_dirs = [
--    os.path.dirname(sysconfig.get_path("include")),
--] + include_path_list
--library_dirs = [sysconfig.get_path("platlib"), os.path.join(os.sys.prefix, "lib")]
-+include_dirs = []
-+library_dirs = []
- 
- extra_compile_args = []
- extra_cythonize_kwargs = {}
- if sys.platform != 'win32':
-     extra_compile_args += [
--        '-std=c++14',
-         '-fpermissive',
--        '-Wno-deprecated-declarations',
--        '-D _GLIBCXX_ASSERTIONS',
--        '-fno-var-tracking-assignments'
-     ]
--    if '--debug' in sys.argv:
--        extra_cythonize_kwargs['gdb_debug'] = True
--        extra_compile_args += ['-g', '-O0']
--    else:
--        extra_compile_args += ['-O3']
- 
- # For Setup
- extensions = []
+     # Prepare compile/link arguments
+-    include_dirs = [
+-        os.path.dirname(sysconfig.get_path("include")),
+-    ] + include_path_list
++    include_dirs = list(include_path_list)
+     library_dirs = [sysconfig.get_path("platlib"), os.path.join(os.sys.prefix, "lib")]
+     cudalib_subdirs = [r"lib\x64"] if sys.platform == "win32" else ["lib64", "lib"]
+     library_dirs.extend(os.path.join(prefix, subdir) for prefix in cuda_paths for subdir in cudalib_subdirs)
+-- 
+2.43.0
+
