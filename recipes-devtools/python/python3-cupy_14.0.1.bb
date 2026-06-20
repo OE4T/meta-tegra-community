@@ -3,39 +3,40 @@ HOMEPAGE = "https://cupy.dev/"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=6b47a0b47b880f6f283bbed9af6176e5"
 
-
-SRC_URI = " \
+SRC_URI = "\
     git://github.com/cupy/cupy.git;protocol=https;nobranch=1;tag=v${PV} \
-    git://github.com/NVIDIA/cccl.git;protocol=https;nobranch=1;name=cccl;destsuffix=${BPN}-${PV}/third_party/cccl \
     file://0001-Fixups-for-cross-building-in-OE.patch \
+    file://0002-Use-system-CCCL-when-bundled-is-unavailable.patch \
 "
-SRCREV = "f45081393d44e4c8e28d93873405b8391c2a3592"
-SRCREV_cccl = "3a388b7b01512d48474b98389a3e776c8d8f817a"
-
-SRCREV_FORMAT = "cupy_cccl"
+SRCREV = "3df3b7e4695029652fec511b71351736bae97389"
 
 DEPENDS += " \
     jitify cuda-profiler-api cuda-cudart cuda-nvrtc cuda-nvtx \
-    libcublas libcufft libcurand libcusparse nccl nvtx dlpack \
-    python3-cython-native python3-fastrlock-native python3-numpy-native \
+    cuda-cccl libcublas libcufft libcurand libcusparse nccl \
+    dlpack python3-cython-native python3-numpy-native \
 "
+
+CXXFLAGS:append = " -I${STAGING_DIR_TARGET}/usr/local/cuda-${CUDA_VERSION}/include/cccl"
 
 COMPATIBLE_MACHINE = "(cuda)"
 
-inherit setuptools3 cuda
+inherit python_setuptools_build_meta cuda
 
 do_compile() {
     export NVCC="${CUDA_NVCC_EXECUTABLE} -ccbin ${CUDAHOSTCXX} ${CUDAFLAGS}"
     export CUPY_NVCC_GENERATE_CODE=""
     export CUDA_VERSION="${CUDA_VERSION}"
-    setuptools3_do_compile
+    export VERBOSE=1
+    python_pep517_do_compile
 }
 
 RDEPENDS:${PN} += " \
     python3-numpy \
-    python3-fastrlock \
+    python3-cuda-pathfinder \
+    cuda-cccl \
+    cuda-cudart-dev \
     bash \
 "
 
-INSANE_SKIP:${PN} = "buildpaths"
+INSANE_SKIP:${PN} = "dev-deps buildpaths"
 INSANE_SKIP:${PN}-src = "buildpaths"
