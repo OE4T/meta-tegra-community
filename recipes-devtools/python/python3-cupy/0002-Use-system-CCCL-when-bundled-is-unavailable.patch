@@ -1,0 +1,71 @@
+From 37b2d4ca95963a90a5eaf860a0b771a05b9f2d26 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 11 May 2026 15:01:36 -0700
+Subject: [PATCH 2/2] Use system CCCL when bundled is unavailable
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ cupy/_core/core.pyx  |  8 +++++++-
+ cupy/_environment.py | 19 +++++++++++++++++++
+ 2 files changed, 26 insertions(+), 1 deletion(-)
+
+diff --git a/cupy/_core/core.pyx b/cupy/_core/core.pyx
+index eddd0380f..419eddd12 100644
+--- a/cupy/_core/core.pyx
++++ b/cupy/_core/core.pyx
+@@ -2400,7 +2400,13 @@ cpdef str _get_header_dir_path():
+ 
+ 
+ cpdef tuple _get_cccl_include_options():
+-    # the search paths are made such that they resemble the layout in CTK
++    # Prefer the system CUDA toolkit's CCCL package when available
++    # (.../include/cccl/ holds cub/, thrust/, cuda/ (libcudacxx), and nv/
++    # under a single include root). Fall back to the bundled CCCL under
++    # cupy/_core/include/cupy/_cccl/ otherwise.
++    system_cccl = _environment._get_system_cccl_path()
++    if system_cccl is not None:
++        return (f"-I{system_cccl}",)
+     return (f"-I{_get_header_dir_path()}/cupy/_cccl/cub",
+             f"-I{_get_header_dir_path()}/cupy/_cccl/thrust",
+             f"-I{_get_header_dir_path()}/cupy/_cccl/libcudacxx")
+diff --git a/cupy/_environment.py b/cupy/_environment.py
+index 3a6aeb757..859cd544f 100644
+--- a/cupy/_environment.py
++++ b/cupy/_environment.py
+@@ -231,6 +231,20 @@ def _get_hipcc_path():
+     return shutil.which('hipcc', path=os.path.join(rocm_path, 'bin'))
+ 
+ 
++def _get_system_cccl_path():
++    """Return the system CUDA toolkit's CCCL include root if present.
++
++    NVIDIA's cuda-cccl package installs cub/, thrust/, cuda/ (libcudacxx),
++    and nv/ all under <CUDA_PATH>/include/cccl/. Returns that path if it
++    exists, otherwise None.
++    """
++    cuda_path = get_cuda_path()
++    if cuda_path is None:
++        return None
++    cccl_path = os.path.join(cuda_path, 'include', 'cccl')
++    return cccl_path if os.path.isdir(cccl_path) else None
++
++
+ def _get_cub_path():
+     # runtime discovery of CUB headers
+     from cupy_backends.cuda.api import runtime
+@@ -240,6 +254,11 @@ def _get_cub_path():
+         if os.path.isdir(
+                 os.path.join(current_dir, '_core/include/cupy/_cccl/cub')):
+             _cub_path = '<bundle>'
++        elif _get_system_cccl_path() is not None:
++            # CCCL provided by the system CUDA toolkit (cuda-cccl package);
++            # the include path is added by _get_cccl_include_options() so
++            # the same '<bundle>' sentinel suffices for header inclusion.
++            _cub_path = '<bundle>'
+         else:
+             _cub_path = None
+     else:
+-- 
+2.43.0
+
