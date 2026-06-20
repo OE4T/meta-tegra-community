@@ -17,6 +17,7 @@ SAMPLEJPG="$SAMPLEROOT/data/Picture/nvidia-logo.jpg"
 SAMPLEYUVPIC="nvidia-logo.yuv"
 SAMPLEMODELS="$SAMPLEROOT/data/Model"
 SKIPCODE=97
+has_hw_encoder=
 
 run_video_decode() {
     vid="${1:-$SAMPLEVID}"
@@ -40,6 +41,7 @@ generate_yuv_sample_vid() {
 
 run_video_encode() {
     local rc=0
+    [ -n "$has_hw_encoder" ] || return $SKIPCODE
     [ -s "$SAMPLEYUV" ] || generate_yuv_sample_vid || return 1
     echo "Running 01_video_encode"
     rm -f samplevid.h264
@@ -61,6 +63,7 @@ run_video_dec_cuda() {
 
 run_video_cuda_enc() {
     local rc=0
+    [ -n "$has_hw_encoder" ] || return $SKIPCODE
     [ -s "$SAMPLEYUV" ] || generate_yuv_sample_vid || return 1
     echo "Running 03_video_cuda_enc"
     rm -f samplevid.h264
@@ -217,6 +220,7 @@ run_decode_sample() {
 
 run_encode_sample() {
     local rc=0
+    [ -n "$has_hw_encoder" ] || return $SKIPCODE
     [ -s "$SAMPLEYUV" ] || generate_yuv_sample_vid || return 1
     echo "Running encode_sample"
     rm -f ut-samplevid.h264
@@ -261,6 +265,10 @@ find_test() {
 }
 
 jetson_clocks
+
+if [ -c /dev/v4l2-nvenc ]; then
+    has_hw_encoder=yes
+fi
 
 testcount=0
 testpass=0
