@@ -3,19 +3,16 @@ HOMEPAGE = "https://developer.nvidia.com/holoscan-sdk"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE.txt;md5=3b83ef96387f14655fc854ddc3c6bd57"
 
+SRC_URI = " \
+    git://github.com/nvidia-holoscan/holoscan-sdk.git;protocol=https;nobranch=1;tag=v${PV} \
+    https://edge.urm.nvidia.com/artifactory/sw-holoscan-thirdparty-generic-local/data/racerx/racerx_20231009.zip;downloadfilename=racerx.zip;name=dataset;subdir=${S}/data/racerx"
 
-SRC_URI = "git://github.com/nvidia-holoscan/holoscan-sdk.git;protocol=https;nobranch=1;tag=v${PV}"
-SRCREV = "3500b333de5883d06517bb636fa0c106c5cbd129"
+SRCREV = "1f6ef481348e03656bcf99e033cfef9899c378a6"
+SRC_URI[dataset.sha256sum] = "7a334c01c11e9620053c88dc3e796501c21564d0e533ca17b1a4ef2ba3a4f041"
 
 SRC_URI += " \
     file://desktop-icons \
-    file://0001-Fix-GXF-TypenameAsString-error.patch \
-    file://0002-Use-external-library-dependencies.patch \
-    file://0003-Build-python-libs-with-install-RPATH.patch \
-    file://0004-Fix-TensorRT-include-interface.patch \
-    file://0005-Disable-various-warnings-as-errors.patch \
-    file://0006-Remove-GXF-python-modules-install.patch \
-    file://0007-Updates-for-OE-cross-builds.patch \
+    file://0001-Updates-for-OE-cross-builds.patch \
 "
 
 HOLOSCAN_INSTALL_PATH = "/opt/nvidia/holoscan"
@@ -24,31 +21,27 @@ COMPATIBLE_MACHINE = "(cuda)"
 
 inherit pkgconfig cmake cuda setuptools3
 
-# Network is need to download the dataset
-# TODO: create a seperate recipe for dataset and add runtime dependency
-do_compile[network] = "1"
-
 # Add extra build paths.
 EXTRA_OECMAKE:append = " \
+    -DHOLOSCAN_BUILD_DEPENDENCIES=OFF \
     -DCMAKE_INSTALL_PREFIX=${HOLOSCAN_INSTALL_PATH} \
     -DGXF_DIR=${RECIPE_SYSROOT}/opt/nvidia/gxf/lib/cmake/GXF \
     -DIMGUI_SOURCE_DIR=${RECIPE_SYSROOT}/opt/nvidia/imgui \
     -Dstb_INCLUDE_DIRS=${RECIPE_SYSROOT}${includedir}/stb \
     -DCPM_SOURCE_CACHE=${RECIPE_SYSROOT}${datadir} \
     -DRAPIDS_CMAKE_DIR=${RECIPE_SYSROOT}/opt/nvidia/rapids-cmake \
-    -Dyaml-cpp_DIR=${RECIPE_SYSROOT}${datadir}/cmake/yaml-cpp \
     -Dglfw3_DIR=${RECIPE_SYSROOT}${libdir}/cmake/glfw3 \
     -DPYTHON_EXECUTABLE=${HOSTTOOLS_DIR}/python3 \
     -DTENSORRT_ROOT=${RECIPE_SYSROOT}${includedir} \
-    -DCCCL_DIR=${RECIPE_SYSROOT}/opt/nvidia/cccl/lib/cmake/cccl \
+    -DFETCHCONTENT_SOURCE_DIR_RAPIDS-CMAKE=${RECIPE_SYSROOT}/opt/nvidia/rapids-cmake \
 "
 
 # Disable unused Holoscan build steps and components.
 EXTRA_OECMAKE:append = " \
     -DHOLOSCAN_INSTALL_EXAMPLE_SOURCE=OFF \
     -DHOLOSCAN_BUILD_TESTS=OFF \
-    -DHOLOSCAN_BUILD_DOCS=OFF \
-    -DHOLOSCAN_USE_CCACHE=OFF \
+    -DHOLOSCAN_USE_CACHE_DIR=OFF \
+    -DHOLOSCAN_DOWNLOAD_DATASETS=OFF \
 "
 
 OECMAKE_CXX_FLAGS:append = " -Wno-error=cpp"
@@ -82,7 +75,7 @@ DEPENDS += " \
     imgui \
     fmt \
     spdlog \
-    cccl \
+    cuda-cccl \
     hwloc \
     cli11 \
     dlpack \
@@ -111,6 +104,7 @@ RDEPENDS:${PN} = " \
     tegra-libraries-multimedia-utils \
     tegra-libraries-multimedia-v4l \
     tegra-libraries-vulkan \
+    rxvt-unicode \
 "
 
 RDEPENDS:${PN}-dev = " \
