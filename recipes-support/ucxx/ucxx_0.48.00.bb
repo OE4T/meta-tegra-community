@@ -11,16 +11,17 @@ SRC_URI = " \
     git://github.com/rapidsai/ucxx.git;protocol=https;nobranch=1;tag=v${PV} \
     file://0001-Updates-for-OE-cross-builds.patch \
 "
-SRCREV = "7b160b312b15cecbed9932145c53e760d7a1dd62"
+SRCREV = "bb8b93e165c48da10756e746e1928dd240a6c249"
 
-DEPENDS += "ucx cccl cpm-cmake rapids-cmake"
+DEPENDS += "ucx cuda-cccl cpm-cmake rapids-cmake"
 
 OECMAKE_SOURCEPATH = "${S}/cpp"
 
 EXTRA_OECMAKE:append = " \
-    -DCCCL_DIR=${RECIPE_SYSROOT}/opt/nvidia/cccl/lib/cmake/cccl \
+    -DCCCL_DIR=${RECIPE_SYSROOT}/usr/local/cuda-${CUDA_VERSION}/lib/cmake/cccl \
     -DCPM_SOURCE_CACHE=${RECIPE_SYSROOT}${datadir} \
     -DRAPIDS_CMAKE_DIR=${RECIPE_SYSROOT}/opt/nvidia/rapids-cmake \
+    -DFETCHCONTENT_SOURCE_DIR_RAPIDS-CMAKE=${RECIPE_SYSROOT}/opt/nvidia/rapids-cmake \
     -DBUILD_TESTS=OFF \
 "
 
