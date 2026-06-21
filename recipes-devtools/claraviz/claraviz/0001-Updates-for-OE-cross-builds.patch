@@ -1,4 +1,4 @@
-From 72e2ecab68d6644d55ad31c4e7c2aa06838a5e82 Mon Sep 17 00:00:00 2001
+From af8858e429d2e72e47d9d12fb6efb1730fc6f7bb Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
 Date: Thu, 18 Sep 2025 13:00:52 +0100
 Subject: [PATCH] Updates for OE cross builds
@@ -10,8 +10,8 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  CMakeLists.txt                               |  44 ++------
  cmake/Project.cmake                          |  28 -----
  cmake/clara_viz_renderer-targets.cmake       | 111 +++++++++++++++++++
- src/claraviz/CMakeLists.txt                  |  60 ++++++++--
- src/claraviz/claraviz-config.cmake.in        |   7 ++
+ src/claraviz/CMakeLists.txt                  |  64 +++++++++--
+ src/claraviz/claraviz-config.cmake.in        |  12 ++
  src/claraviz/image/JpegEncoder.h             |   1 +
  src/claraviz/interface/DataInterface.cpp     |   1 +
  src/claraviz/interface/DataViewInterface.cpp |   2 +
@@ -20,7 +20,7 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  src/claraviz/video/Mp4Wrapper.h              |   1 +
  src/claraviz/video/VideoEncoder.h            |   1 +
  thirdparty/CMakeLists.txt                    |   3 +-
- 13 files changed, 190 insertions(+), 72 deletions(-)
+ 13 files changed, 197 insertions(+), 74 deletions(-)
  create mode 100644 cmake/clara_viz_renderer-targets.cmake
  create mode 100644 src/claraviz/claraviz-config.cmake.in
 
@@ -245,7 +245,7 @@ index 0000000..c1325f0
 +set(CMAKE_IMPORT_FILE_VERSION)
 +cmake_policy(POP)
 diff --git a/src/claraviz/CMakeLists.txt b/src/claraviz/CMakeLists.txt
-index 04710fc..dc12bd3 100644
+index 04710fc..4fa27ff 100644
 --- a/src/claraviz/CMakeLists.txt
 +++ b/src/claraviz/CMakeLists.txt
 @@ -12,6 +12,9 @@
@@ -270,15 +270,17 @@ index 04710fc..dc12bd3 100644
  
  target_code_coverage(${PROJECT_NAME})
  
-@@ -64,7 +64,7 @@ target_sources(${PROJECT_NAME}
+@@ -64,8 +64,8 @@ target_sources(${PROJECT_NAME}
  target_include_directories(${PROJECT_NAME}
      PUBLIC
          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
 -        $<INSTALL_INTERFACE:src>
+-        ${CUDAToolkit_INCLUDE_DIRS}
 +        $<INSTALL_INTERFACE:include/claraviz>
-         ${CUDAToolkit_INCLUDE_DIRS}
++        "$<BUILD_INTERFACE:${CUDAToolkit_INCLUDE_DIRS}>"
      )
  
+ target_link_libraries(${PROJECT_NAME}
 @@ -88,6 +88,15 @@ if(OpenH264_FOUND)
          )
  endif()
@@ -304,8 +306,9 @@ index 04710fc..dc12bd3 100644
 +            ${NVJPEG_INC}
 +        )
      target_link_libraries(${PROJECT_NAME}
-         PUBLIC
+-        PUBLIC
 -            ${nvjpeg_LIB}
++        PRIVATE
 +            ${NVJPEG_LIB}
          )
  endif()
@@ -359,13 +362,18 @@ index 04710fc..dc12bd3 100644
 +    DESTINATION ${CLARA_VIZ_CMAKE_INSTALL_DIR})
 diff --git a/src/claraviz/claraviz-config.cmake.in b/src/claraviz/claraviz-config.cmake.in
 new file mode 100644
-index 0000000..27eeb95
+index 0000000..0e489ce
 --- /dev/null
 +++ b/src/claraviz/claraviz-config.cmake.in
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,12 @@
 +set(CLARAVIZ_VERSION x.y.z)
 +
 +@PACKAGE_INIT@
++
++include(CMakeFindDependencyMacro)
++find_dependency(CUDAToolkit)
++find_dependency(ZLIB)
++find_dependency(nlohmann_json)
 +
 +include(${CMAKE_CURRENT_LIST_DIR}/clara_viz_core-targets.cmake)
 +include(${CMAKE_CURRENT_LIST_DIR}/clara_viz_core_hw-targets.cmake)
@@ -476,5 +484,5 @@ index 32ee53b..4a3aec9 100644
 \ No newline at end of file
 +endif()
 -- 
-2.34.1
+2.43.0
 
