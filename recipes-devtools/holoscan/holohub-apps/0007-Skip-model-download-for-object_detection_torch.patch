@@ -1,6 +1,6 @@
-From 1a9fb198c48677839a8a5273bac07a9902a472f1 Mon Sep 17 00:00:00 2001
+From 1d5d9c795aad060cf521dcbb914722c4e1d31b4c Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 9 Dec 2025 20:19:51 +0000
+Date: Tue, 3 Mar 2026 09:03:26 -0800
 Subject: [PATCH 7/9] Skip model download for object_detection_torch
 
 This step requires a native installation of PyTorch, which
@@ -11,28 +11,30 @@ outside of the OE build process.
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
 ---
- applications/object_detection_torch/CMakeLists.txt | 8 --------
- 1 file changed, 8 deletions(-)
+ applications/object_detection_torch/CMakeLists.txt | 10 ----------
+ 1 file changed, 10 deletions(-)
 
 diff --git a/applications/object_detection_torch/CMakeLists.txt b/applications/object_detection_torch/CMakeLists.txt
-index 6d9e685d..7929603b 100644
+index fb25bf903..7d03489bc 100644
 --- a/applications/object_detection_torch/CMakeLists.txt
 +++ b/applications/object_detection_torch/CMakeLists.txt
-@@ -102,14 +102,6 @@ if(HOLOHUB_DOWNLOAD_DATASETS)
+@@ -107,16 +107,6 @@ if(HOLOHUB_DOWNLOAD_DATASETS)
      GXF_ENTITIES_FRAMERATE 30
    )
    add_dependencies(object_detection_torch object_detection_torch_data)
 -
--  # Download the model
--  add_custom_target(download_model
--    COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/generate_resnet_model.py"  "${HOLOHUB_DATA_DIR}/object_detection_torch/frcnn_resnet50_t.pt"
--    DEPENDS object_detection_torch_data
--    BYPRODUCTS "${HOLOHUB_DATA_DIR}/object_detection_torch/frcnn_resnet50_t.pt"
+-  # Generate the model (runs when output is missing or dependencies change)
+-  set(MODEL_FILEPATH "${HOLOHUB_DATA_DIR}/object_detection_torch/frcnn_resnet50_t.pt")
+-  add_custom_command(OUTPUT "${MODEL_FILEPATH}"
+-    COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/generate_resnet_model.py" "${MODEL_FILEPATH}"
+-    DEPENDS object_detection_torch_data "${CMAKE_CURRENT_SOURCE_DIR}/generate_resnet_model.py"
+-    COMMENT "Generating FRCNN ResNet50 model"
 -  )
+-  add_custom_target(download_model DEPENDS "${MODEL_FILEPATH}")
 -  add_dependencies(object_detection_torch download_model)
  endif()
  
- # Copy config file
+ # Copy application config file and PyTorch model config files
 -- 
-2.34.1
+2.43.0
 

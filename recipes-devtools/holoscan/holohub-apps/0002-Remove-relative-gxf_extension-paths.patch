@@ -1,31 +1,28 @@
-From 4381a19e4309324a2e540ebeceac6b2fc49f52da Mon Sep 17 00:00:00 2001
+From 09fb3e0e6fced257ae03460799dc3025725b4176 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 9 Dec 2025 20:09:16 +0000
-Subject: [PATCH 2/9] Fix ajantv2 dependencies
+Date: Thu, 22 Jan 2026 12:39:14 -0800
+Subject: [PATCH 2/9] Remove relative gxf_extension paths
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
 ---
- .../cpp/endoscopy_tool_tracking.yaml                        | 6 +++---
+ .../cpp/endoscopy_tool_tracking.yaml                        | 4 ++--
  .../python/endoscopy_tool_tracking.yaml                     | 6 +++---
  .../cpp/h264_endoscopy_tool_tracking.yaml                   | 2 +-
  .../high_speed_endoscopy/cpp/high_speed_endoscopy.yaml      | 2 +-
  .../high_speed_endoscopy/python/high_speed_endoscopy.yaml   | 2 +-
- 5 files changed, 9 insertions(+), 9 deletions(-)
+ 5 files changed, 8 insertions(+), 8 deletions(-)
 
 diff --git a/applications/endoscopy_tool_tracking/cpp/endoscopy_tool_tracking.yaml b/applications/endoscopy_tool_tracking/cpp/endoscopy_tool_tracking.yaml
-index 56f38e4b..8bd5530e 100644
+index 1ea94c4a7..d5926ccaa 100644
 --- a/applications/endoscopy_tool_tracking/cpp/endoscopy_tool_tracking.yaml
 +++ b/applications/endoscopy_tool_tracking/cpp/endoscopy_tool_tracking.yaml
-@@ -29,11 +29,11 @@ resources:
+@@ -29,9 +29,9 @@ resources:
    gpuMemory: 1Gi
  
  extensions:
 -  - lib/gxf_extensions/libgxf_lstm_tensor_rt_inference.so
 +  - libgxf_lstm_tensor_rt_inference.so
- # Uncomment the following extension when using deltacast as a source
--#  - lib/gxf_extensions/libgxf_videomaster.so
-+#  - libgxf_videomaster.so
  # Uncomment the following extension when using yuan as source
 -#  - lib/gxf_extensions/libgxf_qcap_source.so
 +#  - libgxf_qcap_source.so
@@ -33,7 +30,7 @@ index 56f38e4b..8bd5530e 100644
  source: "replayer"    # "replayer" or "aja" or "deltacast" or "yuan"
  postprocessor: "tool_tracking_postprocessor" # "slang_shader" or "tool_tracking_postprocessor"
 diff --git a/applications/endoscopy_tool_tracking/python/endoscopy_tool_tracking.yaml b/applications/endoscopy_tool_tracking/python/endoscopy_tool_tracking.yaml
-index b8fbd969..cec09f01 100644
+index b8fbd9697..cec09f01e 100644
 --- a/applications/endoscopy_tool_tracking/python/endoscopy_tool_tracking.yaml
 +++ b/applications/endoscopy_tool_tracking/python/endoscopy_tool_tracking.yaml
 @@ -29,9 +29,9 @@ resources:
@@ -50,7 +47,7 @@ index b8fbd969..cec09f01 100644
  visualizer: "holoviz" # "holoviz" or "vtk"
  
 diff --git a/applications/h264/h264_endoscopy_tool_tracking/cpp/h264_endoscopy_tool_tracking.yaml b/applications/h264/h264_endoscopy_tool_tracking/cpp/h264_endoscopy_tool_tracking.yaml
-index b6bcae5a..6b72dbe4 100644
+index 2c0a91d0a..245418b6a 100644
 --- a/applications/h264/h264_endoscopy_tool_tracking/cpp/h264_endoscopy_tool_tracking.yaml
 +++ b/applications/h264/h264_endoscopy_tool_tracking/cpp/h264_endoscopy_tool_tracking.yaml
 @@ -19,7 +19,7 @@ extensions:
@@ -63,7 +60,7 @@ index b6bcae5a..6b72dbe4 100644
  record_output: true # Setting this to `false` disables H264 encoding of output and recording it to the file.
  
 diff --git a/applications/high_speed_endoscopy/cpp/high_speed_endoscopy.yaml b/applications/high_speed_endoscopy/cpp/high_speed_endoscopy.yaml
-index 735f227e..bb7f2834 100644
+index 165170c20..7f9d82f09 100644
 --- a/applications/high_speed_endoscopy/cpp/high_speed_endoscopy.yaml
 +++ b/applications/high_speed_endoscopy/cpp/high_speed_endoscopy.yaml
 @@ -15,7 +15,7 @@
@@ -76,7 +73,7 @@ index 735f227e..bb7f2834 100644
  emergent:
    width: 4200
 diff --git a/applications/high_speed_endoscopy/python/high_speed_endoscopy.yaml b/applications/high_speed_endoscopy/python/high_speed_endoscopy.yaml
-index 735f227e..bb7f2834 100644
+index 165170c20..7f9d82f09 100644
 --- a/applications/high_speed_endoscopy/python/high_speed_endoscopy.yaml
 +++ b/applications/high_speed_endoscopy/python/high_speed_endoscopy.yaml
 @@ -15,7 +15,7 @@
@@ -89,5 +86,5 @@ index 735f227e..bb7f2834 100644
  emergent:
    width: 4200
 -- 
-2.34.1
+2.43.0
 
