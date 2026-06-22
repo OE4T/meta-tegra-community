@@ -1,6 +1,33 @@
-#! /bin/bash
+#!/bin/sh
+set -u
+rc=0
 
-DOCKER_TESTS_DIR="/opt/nvidia-docker-tests"
-cd ${DOCKER_TESTS_DIR}
+docker info >/dev/null 2>&1 || { echo "FAIL docker daemon not responsive"; exit 1; }
+docker info -f '{{json .Runtimes}}' | grep -q '"nvidia"' || { echo "FAIL nvidia runtime not registered"; exit 1; }
+echo "PASS nvidia runtime registered"
 
-./scripts/docker_test_ml.sh all nvcr.io/nvidia/
+# every host file the CSVs list for injection must reach the container
+host_files=$(
+    grep -hE '^(lib|sym|dev),' /etc/nvidia-container-runtime/host-files-for-container.d/*.csv 2>/dev/null |
+        sed 's/^[a-z]*, *//' |
+        while read -r pattern; do ls $pattern 2>/dev/null; done |
+        sort -u
+)
+[ -n "$host_files" ] || { echo "FAIL no container CSV to inject"; exit 1; }
+printf '%s\n' "$host_files" | docker run --rm -i --runtime nvidia \
+    nvcr.io/nvidia/cuda:@CUDA_VERSION@.0-base-ubuntu24.04 sh -c '
+    count=0; missing=0
+    while read -r file; do count=$((count+1)); [ -e "$file" ] || { echo "FAIL $file not in container"; missing=1; }; done
+    [ $missing -eq 0 ] && echo "PASS $count host files in container"
+    exit $missing' || rc=1
+
+# the GPU must be usable from a container, not just injected into it
+docker run --rm --runtime nvidia -v /usr/bin/cuda-samples:/usr/bin/cuda-samples:ro \
+    nvcr.io/nvidia/cuda:@CUDA_VERSION@.0-base-ubuntu24.04 \
+    sh -c '/usr/bin/cuda-samples/deviceQuery; /usr/bin/cuda-samples/vectorAdd' 2>&1 | tee /tmp/cuda-samples.log
+if grep -q 'Result = PASS' /tmp/cuda-samples.log && grep -q 'Test PASSED' /tmp/cuda-samples.log
+then echo "PASS CUDA samples in container"
+else echo "FAIL CUDA samples in container"; rc=1
+fi
+
+exit $rc
