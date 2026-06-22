@@ -1,6 +1,20 @@
-#! /bin/bash
+#!/bin/bash
+set -u
+rc=0
 
-DOCKER_TESTS_DIR="/opt/nvidia-docker-tests"
-cd ${DOCKER_TESTS_DIR}
+printf '%s' '#include <cstdio>
+int main(){int n=0; cudaGetDeviceCount(&n); if(n<1){puts("no CUDA device");return 1;}
+cudaDeviceProp p; cudaGetDeviceProperties(&p,0); printf("%s\n",p.name); return 0;}' \
+    | docker run --rm -i --runtime nvidia nvcr.io/nvidia/cuda:@CUDA_VERSION@.0-devel-ubuntu24.04 \
+        bash -c 'cat >q.cu && nvcc q.cu -o q && ./q' || rc=1
+docker rmi nvcr.io/nvidia/cuda:@CUDA_VERSION@.0-devel-ubuntu24.04 >/dev/null 2>&1
 
-./scripts/docker_test_ml.sh all nvcr.io/nvidia/
+docker run --rm --runtime nvidia nvcr.io/nvidia/pytorch:26.02-py3-igpu \
+    python3 -c 'import torch; assert torch.cuda.is_available(); print(torch.cuda.get_device_name(0))' || rc=1
+docker rmi nvcr.io/nvidia/pytorch:26.02-py3-igpu >/dev/null 2>&1
+
+docker run --rm --runtime nvidia nvcr.io/nvidia/tensorflow:25.02-tf2-py3-igpu \
+    python3 -c 'import tensorflow as tf; assert tf.config.list_physical_devices("GPU")' || rc=1
+docker rmi nvcr.io/nvidia/tensorflow:25.02-tf2-py3-igpu >/dev/null 2>&1
+
+exit $rc

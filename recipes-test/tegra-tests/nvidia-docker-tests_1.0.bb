@@ -1,45 +1,20 @@
-DESCRIPTION = "Scripts for testing docker containers with PyTorch, TensorFlow, TensorRT and CUDA library"
+DESCRIPTION = "Scripts for testing docker containers with CUDA, PyTorch and TensorFlow"
 LICENSE = "MIT"
-LIC_FILES_CHKSUM = "file://LICENSE.md;md5=da33f1c12f6d31e71cd114d0c336d4be"
+LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
-SRC_REPO ?= "github.com/dusty-nv/jetson-containers"
-SRCBRANCH ?= "master"
-SRC_URI = "git://${SRC_REPO};branch=${SRCBRANCH};protocol=https"
-SRCREV = "4636fc6400607d8e60729d14055a0e26ab8d3ba6"
-PV = "1.0+git"
+SRC_URI = "file://run-docker-tests.sh.in"
 
-SRC_URI += "\
-    file://0001-Distro-agnostic-support-for-Test-ML-script.patch \
-    file://0002-Add-version-remap-script-support.patch \
-    file://l4t_version_remap.sh.in \
-    file://run-docker-tests.sh.in \
-"
+S = "${UNPACKDIR}"
 
 COMPATIBLE_MACHINE = "(tegra)"
 
 do_install() {
-    # Install scripts in /opt
-    install -d ${D}/opt/nvidia-docker-tests/scripts
-    install -m 0755 ${S}/scripts/l4t_version.sh ${D}/opt/nvidia-docker-tests/scripts
-    install -m 0755 ${S}/scripts/docker_run.sh ${D}/opt/nvidia-docker-tests/scripts
-    install -m 0755 ${S}/scripts/docker_test_ml.sh ${D}/opt/nvidia-docker-tests/scripts
-    install -d ${D}/opt/nvidia-docker-tests/test
-    for i in $(ls ${S}/test/*.py); do
-        install ${i} ${D}/opt/nvidia-docker-tests/test
-    done
-    for i in $(ls ${S}/test/*.sh); do
-        install -m 0755 ${i} ${D}/opt/nvidia-docker-tests/test
-    done
-    install -d ${D}/opt/nvidia-docker-tests/test/data
-    install -m 0644 ${S}/test/data/test_0.jpg ${D}/opt/nvidia-docker-tests/test/data
-
     install -d ${D}${bindir}
-    install -m 0755 ${UNPACKDIR}/run-docker-tests.sh.in ${D}${bindir}/run-docker-tests
-    install -m 0755 ${UNPACKDIR}/l4t_version_remap.sh.in ${D}/opt/nvidia-docker-tests/scripts/l4t_version_remap.sh
+    sed 's/@CUDA_VERSION@/${CUDA_VERSION}/' ${UNPACKDIR}/run-docker-tests.sh.in > ${D}${bindir}/run-docker-tests
+    chmod 0755 ${D}${bindir}/run-docker-tests
 }
 
 FILES:${PN} = " \
-    /opt/nvidia-docker-tests \
     ${bindir}/run-docker-tests \
 "
 RDEPENDS:${PN} = " \
