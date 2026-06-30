@@ -1,0 +1,127 @@
+From 2ea8c686f0398c36ca50122fdbb26b1cd34d13f0 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Tue, 30 Jun 2026 08:22:00 -0700
+Subject: [PATCH] Updates for OE cross builds
+
+Upstream-Status: Inappropriate [oe-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ cmake/sipl_api.cmake                             |  5 ++++-
+ src/hololink/common/CMakeLists.txt               | 10 +++++++---
+ src/hololink/operators/iq_dec/CMakeLists.txt     |  3 ++-
+ src/hololink/operators/iq_enc/CMakeLists.txt     |  3 ++-
+ src/hololink/operators/sig_gen/CMakeLists.txt    |  3 ++-
+ src/hololink/operators/sig_viewer/CMakeLists.txt |  2 +-
+ 6 files changed, 18 insertions(+), 8 deletions(-)
+
+diff --git a/cmake/sipl_api.cmake b/cmake/sipl_api.cmake
+index d4e7cf3..d16f186 100644
+--- a/cmake/sipl_api.cmake
++++ b/cmake/sipl_api.cmake
+@@ -18,7 +18,10 @@ include_guard(GLOBAL)
+ # Detect SIPL API version from the L4T major version.
+ # Check L4T_MAJ_VER env var first (set in Docker builds); fall back to
+ # parsing /sys/class/dmi/id/bios_version on the host.
+-if(DEFINED ENV{L4T_MAJ_VER})
++if(DEFINED L4T_MAJ_VER)
++    set(_l4t_major_raw "${L4T_MAJ_VER}")
++    message(STATUS "L4T major version (from CMake): ${_l4t_major_raw}")
++elseif(DEFINED ENV{L4T_MAJ_VER})
+     set(_l4t_major_raw "$ENV{L4T_MAJ_VER}")
+     message(STATUS "L4T major version (from environment): ${_l4t_major_raw}")
+ else()
+diff --git a/src/hololink/common/CMakeLists.txt b/src/hololink/common/CMakeLists.txt
+index 45cf9dc..87720aa 100644
+--- a/src/hololink/common/CMakeLists.txt
++++ b/src/hololink/common/CMakeLists.txt
+@@ -32,6 +32,11 @@ target_include_directories(hololink
+     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+   )
+ 
++target_include_directories(hololink
++  PUBLIC
++    ${IMGUI_SOURCE_DIR}
++)
++
+ if(TARGET CUDA::nvtx3)
+   set(CUDA_NVTX_TARGET CUDA::nvtx3)
+ else()
+@@ -42,15 +47,14 @@ target_link_libraries(hololink
+   PRIVATE
+     holoscan::core
+ 
+-    # Required by the gui_renderer
+-    holoscan::viz
+-    holoscan::viz::imgui
+   PUBLIC
+     hololink::core
+     CUDA::cuda_driver
+     CUDA::nvrtc
+     ${CUDA_NVTX_TARGET}
+     fmt::fmt-header-only
++    holoscan::viz
++    holoviz_imgui
+   )
+ 
+ if (HOLOLINK_BUILD_ROCE)
+diff --git a/src/hololink/operators/iq_dec/CMakeLists.txt b/src/hololink/operators/iq_dec/CMakeLists.txt
+index babab8e..8f87754 100644
+--- a/src/hololink/operators/iq_dec/CMakeLists.txt
++++ b/src/hololink/operators/iq_dec/CMakeLists.txt
+@@ -32,7 +32,8 @@ target_link_libraries(iq_dec
+   PRIVATE
+     hololink
+     holoscan::core
+-    holoscan::viz::imgui
++  PUBLIC
++    holoviz_imgui
+ )
+ 
+ # Installation of the iq_dec operator
+diff --git a/src/hololink/operators/iq_enc/CMakeLists.txt b/src/hololink/operators/iq_enc/CMakeLists.txt
+index 99ef8da..f8e03a9 100644
+--- a/src/hololink/operators/iq_enc/CMakeLists.txt
++++ b/src/hololink/operators/iq_enc/CMakeLists.txt
+@@ -32,7 +32,8 @@ target_link_libraries(iq_enc
+   PRIVATE
+     hololink
+     holoscan::core
+-    holoscan::viz::imgui
++  PUBLIC
++    holoviz_imgui
+ )
+ 
+ # Installation of the iq_enc operator
+diff --git a/src/hololink/operators/sig_gen/CMakeLists.txt b/src/hololink/operators/sig_gen/CMakeLists.txt
+index 87650dc..7456536 100644
+--- a/src/hololink/operators/sig_gen/CMakeLists.txt
++++ b/src/hololink/operators/sig_gen/CMakeLists.txt
+@@ -48,7 +48,8 @@ target_link_libraries(sig_gen
+     hololink
+     hololink::expr_eval
+     holoscan::core
+-    holoscan::viz::imgui
++  PUBLIC
++    holoviz_imgui
+ )
+ 
+ # Installation of the sig_gen operator
+diff --git a/src/hololink/operators/sig_viewer/CMakeLists.txt b/src/hololink/operators/sig_viewer/CMakeLists.txt
+index ba197cf..ef20d0c 100644
+--- a/src/hololink/operators/sig_viewer/CMakeLists.txt
++++ b/src/hololink/operators/sig_viewer/CMakeLists.txt
+@@ -37,10 +37,10 @@ target_link_libraries(sig_viewer
+     hololink
+     hololink::core
+     holoscan::core
++    holoviz_imgui
+   PRIVATE
+     CUDA::cufft
+     CUDA::cuda_driver
+-    holoscan::viz::imgui
+ )
+ 
+ # Installation of the sig_viewer operator
+-- 
+2.43.0
+
