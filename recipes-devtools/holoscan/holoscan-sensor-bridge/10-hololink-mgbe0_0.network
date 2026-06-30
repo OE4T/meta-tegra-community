@@ -1,0 +1,16 @@
+[Match]
+Name=mgbe0_0
+
+[Link]
+MTUBytes=9000
+RequiredForOnline=no
+
+[Network]
+ConfigureWithoutCarrier=yes
+Address=192.168.0.101/24
+DHCP=no
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+LLDP=no
+EmitLLDP=no
+MulticastDNS=no
