@@ -1,0 +1,39 @@
+From ee95d952d78d7b167a672cb2821e40306c463e23 Mon Sep 17 00:00:00 2001
+From: Your Name <your.email@example.com>
+Date: Wed, 4 Mar 2026 16:20:00 +0800
+Subject: [PATCH] Fix Python 3.14 multiprocessing compatibility
+
+Force fork method for multiprocessing to avoid pickle errors
+with lambda functions in Python 3.14+ which uses forkserver by default.
+
+Upstream-Status: Pending
+
+Signed-off-by: Meng Li <Meng.Li@windriver.com>
+---
+ jtop/service.py | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/jtop/service.py b/jtop/service.py
+index 02b9d9d..96a36e5 100644
+--- a/jtop/service.py
++++ b/jtop/service.py
+@@ -25,6 +25,7 @@ import sys
+ import stat
+ import shlex
+ import subprocess as sp
++import multiprocessing
+ from copy import deepcopy
+ from grp import getgrnam
+ from shutil import copyfile, rmtree
+@@ -148,6 +149,8 @@ class JtopServer(Process):
+ 
+     def __init__(self, force=False):
+         self.force = force
++        # Force fork method for Python 3.14+ compatibility
++        multiprocessing.set_start_method('fork', force=True)
+         # Load configuration
+         self.config = Config()
+         # Save version jtop
+-- 
+2.34.1
+
