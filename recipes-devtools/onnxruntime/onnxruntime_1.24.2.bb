@@ -118,27 +118,6 @@ FILES:${PN}-dev = " \
 FILES:python3-${PN} = "${PYTHON_SITEPACKAGES_DIR}"
 RDEPENDS:python3-${PN} = "${PN}"
 
-PACKAGECONFIG ?= "python"
-PACKAGECONFIG[python] = ",,python3-numpy-native,python3-coloredlogs python3-flatbuffers python3-numpy python3-protobuf python3-sympy"
-
-do_configure() {
-    cmake_do_configure
-}
-
-do_compile() {
-    cmake_do_compile
-    if "${@bb.utils.contains('PACKAGECONFIG', 'python', 'true', 'false', d)}"; then
-        setuptools3_do_compile
-    fi
-}
-
-do_install() {
-    cmake_do_install
-    if "${@bb.utils.contains('PACKAGECONFIG', 'python', 'true', 'false', d)}"; then
-        setuptools3_do_install
-    fi
-}
-
 INSANE_SKIP:${PN} = "buildpaths dev-so"
 INSANE_SKIP:python3-${PN} = "buildpaths"
 INSANE_SKIP:${PN}-dev = "buildpaths"
