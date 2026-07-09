@@ -76,7 +76,12 @@ EXTRA_OECMAKE = " \
 # instead of building ONNX from source or finding the shared system onnx.
 OECMAKE_EXTRA_ROOT_PATH = "${RECIPE_SYSROOT}${prefix}/onnx-ort"
 
-OECMAKE_CXX_FLAGS:append = " -Wno-array-bounds -Wno-deprecated-declarations -Wno-unused-variable -Wno-template-id-cdtor -Wno-range-loop-construct -Wno-maybe-uninitialized -Wno-error=cpp -Wno-error=uninitialized -Wno-error=sfinae-incomplete -Wno-error=unused-but-set-parameter"
+OECMAKE_CXX_FLAGS:append = " -Wno-array-bounds -Wno-deprecated-declarations -Wno-unused-variable -Wno-template-id-cdtor -Wno-range-loop-construct -Wno-maybe-uninitialized -Wno-error=cpp -Wno-error=uninitialized -Wno-error=unused-but-set-parameter"
+# -Wsfinae-incomplete was introduced in GCC 16. On older GCC the -Wno-error=
+# form is rejected outright ("cc1plus: error: no option '-Wsfinae-incomplete'"),
+# which breaks even the CMake compiler ABI test in do_configure. Only pass it
+# where the compiler actually knows the option.
+OECMAKE_CXX_FLAGS:append = "${@' -Wno-error=sfinae-incomplete' if ((d.getVar('GCCVERSION') or '').split('.')[0] or '0').isdigit() and int((d.getVar('GCCVERSION') or '0').split('.')[0]) >= 16 else ''}"
 OECMAKE_SOURCEPATH = "${S}/cmake"
 
 PACKAGECONFIG ?= "python"
