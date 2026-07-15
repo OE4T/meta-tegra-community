@@ -9,13 +9,13 @@ SRC_URI = "git://${SRC_REPO};branch=${SRCBRANCH} \
            file://0001-OE-cross-build-fixups.patch \
            file://0002-Allow-apps-to-be-run-from-other-working-directories.patch \
            "
-# v1.2.0 tag
-SRCREV = "cb7fd9c8aa012178527e0cb84f91d1f5a0ad37ff"
+# v1.2.2 tag
+SRCREV = "6fdeefb7128435873f7794d2242ed48a1471ad7e"
 
 COMPATIBLE_MACHINE = "(tegra)"
 
-DEPENDS = "deepstream-7.1 python3-pybind11 gstreamer1.0-python gstreamer1.0 glib-2.0"
-DS_PATH = "/opt/nvidia/deepstream/deepstream-7.1"
+DEPENDS = "deepstream-9.1 python3-pybind11 gstreamer1.0-python gstreamer1.0 glib-2.0"
+DS_PATH = "/opt/nvidia/deepstream/deepstream-9.1"
 
 inherit cmake python_setuptools_build_meta pkgconfig ptest
 
@@ -49,5 +49,5 @@ do_install() {
 PACKAGES += "${PN}-samples"
 RDEPENDS:${PN} = "python3-pygobject gstreamer1.0-python python3-cuda"
 FILES:${PN}-samples = "${DS_PATH}/sources/deepstream_python_apps"
-RDEPENDS:${PN}-samples = "${PN} deepstream-7.1-samples-data python3-opencv python3-numpy gobject-introspection"
+RDEPENDS:${PN}-samples = "${PN} deepstream-9.1-samples-data python3-opencv python3-numpy gobject-introspection"
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"
