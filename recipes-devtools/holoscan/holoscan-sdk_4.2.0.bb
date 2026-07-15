@@ -69,7 +69,7 @@ DEPENDS += " \
     v4l-utils \
     vulkan-headers \
     vulkan-loader \
-    yaml-cpp-080 \
+    yaml-cpp-080-static \
     curl-native \
     stb \
     imgui \
