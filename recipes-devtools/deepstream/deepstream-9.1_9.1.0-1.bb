@@ -45,7 +45,7 @@ B = "${WORKDIR}/build"
 
 DEEPSTREAM_BASEDIR = "/opt/nvidia/deepstream"
 DEEPSTREAM_PATH = "${DEEPSTREAM_BASEDIR}/deepstream-9.1"
-SYSROOT_DIRS += "${DEEPSTREAM_PATH}/lib/ ${DEEPSTREAM_PATH}/sources/includes/"
+SYSROOT_DIRS += "${DEEPSTREAM_PATH}/lib/ ${DEEPSTREAM_PATH}/sources/includes/ ${DEEPSTREAM_PATH}/sources/gst-plugins/gst-nvdspreprocess/include/"
 
 do_configure() {
     for feature in azure amqp kafka nmos redis triton rivermax realsense; do
