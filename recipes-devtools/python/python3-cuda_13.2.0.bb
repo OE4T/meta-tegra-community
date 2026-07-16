@@ -79,5 +79,8 @@ RDEPENDS:python3-cuda-bindings  += "python3-cuda-pathfinder cuda-nvrtc libnvjitl
 RDEPENDS:python3-cuda-core      += "python3-cuda-bindings python3-cuda-pathfinder python3-numpy"
 RDEPENDS:python3-cuda-python    += "python3-cuda-bindings python3-cuda-pathfinder"
 
+ALLOW_EMPTY:${PN} = "1"
+RDEPENDS:${PN} = "python3-cuda-bindings python3-cuda-core python3-cuda-pathfinder python3-cuda-python"
+
 INSANE_SKIP:${PN} += "already-stripped"
 INSANE_SKIP:${PN}-src += "buildpaths"
