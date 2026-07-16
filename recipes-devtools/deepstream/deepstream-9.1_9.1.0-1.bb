@@ -95,6 +95,15 @@ do_install() {
     ln -sf libnvds_msgconv.so.1.0.0 ${D}${DEEPSTREAM_PATH}/lib/libnvds_msgconv.so
     ln -sf libnvds_msgconv_audio.so.1.0.0 ${D}${DEEPSTREAM_PATH}/lib/libnvds_msgconv_audio.so
 
+    # Recreate the missing SONAME symlinks for bundled third-party libraries.
+    for realso in ${D}${DEEPSTREAM_PATH}/lib/libcivetweb.so.*.* ${D}${DEEPSTREAM_PATH}/lib/libprometheus-cpp-core.so.*.*; do
+        [ -f "$realso" ] || continue
+        soname=$(${OBJDUMP} -p "$realso" | awk '/SONAME/{print $2}')
+        if [ -n "$soname" ] && [ ! -e "${D}${DEEPSTREAM_PATH}/lib/$soname" ]; then
+            ln -sf "$(basename "$realso")" "${D}${DEEPSTREAM_PATH}/lib/$soname"
+        fi
+    done
+
     install -d ${D}/${sysconfdir}/ld.so.conf.d/
     echo "${DEEPSTREAM_PATH}/lib" > ${D}/${sysconfdir}/ld.so.conf.d/deepstream.conf
     echo "${libdir}/gstreamer-1.0/deepstream" >> ${D}/${sysconfdir}/ld.so.conf.d/deepstream.conf
@@ -178,7 +187,7 @@ FILES:${PN}-staticdev = " \
     ${DEEPSTREAM_PATH}/lib/libnvds_service_maker_utils.a \
 "
 
-RDEPENDS:${PN} = "libgstnvcustomhelper yaml-cpp-080 libcurl tegra-libraries-nvml opentelemetry-cpp"
+RDEPENDS:${PN} = "libgstnvcustomhelper yaml-cpp-080 libcurl tegra-libraries-nvml opentelemetry-cpp-1230"
 RDEPENDS:${PN}-samples = "${PN} ${PN}-samples-data libgstnvcustomhelper yaml-cpp-080"
 RDEPENDS:${PN}-samples-data = "bash"
 RDEPENDS:${PN}-sources = "bash ${PN}-samples-data ${PN}"
