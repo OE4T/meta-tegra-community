@@ -1,0 +1,149 @@
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Subject: [PATCH] Fix missing <cstring> include for GCC 16
+
+Upstream-Status: Pending
+
+GCC 16 tightened libstdc++ header inclusions so that <cstring> is no
+longer pulled in transitively through <string>, POSIX network headers,
+or other standard headers.  Eleven files use std::memset / std::memcmp /
+std::strncpy without including <cstring> directly, which worked by
+accident on older GCC versions and breaks on GCC 16.
+
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ examples/holoviz/cpp/holoviz_camera.cpp                   | 1 +
+ examples/holoviz/cpp/holoviz_conditions.cpp                | 1 +
+ examples/holoviz/cpp/holoviz_geometry.cpp                  | 1 +
+ modules/holoinfer/src/process/transforms/generate_boxes.cpp | 1 +
+ modules/holoviz/src/cuda/cuda_service.cpp                  | 1 +
+ modules/holoviz/src/glfw_window.cpp                        | 1 +
+ src/core/application.cpp                                   | 1 +
+ src/core/cli_options.cpp                                   | 1 +
+ src/core/system/gpu_resource_monitor.cpp                   | 1 +
+ src/operators/ping_tensor_tx/ping_tensor_tx.cpp            | 1 +
+ src/pose_tree/pose_tree_ucx_server.cpp                     | 1 +
+ 11 files changed, 11 insertions(+)
+
+diff --git a/src/core/cli_options.cpp b/src/core/cli_options.cpp
+--- a/src/core/cli_options.cpp
++++ b/src/core/cli_options.cpp
+@@ -21,6 +21,7 @@
+ #include <netdb.h>
+ #include <sys/socket.h>
+ #include <sys/types.h>
++#include <cstring>
+
+ #include <string>
+ #include <utility>  // std::pair
+diff --git a/src/core/system/gpu_resource_monitor.cpp b/src/core/system/gpu_resource_monitor.cpp
+--- a/src/core/system/gpu_resource_monitor.cpp
++++ b/src/core/system/gpu_resource_monitor.cpp
+@@ -18,6 +18,7 @@
+
+ #include <dlfcn.h>
+
++#include <cstring>
+ #include <fstream>
+ #include <iostream>
+ #include <sstream>
+diff --git a/src/operators/ping_tensor_tx/ping_tensor_tx.cpp b/src/operators/ping_tensor_tx/ping_tensor_tx.cpp
+--- a/src/operators/ping_tensor_tx/ping_tensor_tx.cpp
++++ b/src/operators/ping_tensor_tx/ping_tensor_tx.cpp
+@@ -20,6 +20,7 @@
+ #include <cuda_runtime.h>
+
+ #include <cstdint>
++#include <cstring>
+ #include <memory>
+ #include <string>
+ #include <vector>
+diff --git a/src/pose_tree/pose_tree_ucx_server.cpp b/src/pose_tree/pose_tree_ucx_server.cpp
+--- a/src/pose_tree/pose_tree_ucx_server.cpp
++++ b/src/pose_tree/pose_tree_ucx_server.cpp
+@@ -26,6 +26,7 @@
+ #include <chrono>
+ #include <condition_variable>
+ #include <cstdint>
++#include <cstring>
+ #include <list>
+ #include <map>
+ #include <memory>
+diff --git a/src/core/application.cpp b/src/core/application.cpp
+--- a/src/core/application.cpp
++++ b/src/core/application.cpp
+@@ -25,6 +25,7 @@
+ #include <chrono>
+ #include <cstdio>
+ #include <cstdlib>
++#include <cstring>
+ #include <functional>
+ #include <memory>
+ #include <mutex>  // for std::call_once
+diff --git a/modules/holoviz/src/cuda/cuda_service.cpp b/modules/holoviz/src/cuda/cuda_service.cpp
+--- a/modules/holoviz/src/cuda/cuda_service.cpp
++++ b/modules/holoviz/src/cuda/cuda_service.cpp
+@@ -17,6 +17,7 @@
+
+ #include "cuda_service.hpp"
+
++#include <cstring>
+ #include <memory>
+ #include <mutex>
+ #include <utility>
+diff --git a/modules/holoviz/src/glfw_window.cpp b/modules/holoviz/src/glfw_window.cpp
+--- a/modules/holoviz/src/glfw_window.cpp
++++ b/modules/holoviz/src/glfw_window.cpp
+@@ -22,6 +22,7 @@
+ #include <backends/imgui_impl_glfw.h>
+ #include <unistd.h>
+
++#include <cstring>
+ #include <iostream>
+ #include <list>
+ #include <mutex>
+diff --git a/modules/holoinfer/src/process/transforms/generate_boxes.cpp b/modules/holoinfer/src/process/transforms/generate_boxes.cpp
+--- a/modules/holoinfer/src/process/transforms/generate_boxes.cpp
++++ b/modules/holoinfer/src/process/transforms/generate_boxes.cpp
+@@ -18,6 +18,7 @@
+
+ #include <yaml-cpp/yaml.h>
+
++#include <cstring>
+ #include <functional>
+ #include <map>
+ #include <memory>
+diff --git a/examples/holoviz/cpp/holoviz_geometry.cpp b/examples/holoviz/cpp/holoviz_geometry.cpp
+--- a/examples/holoviz/cpp/holoviz_geometry.cpp
++++ b/examples/holoviz/cpp/holoviz_geometry.cpp
+@@ -16,6 +16,7 @@
+  */
+ #include <getopt.h>
+
++#include <cstring>
+ #include <filesystem>
+ #include <iostream>
+ #include <memory>
+diff --git a/examples/holoviz/cpp/holoviz_conditions.cpp b/examples/holoviz/cpp/holoviz_conditions.cpp
+--- a/examples/holoviz/cpp/holoviz_conditions.cpp
++++ b/examples/holoviz/cpp/holoviz_conditions.cpp
+@@ -38,6 +38,7 @@
+
+ #include <getopt.h>
+
++#include <cstring>
+ #include <chrono>
+ #include <iostream>
+ #include <memory>
+diff --git a/examples/holoviz/cpp/holoviz_camera.cpp b/examples/holoviz/cpp/holoviz_camera.cpp
+--- a/examples/holoviz/cpp/holoviz_camera.cpp
++++ b/examples/holoviz/cpp/holoviz_camera.cpp
+@@ -18,6 +18,7 @@
+
+ #include <getopt.h>
+
++#include <cstring>
+ #include <chrono>
+ #include <iostream>
+ #include <memory>
+--
+2.34.1

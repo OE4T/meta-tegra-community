@@ -13,6 +13,7 @@ SRC_URI[dataset.sha256sum] = "7a334c01c11e9620053c88dc3e796501c21564d0e533ca17b1
 SRC_URI += " \
     file://desktop-icons \
     file://0001-Updates-for-OE-cross-builds.patch \
+    file://0002-Fix-missing-cstring-include-for-GCC-16.patch \
 "
 
 HOLOSCAN_INSTALL_PATH = "/opt/nvidia/holoscan"
