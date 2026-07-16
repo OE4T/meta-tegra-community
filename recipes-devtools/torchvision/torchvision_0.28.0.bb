@@ -3,8 +3,8 @@ HOMEPAGE = "https://github.com/pytorch/vision"
 LICENSE = "BSD-3-Clause"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=bd7749a3307486a4d4bfefbc81c8b796"
 
-SRC_URI = "git://github.com/pytorch/vision.git;protocol=https;branch=release/0.26;tag=v${PV}"
-SRCREV = "336d36e8db990a905498c73933e35231876e28bc"
+SRC_URI = "git://github.com/pytorch/vision.git;protocol=https;branch=release/0.28;tag=v${PV}"
+SRCREV = "8fb87713a24951e639c494b0f2a8a81b5f8e33a6"
 
 COMPATIBLE_MACHINE = "(cuda)"
 
