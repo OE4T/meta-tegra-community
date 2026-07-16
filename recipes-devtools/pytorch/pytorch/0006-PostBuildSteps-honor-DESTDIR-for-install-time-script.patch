@@ -1,0 +1,52 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Wed, 15 Jul 2026 00:00:00 -0700
+Subject: [PATCH 6/6] PostBuildSteps: honor DESTDIR for install-time scripts
+
+The install(CODE ...) steps in PostBuildSteps.cmake invoke helper scripts
+(wrap_headers.py, embed_libomp_macos.py) with a path built from
+${CMAKE_INSTALL_PREFIX} but without the ${DESTDIR} prefix. Unlike
+file(INSTALL ...), a custom execute_process() run at install time is not
+relocated into DESTDIR by CMake, so with a staged install (DESTDIR set,
+as done by OpenEmbedded and any packaging build) wrap_headers.py is handed
+the literal "/usr/include" -- the host's include directory -- and tries to
+rewrite every system header in place, failing with e.g.:
+
+  PermissionError: [Errno 13] Permission denied: '/usr/include/EGL/egl.h'
+
+Prefix the target paths with $ENV{DESTDIR}, matching how file(INSTALL) and
+cmake_uninstall.cmake.in already handle DESTDIR, so the scripts operate on
+the staged tree instead of the host root.
+
+Upstream-Status: Pending
+
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ cmake/PostBuildSteps.cmake | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/cmake/PostBuildSteps.cmake b/cmake/PostBuildSteps.cmake
+index 71bd043..8149efc 100644
+--- a/cmake/PostBuildSteps.cmake
++++ b/cmake/PostBuildSteps.cmake
+@@ -21,7 +21,7 @@ install(CODE "
+   execute_process(
+     COMMAND \"${_python_exe}\"
+       \"${_project_src}/tools/wrap_headers.py\"
+-      \"\${CMAKE_INSTALL_PREFIX}/${TORCH_INSTALL_INCLUDE_DIR}\"
++      \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${TORCH_INSTALL_INCLUDE_DIR}\"
+     COMMAND_ERROR_IS_FATAL ANY
+   )
+ ")
+@@ -158,7 +158,7 @@ if(APPLE AND BUILD_PYTHON AND USE_OPENMP AND OpenMP_FOUND)
+         COMMAND \"${_python_exe}\"
+           \"${_project_src}/tools/embed_libomp_macos.py\"
+           --libomp-path \"${OpenMP_libomp_LIBRARY}\"
+-          --lib-dir \"\${CMAKE_INSTALL_PREFIX}/${TORCH_INSTALL_LIB_DIR}\"
++          --lib-dir \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${TORCH_INSTALL_LIB_DIR}\"
+         COMMAND_ERROR_IS_FATAL ANY
+       )
+     ")
+--
+2.43.0
+
