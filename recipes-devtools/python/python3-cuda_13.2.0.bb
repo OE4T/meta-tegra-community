@@ -1,6 +1,6 @@
 SUMMARY = "CUDA Python Low-level Bindings"
 HOMEPAGE = "https://nvidia.github.io/cuda-python"
-LICENSE = "Apache-2.0 & Proprietary"
+LICENSE = "Apache-2.0 AND LicenseRef-Proprietary"
 LIC_FILES_CHKSUM = " \
     file://LICENSE.md;md5=5028fedd819277227c4246007f1c0190 \
     file://cuda_core/LICENSE;md5=2ee41112a44fe7014dce33e26468ba93 \
