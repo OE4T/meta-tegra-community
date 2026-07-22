@@ -1,6 +1,6 @@
 SUMMARY = "NVIDIA VPI command-line sample applications"
 HOMEPAGE = "https://developer.nvidia.com/embedded/vpi"
-LICENSE = "BSD-3-Clause & Proprietary"
+LICENSE = "BSD-3-Clause AND LicenseRef-Proprietary"
 LIC_FILES_CHKSUM = "file://01-convolve_2d/main.cpp;endline=27;md5=ad6efe6d8b43b8bceef6d97c7b79193f \
                     file://assets/LICENSE;md5=6b5f633fc3acaabf21035790a05b1c71"
 

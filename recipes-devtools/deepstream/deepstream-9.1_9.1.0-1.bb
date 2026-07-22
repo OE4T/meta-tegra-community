@@ -1,6 +1,6 @@
 DESCRIPTION = "NVIDIA Deepstream SDK"
 HOMEPAGE = "https://developer.nvidia.com/deepstream-sdk"
-LICENSE = "Proprietary"
+LICENSE = "LicenseRef-Proprietary"
 LIC_FILES_CHKSUM = " \
     file://usr/share/doc/deepstream-9.1/copyright;md5=d491e636a05accc669f7c2741540bc0f \
     file://opt/nvidia/deepstream/deepstream-9.1/LICENSE.txt;md5=675906f1fcfa7711c6b07dc356dfe550 \

@@ -1,6 +1,6 @@
 SUMMARY = "Optimized primitives for collective multi-GPU communication"
 HOMEPAGE = "https://github.com/NVIDIA/nccl"
-LICENSE = "Apache-2.0 & BSD-3-Clause"
+LICENSE = "Apache-2.0 AND BSD-3-Clause"
 LIC_FILES_CHKSUM = "file://LICENSE.txt;md5=b534c6bfd96fb19f09094709991f6788"
 
 SRC_URI = " \

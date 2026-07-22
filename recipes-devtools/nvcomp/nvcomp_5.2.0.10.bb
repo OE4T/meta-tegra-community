@@ -1,6 +1,6 @@
 SUMMARY = "nvCOMP library provides fast lossless data compression and decompression using a GPU"
 HOMEPAGE = "https://docs.nvidia.com/cuda/nvcomp"
-LICENSE = "Proprietary"
+LICENSE = "LicenseRef-Proprietary"
 LIC_FILES_CHKSUM = "file://nvcomp-linux-sbsa-${PV}_cuda13-archive/LICENSE;md5=85649c377f72fda614b170fb9e1216f3"
 
 COMPATIBLE_MACHINE = "(cuda)"
