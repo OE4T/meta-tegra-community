@@ -26,6 +26,19 @@ B = "${S}"
 export CUDA_HOME = "${STAGING_DIR_HOST}/usr/local/cuda-${CUDA_VERSION}"
 export CUDA_PYTHON_PARALLEL_LEVEL = "${@oe.utils.cpu_count()}"
 CUDA_PYTHON_PARALLEL_LEVEL[vardepvalue] = "1"
+
+# The cuda-python monorepo versions each sub-package independently via
+# setuptools-scm using component-specific tags (cuda-pathfinder-vX.Y.Z,
+# cuda-core-vX.Y.Z, ...). Only the umbrella v${PV} tag is fetched (shallow) and
+# the applied patch dirties the worktree, so setuptools-scm cannot resolve the
+# per-component versions and falls back to a bogus "0.1.dev1", which breaks the
+# cuda-bindings 'cuda-pathfinder~=1.1' and cuda-core 'cuda-pathfinder>=1.4.1'
+# build requirements. Pin each explicitly to the versions at this SRCREV.
+export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_CUDA_PATHFINDER = "1.4.2"
+export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_CUDA_BINDINGS = "${PV}"
+export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_CUDA_CORE = "0.7.0"
+export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_CUDA_PYTHON = "${PV}"
+
 CXXFLAGS += "-I${RECIPE_SYSROOT}/usr/local/cuda-${CUDA_VERSION}/include"
 CFLAGS += "-I${RECIPE_SYSROOT}/usr/local/cuda-${CUDA_VERSION}/include"
 
