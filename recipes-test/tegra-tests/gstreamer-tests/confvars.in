@@ -3,7 +3,7 @@ if [ -n "$WAYLAND_DISPLAY" ]; then
     unset DISPLAY
     VIDEOSINK="nveglglessink winsys=wayland"
     IMAGESINK="waylandsink"
-    TRANSFORM="! nvegltransform"
+    TRANSFORM=""
 elif [ -n "$DISPLAY" ]; then
     VIDEOSINK="nv3dsink"
     IMAGESINK="xvimagesink"
