@@ -1,34 +1,37 @@
-SUMMARY = "Interactive system-monitor process viewer for NVIDIA Jetson TX1, \
-  Nano, TX2, Xavier and Orin series"
+SUMMARY = "Interactive system-monitor process viewer for NVIDIA Jetson \
+  Thor, Orin, Xavier, Nano and TX series"
 HOMEPAGE = "https://pypi.org/project/jetson-stats/"
 SECTION = "devel/python"
 LICENSE = "AGPL-3.0-only"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=8763b57f0092c337eb12c354870a324a"
 
-SRC_URI += "file://0001-fix-installation-process-issue-and-cleanup.patch \
-            file://0002-fix-paths-to-match-with-OE-and-getting-the-right-ver.patch \
-           "
-SRC_URI[sha256sum] = "38b11fcb6a27d59a194bc587e7665bccfc0c658979171969974550013e62afeb"
+# PEP 625 sdist uses underscores: jetson_stats-7.2.0.tar.gz
+PYPI_PACKAGE = "jetson_stats"
+SRC_URI += "file://0001-setup.py-strip-host-service-install-for-OE-packaging.patch"
+SRC_URI[sha256sum] = "b28e0eba26b96d56a610cbbfbcb5d3d2b74ce22c70d9f4d1b090f7f5f9ff44b9"
 
 COMPATIBLE_MACHINE = "(tegra)"
 
-inherit pypi setuptools3 systemd useradd
+inherit pypi python_setuptools_build_meta systemd useradd
 
 do_install:append() {
     install -d ${D}${sysconfdir}/profile.d
-    install -m 0755 ${D}${prefix}/jetson_stats/jtop_env.sh ${D}${sysconfdir}/profile.d
+    install -m 0755 ${D}${datadir}/jetson_stats/jtop_env.sh ${D}${sysconfdir}/profile.d
 
     install -d ${D}${systemd_system_unitdir}
-    install -m 0644 ${D}${prefix}/jetson_stats/jtop.service ${D}${systemd_system_unitdir}
-    sed -i 's/ExecStart=\/usr\/local\/bin\/jtop/ExecStart=\/usr\/bin\/jtop/g' \
+    install -m 0644 ${D}${datadir}/jetson_stats/jtop.service ${D}${systemd_system_unitdir}
+    sed -i 's|ExecStart=/usr/local/bin/jtop|ExecStart=/usr/bin/jtop|g' \
         ${D}${systemd_system_unitdir}/jtop.service
 
     rm ${D}${bindir}/jetson_config
     rm ${D}${bindir}/jetson_swap
     rm ${D}${bindir}/jetson_release
-    rm ${D}${prefix}/jetson_stats/jtop.service
-    rm ${D}${prefix}/jetson_stats/jtop_env.sh
-    rm -rf ${D}${prefix}/jetson_stats
+    rm ${D}${datadir}/jetson_stats/jtop.service
+    rm ${D}${datadir}/jetson_stats/jtop_env.sh
+    rm -rf ${D}${datadir}/jetson_stats
+    # Wheel data-files left an empty ${datadir}; drop it so QA does not
+    # complain about an installed-but-unshipped directory.
+    rmdir ${D}${datadir} 2>/dev/null || true
 }
 
 SYSTEMD_SERVICE:${PN} = "jtop.service"
@@ -40,14 +43,15 @@ GROUPADD_PARAM:${PN} = "-f -r jtop"
 FILES:${PN} += "${sysconfdir}/profile.d"
 RDEPENDS:${PN} += " \
     bash \
+    python3-ctypes \
     python3-curses \
     python3-email \
     python3-fcntl \
     python3-json \
     python3-multiprocessing \
-    python3-setuptools \
     python3-smbus2 \
     python3-distro \
+    python3-nvidia-ml-py \
     tegra-nvpmodel \
     tegra-tools-jetson-clocks \
     tegra-tools-tegrastats \
