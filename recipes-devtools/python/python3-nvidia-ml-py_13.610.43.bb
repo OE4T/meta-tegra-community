@@ -11,6 +11,5 @@ SRC_URI[sha256sum] = "65437eb73d68d0c62c931ca4d45038472faff03bd0b8729abba4b899f7
 inherit pypi setuptools3
 
 RDEPENDS:${PN} += "python3-ctypes"
-RRECOMMENDS:${PN} += "tegra-libraries-nvml"
 
 BBCLASSEXTEND = "native nativesdk"
