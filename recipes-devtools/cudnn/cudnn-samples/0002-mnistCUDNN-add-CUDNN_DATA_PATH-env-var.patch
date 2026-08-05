@@ -1,0 +1,43 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Wed, 27 Aug 2025 17:14:58 +0100
+Subject: [PATCH] mnistCUDNN: add CUDNN_DATA_PATH env var support
+
+Allow callers to point mnistCUDNN at its data directory via the
+CUDNN_DATA_PATH environment variable instead of requiring the CWD to
+contain a "data/" subdirectory.  Falls back to the original relative
+path when the variable is not set.
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ mnistCUDNN/mnistCUDNN.cpp | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/mnistCUDNN/mnistCUDNN.cpp b/mnistCUDNN/mnistCUDNN.cpp
+index b151099..382f7cb 100644
+--- a/mnistCUDNN/mnistCUDNN.cpp
++++ b/mnistCUDNN/mnistCUDNN.cpp
+@@ -25,6 +25,7 @@
+ #include <sstream>
+ #include <fstream>
+ #include <stdlib.h>
++#include <cstdlib>
+ 
+ #include <cuda.h>  // need CUDA_VERSION
+ #include <cudnn.h>
+@@ -57,7 +57,12 @@
+ 
+ void
+ get_path(std::string& sFilename, const char* fname, const char* pname) {
+-    sFilename = (std::string("data/") + std::string(fname));
++    const char* cudnn_data_path = std::getenv("CUDNN_DATA_PATH");
++    if (cudnn_data_path) {
++        sFilename = (std::string(cudnn_data_path) + std::string("/") + std::string(fname));
++    } else {
++        sFilename = (std::string("data/") + std::string(fname));
++    }
+ }
+ 
+ // Need the map, since scaling factor is of float type in half precision
+ 

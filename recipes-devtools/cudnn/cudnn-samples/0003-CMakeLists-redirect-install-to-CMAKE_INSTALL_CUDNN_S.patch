@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Kurt Kiefer <kkiefer@nvidia.com>
+Date: Wed, 6 Aug 2026 00:00:00 -0700
+Subject: [PATCH] CMakeLists: redirect install to CMAKE_INSTALL_CUDNN_SAMPLES
+
+Replace the hardcoded "bin" RUNTIME DESTINATION with a
+CMAKE_INSTALL_CUDNN_SAMPLES variable so callers can redirect the
+binaries to a subdirectory without patching each sample individually.
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Kurt Kiefer <kkiefer@nvidia.com>
+---
+ CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1111111..2222222 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -23,6 +23,6 @@
+ add_subdirectory(multiHeadAttention)
+ add_subdirectory(RNN_v8.0)
+ 
+-install(TARGETS RNN_v8.0 multiHeadAttention mnistCUDNN conv_sample
+-        RUNTIME DESTINATION bin
+-)
++install(TARGETS RNN_v8.0 multiHeadAttention mnistCUDNN conv_sample
++        RUNTIME DESTINATION ${CMAKE_INSTALL_CUDNN_SAMPLES}
++)
+ 

@@ -1,0 +1,37 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Kurt Kiefer <kkiefer@nvidia.com>
+Date: Wed, 6 Aug 2026 00:00:00 -0700
+Subject: [PATCH] mnistCUDNN: use system FreeImage via find_package
+
+Replace the bundled add_subdirectory(FreeImage) approach with
+find_package(FreeImage REQUIRED) so the system-installed FreeImage
+(from the freeimage recipe) is used instead of an in-tree copy.
+Update the link target from the plain "FreeImage" subdirectory target
+to the cmake-namespaced "FreeImage::FreeImage" imported target exported
+by FreeImageConfig.cmake.
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Kurt Kiefer <kkiefer@nvidia.com>
+---
+ mnistCUDNN/CMakeLists.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/mnistCUDNN/CMakeLists.txt b/mnistCUDNN/CMakeLists.txt
+index 1111111..2222222 100644
+--- a/mnistCUDNN/CMakeLists.txt
++++ b/mnistCUDNN/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-add_subdirectory(FreeImage)
++find_package(FreeImage REQUIRED)
+
+ add_executable(
+     mnistCUDNN
+@@ -12,7 +12,7 @@
+ )
+ target_link_libraries(
+     mnistCUDNN
+-    PRIVATE FreeImage
++    PRIVATE FreeImage::FreeImage
+     CUDA::cublas
+     CUDA::cudart_static
+     cudnn
