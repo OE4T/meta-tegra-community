@@ -1,18 +1,16 @@
-From ed108babb6fef80df997d89ae42a13298cfe51a6 Mon Sep 17 00:00:00 2001
+From 40bc611cad74041906f2ec7d7c82f46105d3785b Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Fri, 8 May 2026 17:55:15 -0700
-Subject: [PATCH] Updates for OE cross builds
+Date: Tue, 18 Aug 2026 08:39:10 -0700
+Subject: [PATCH 1/2] Updates for OE cross builds
 
 Upstream-Status: Inappropriate [OE-specific]
-
-Signed-off-by: Julien Jomier <jjomier@nvidia.com>
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt                                |  17 ++-
- cmake/deps/fmt_rapids.cmake                   |   4 +-
+ CMakeLists.txt                                |  19 ++-
+ cmake/deps/fmt_rapids.cmake                   |   2 +-
  cmake/deps/grpc.cmake                         |  10 +-
  cmake/deps/pybind11.cmake                     |   4 +-
- cmake/modules/SetupRapidsCMake.cmake          |  35 +++---
+ cmake/modules/SetupRapidsCMake.cmake          |  26 ++--
  cmake/setup_dependencies.cmake                | 117 +++++++++++-------
  examples/CMakeLists.txt                       |  37 +++---
  .../matx/matx_basic/cpp/CMakeLists.min.txt    |   5 +
@@ -23,6 +21,7 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  .../core/resources/data_logger_queue.hpp      |   2 +-
  .../holoinfer/src/infer/onnx/CMakeLists.txt   |   6 +-
  .../holoinfer/src/infer/torch/CMakeLists.txt  |  19 +--
+ .../transport/fastdds/fast_dds_idl_gen.cmake  |   2 +-
  modules/holoviz/examples/demo/CMakeLists.txt  |  14 +--
  .../holoviz/examples/depth_map/CMakeLists.txt |  14 +--
  modules/holoviz/src/glfw_window.cpp           |   2 +-
@@ -30,13 +29,13 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  .../holoviz/tests/functional/CMakeLists.txt   |  14 +--
  .../holoviz/thirdparty/imgui/CMakeLists.txt   |  44 +++----
  src/CMakeLists.txt                            |   3 +-
- 22 files changed, 204 insertions(+), 191 deletions(-)
+ 23 files changed, 207 insertions(+), 181 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 4641d6a..e604673 100644
+index 895f4698..e6fe92f4 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -74,7 +74,9 @@ project(${HOLOSCAN_PACKAGE_NAME}
+@@ -62,7 +62,9 @@ project(${HOLOSCAN_PACKAGE_NAME}
      DESCRIPTION "Holoscan SDK"
      LANGUAGES C CXX
  )
@@ -47,7 +46,7 @@ index 4641d6a..e604673 100644
  
  # If enabling google sanitizer
  if(HOLOSCAN_ENABLE_GOOGLE_SANITIZER)
-@@ -134,6 +136,18 @@ set(CMAKE_CXX_EXTENSIONS NO)
+@@ -122,6 +124,18 @@ set(CMAKE_CXX_EXTENSIONS NO)
  # Don't append suffix to shared libraries for debug build
  set(CMAKE_DEBUG_POSTFIX "")
  
@@ -66,7 +65,7 @@ index 4641d6a..e604673 100644
  # ##############################################################################
  # # RAPIDS CMAKE configurations
  # # (https://docs.rapids.ai/api/rapids-cmake/stable/api.html)
-@@ -329,7 +343,6 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS
+@@ -363,7 +377,6 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS
      holoinfer_utils
      infer_utils
      logger
@@ -74,31 +73,33 @@ index 4641d6a..e604673 100644
      data_loggers_async_console_logger
      data_loggers_basic_console_logger
      op_async_ping_rx
+@@ -525,7 +538,7 @@ find_dependency(concurrentqueue HINTS ${CMAKE_CURRENT_LIST_DIR}/../concurrentque
+ if(NOT Eigen3_ROOT)
+   set(Eigen3_ROOT "${PACKAGE_PREFIX_DIR}/include/3rdparty/Eigen/include")
+ endif()
+-find_dependency(Eigen3 3.4)
++find_dependency(Eigen3)
+ find_dependency(fmt HINTS ${CMAKE_CURRENT_LIST_DIR}/../fmt)
+ find_dependency(magic_enum HINTS ${CMAKE_CURRENT_LIST_DIR}/../magic_enum)
+ find_dependency(nvtx3 HINTS ${CMAKE_CURRENT_LIST_DIR}/../nvtx3)
 diff --git a/cmake/deps/fmt_rapids.cmake b/cmake/deps/fmt_rapids.cmake
-index 3fe1152..f95076b 100644
+index 6b173f6d..f812a1ae 100644
 --- a/cmake/deps/fmt_rapids.cmake
 +++ b/cmake/deps/fmt_rapids.cmake
-@@ -16,13 +16,13 @@
+@@ -4,7 +4,7 @@
  # https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_cpm_find.html
  include(${rapids-cmake-dir}/cpm/find.cmake)
  
--rapids_cpm_find(fmt 11.0.2
-+rapids_cpm_find(fmt 12.1.0
+-set(fmt_VERSION 12.1.0)
++set(fmt_VERSION 12.2.0)
+ rapids_cpm_find(fmt "${fmt_VERSION}"
      GLOBAL_TARGETS fmt fmt-header-only
      BUILD_EXPORT_SET ${HOLOSCAN_PACKAGE_NAME}-exports
-     CPM_ARGS
- 
-     GITHUB_REPOSITORY fmtlib/fmt
--    GIT_TAG 11.0.2
-+    GIT_TAG 12.1.0
-     GIT_SHALLOW TRUE
- 
-     OPTIONS
 diff --git a/cmake/deps/grpc.cmake b/cmake/deps/grpc.cmake
-index 360f64c..8b877f0 100644
+index 515000aa..ea09df51 100644
 --- a/cmake/deps/grpc.cmake
 +++ b/cmake/deps/grpc.cmake
-@@ -75,7 +75,7 @@ endfunction()
+@@ -62,7 +62,7 @@ endfunction()
  # GRPC_CPP_EXECUTABLE - the path to the grpc_cpp_plugin executable
  
  set(protobuf_MODULE_COMPATIBLE TRUE)
@@ -107,7 +108,7 @@ index 360f64c..8b877f0 100644
  message(STATUS "Using protobuf ${Protobuf_VERSION}")
  
  if(CMAKE_CROSSCOMPILING)
-@@ -84,6 +84,14 @@ else()
+@@ -71,6 +71,14 @@ else()
      get_target_property(PROTOC_EXECUTABLE protobuf::protoc LOCATION)
  endif()
  
@@ -123,10 +124,10 @@ index 360f64c..8b877f0 100644
  # Looks for gRPCConfig.cmake file installed by gRPC's cmake installation.
  find_package(gRPC CONFIG REQUIRED)
 diff --git a/cmake/deps/pybind11.cmake b/cmake/deps/pybind11.cmake
-index 3aa140e..f2972cc 100644
+index a52a47c6..5555f868 100644
 --- a/cmake/deps/pybind11.cmake
 +++ b/cmake/deps/pybind11.cmake
-@@ -17,13 +17,13 @@
+@@ -4,13 +4,13 @@
  # https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_find_package.html#
  include(${rapids-cmake-dir}/cpm/find.cmake)
  
@@ -143,39 +144,28 @@ index 3aa140e..f2972cc 100644
      EXCLUDE_FROM_ALL
  )
 diff --git a/cmake/modules/SetupRapidsCMake.cmake b/cmake/modules/SetupRapidsCMake.cmake
-index 0fabd0e..ed37ed0 100644
+index 8f8922c5..c2787401 100644
 --- a/cmake/modules/SetupRapidsCMake.cmake
 +++ b/cmake/modules/SetupRapidsCMake.cmake
-@@ -15,26 +15,25 @@
+@@ -3,13 +3,25 @@
  
- set(rapids-cmake-version 26.02)
+ set(rapids-cmake-version v26.02.00)
  
 -# https://github.com/rapidsai/rapids-cmake#installation
--if(NOT EXISTS ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
--  file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/refs/heads/release/${rapids-cmake-version}/RAPIDS.cmake
--       ${CMAKE_BINARY_DIR}/RAPIDS.cmake
--       TIMEOUT 120
--       TLS_VERIFY ON
--       EXPECTED_HASH SHA256=7690a95285e02b4f04dd23b327da0ad46e1b7c19d85207e9ca7ac17faa1947ec
--       STATUS _rapids_dl_status
--       LOG _rapids_dl_log)
--  list(GET _rapids_dl_status 0 _rapids_dl_code)
--  list(GET _rapids_dl_status 1 _rapids_dl_message)
--  if(NOT _rapids_dl_code EQUAL 0)
--    file(REMOVE ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
--    message(FATAL_ERROR
--            "rapids-cmake RAPIDS.cmake download failed (code ${_rapids_dl_code}): ${_rapids_dl_message}\n"
--            "${_rapids_dl_log}")
--  endif()
+-include(FetchContent)
+-FetchContent_Declare(rapids-cmake
+-  GIT_REPOSITORY https://github.com/rapidsai/rapids-cmake
+-  GIT_TAG ${rapids-cmake-version}
+-)
+-FetchContent_MakeAvailable(rapids-cmake)
 +set(CPM_DOWNLOAD_VERSION 0.42.0)
 +set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
 +message(STATUS "CPM download location: ${CPM_DOWNLOAD_LOCATION}")
 +
 +if(NOT EXISTS "${RAPIDS_CMAKE_DIR}/RAPIDS.cmake")
 +  message(FATAL_ERROR "Required RAPIDS.cmake does not exist!")
- endif()
- 
--include(${CMAKE_BINARY_DIR}/RAPIDS.cmake)
++endif()
++
 +set(rapids-cmake_POPULATED "TRUE")
 +if(NOT rapids-cmake-version)
 +  set(rapids-cmake-version "26.02")
@@ -191,10 +181,10 @@ index 0fabd0e..ed37ed0 100644
  include(rapids-cmake)
  include(rapids-cpm)
 diff --git a/cmake/setup_dependencies.cmake b/cmake/setup_dependencies.cmake
-index d561b88..67343a5 100644
+index bee87b5e..58c99588 100644
 --- a/cmake/setup_dependencies.cmake
 +++ b/cmake/setup_dependencies.cmake
-@@ -26,12 +26,6 @@ list(APPEND CMAKE_IGNORE_PREFIX_PATH "${CMAKE_BINARY_DIR}")
+@@ -14,12 +14,6 @@ list(APPEND CMAKE_IGNORE_PREFIX_PATH "${CMAKE_BINARY_DIR}")
  # Note that "set" only applies to this subdirectory scope.
  set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME "holoscan-dependencies")
  
@@ -207,7 +197,7 @@ index d561b88..67343a5 100644
  function(superbuild_depend module_name)
      cmake_parse_arguments(PARSE_ARGV 1 _SUPER_BUILD "" "COMPONENT" "")
      # Set CMAKE_INSTALL_DEFAULT_COMPONENT_NAME before including .cmake file
-@@ -52,49 +46,88 @@ rapids_cpm_init()
+@@ -40,49 +34,88 @@ rapids_cpm_init()
  set(_SAVED_CMAKE_CXX_CLANG_TIDY "${CMAKE_CXX_CLANG_TIDY}")
  set(CMAKE_CXX_CLANG_TIDY "")
  
@@ -284,25 +274,25 @@ index d561b88..67343a5 100644
 +    superbuild_depend(v4l2)
 +    superbuild_depend(threads)
 +    find_package(CCCL REQUIRED)
-+    find_package(fmt 12.1.0 REQUIRED)
++    find_package(fmt REQUIRED)
 +    find_package(CUB REQUIRED)
 +    find_package(libcudacxx REQUIRED)
 +    find_package(Thrust REQUIRED)
-+    rapids_find_package(CLI11 2.6.1 REQUIRED)
++    rapids_find_package(CLI11 REQUIRED)
 +    rapids_find_package(concurrentqueue 1.0.0 REQUIRED)
 +    rapids_find_package(dlpack 1.2 REQUIRED)
 +    find_package(Eigen3 REQUIRED)
 +    rapids_find_package(tl-expected 1.1.0 REQUIRED)
 +    rapids_find_package(glfw3 3.4.0 REQUIRED)
-+    find_package(GTest 1.17.0 REQUIRED)
++    find_package(GTest REQUIRED)
 +    find_package(PkgConfig)
 +    pkg_check_modules(hwloc REQUIRED IMPORTED_TARGET GLOBAL hwloc>=2.12.2)
-+    rapids_find_package(magic_enum 0.9.7 REQUIRED)
++    rapids_find_package(magic_enum REQUIRED)
 +    rapids_find_package(matx 0.9.4 REQUIRED)
 +    find_package(nvtx3 3.3.0 REQUIRED)
 +    rapids_find_package(rapids_logger 0.2.3 REQUIRED)
 +    rapids_find_package(rmm 26.02.0 REQUIRED)
-+    rapids_find_package(spdlog 1.17.0 REQUIRED)
++    rapids_find_package(spdlog REQUIRED)
 +    find_package(ucx 1.20.1 REQUIRED)
 +    # GXF needs to be included after finding ucx to avoid duplicate targets
 +    superbuild_depend(gxf)
@@ -326,22 +316,22 @@ index d561b88..67343a5 100644
 +    if(HOLOSCAN_BUILD_DEPENDENCIES)
 +        superbuild_depend(pybind11)
 +    else()
-+        rapids_find_package(pybind11 3.0.1 REQUIRED)
++        rapids_find_package(pybind11 REQUIRED)
 +    endif()
  endif()
  
  # Add after pybind11 to avoid conflicting pybind11 fetch procedures
-@@ -107,5 +140,3 @@ set(CMAKE_CXX_CLANG_TIDY "${_SAVED_CMAKE_CXX_CLANG_TIDY}")
+@@ -95,5 +128,3 @@ set(CMAKE_CXX_CLANG_TIDY "${_SAVED_CMAKE_CXX_CLANG_TIDY}")
  unset(_SAVED_CMAKE_CXX_CLANG_TIDY)
  
  set(CMAKE_IGNORE_PREFIX_PATH "${_SAVED_CMAKE_IGNORE_PREFIX_PATH}")
 -
 -unset(CMAKE_POLICY_DEFAULT_CMP0169)
 diff --git a/examples/CMakeLists.txt b/examples/CMakeLists.txt
-index 0a999a1..b1bf9e8 100644
+index 309724d3..68b55cd3 100644
 --- a/examples/CMakeLists.txt
 +++ b/examples/CMakeLists.txt
-@@ -22,6 +22,7 @@ endif()
+@@ -10,6 +10,7 @@ endif()
  
  option(HOLOSCAN_CPP_EXAMPLES "Build C++ examples" ON)
  option(HOLOSCAN_PYTHON_EXAMPLES "Build Python examples" ${HOLOSCAN_BUILD_PYTHON})
@@ -349,7 +339,7 @@ index 0a999a1..b1bf9e8 100644
  
  # Check if the data target exists otherwise define it
  if(NOT TARGET racerx_data)
-@@ -31,23 +32,25 @@ if(NOT TARGET racerx_data)
+@@ -19,23 +20,25 @@ if(NOT TARGET racerx_data)
    # Setup the installation rule
    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/racerx DESTINATION data COMPONENT holoscan-data)
  
@@ -393,10 +383,10 @@ index 0a999a1..b1bf9e8 100644
  
  # Enable testing
 diff --git a/examples/matx/matx_basic/cpp/CMakeLists.min.txt b/examples/matx/matx_basic/cpp/CMakeLists.min.txt
-index b880940..ea49196 100644
+index b347121c..97eab128 100644
 --- a/examples/matx/matx_basic/cpp/CMakeLists.min.txt
 +++ b/examples/matx/matx_basic/cpp/CMakeLists.min.txt
-@@ -27,6 +27,11 @@ elseif(CMAKE_CUDA_ARCHITECTURES MATCHES "^[0-9]+$" AND CMAKE_CUDA_ARCHITECTURES
+@@ -15,6 +15,11 @@ elseif(CMAKE_CUDA_ARCHITECTURES MATCHES "^[0-9]+$" AND CMAKE_CUDA_ARCHITECTURES
  endif()
  
  find_package(CUDAToolkit QUIET)
@@ -409,23 +399,23 @@ index b880940..ea49196 100644
  # Find the Holoscan SDK development package and its embedded MatX distribution
  find_package(holoscan REQUIRED CONFIG
 diff --git a/examples/matx/matx_basic/cpp/CMakeLists.txt b/examples/matx/matx_basic/cpp/CMakeLists.txt
-index c32b958..e3e0a4e 100644
+index 69f54281..f24405b4 100644
 --- a/examples/matx/matx_basic/cpp/CMakeLists.txt
 +++ b/examples/matx/matx_basic/cpp/CMakeLists.txt
-@@ -13,6 +13,8 @@
- # See the License for the specific language governing permissions and
- # limitations under the License.
+@@ -1,6 +1,8 @@
+ # SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # SPDX-License-Identifier: Apache-2.0
  
-+find_package(matx 0.9.3 REQUIRED)
++find_package(matx 0.9.4 REQUIRED)
 +
  # Create examples
  add_executable(matx_basic
    matx_basic.cu
 diff --git a/examples/pose_tree/distributed_pose_tree/cpp/CMakeLists.txt b/examples/pose_tree/distributed_pose_tree/cpp/CMakeLists.txt
-index dafe6a6..3002982 100644
+index 60d98e64..a5523032 100644
 --- a/examples/pose_tree/distributed_pose_tree/cpp/CMakeLists.txt
 +++ b/examples/pose_tree/distributed_pose_tree/cpp/CMakeLists.txt
-@@ -19,8 +19,10 @@ add_executable(distributed_pose_tree
+@@ -7,8 +7,10 @@ add_executable(distributed_pose_tree
  )
  target_link_libraries(distributed_pose_tree
    PUBLIC
@@ -439,10 +429,10 @@ index dafe6a6..3002982 100644
  
  # Copy config file
 diff --git a/examples/pose_tree/pose_tree_basic/cpp/CMakeLists.txt b/examples/pose_tree/pose_tree_basic/cpp/CMakeLists.txt
-index ef797f1..8df1b51 100644
+index f344275b..85f2040d 100644
 --- a/examples/pose_tree/pose_tree_basic/cpp/CMakeLists.txt
 +++ b/examples/pose_tree/pose_tree_basic/cpp/CMakeLists.txt
-@@ -19,8 +19,10 @@ add_executable(pose_tree_basic
+@@ -7,8 +7,10 @@ add_executable(pose_tree_basic
  )
  target_link_libraries(pose_tree_basic
    PUBLIC
@@ -456,10 +446,10 @@ index ef797f1..8df1b51 100644
  
  # Copy config file
 diff --git a/examples/v4l2_camera/cpp/v4l2_camera_passthrough_op/CMakeLists.txt b/examples/v4l2_camera/cpp/v4l2_camera_passthrough_op/CMakeLists.txt
-index fc819f1..fc53c73 100644
+index 11391687..61c69fab 100644
 --- a/examples/v4l2_camera/cpp/v4l2_camera_passthrough_op/CMakeLists.txt
 +++ b/examples/v4l2_camera/cpp/v4l2_camera_passthrough_op/CMakeLists.txt
-@@ -36,18 +36,24 @@ if(HOLOSCAN_PYTHON_EXAMPLES)
+@@ -24,18 +24,24 @@ if(HOLOSCAN_PYTHON_EXAMPLES)
              holoscan::pybind11
      )
  
@@ -490,10 +480,10 @@ index fc819f1..fc53c73 100644
  
      # custom target to ensure the module's __init__.py file is copied
 diff --git a/include/holoscan/core/resources/data_logger_queue.hpp b/include/holoscan/core/resources/data_logger_queue.hpp
-index bc70538..9407780 100644
+index cc23bd75..94dc4016 100644
 --- a/include/holoscan/core/resources/data_logger_queue.hpp
 +++ b/include/holoscan/core/resources/data_logger_queue.hpp
-@@ -28,7 +28,7 @@
+@@ -16,7 +16,7 @@
  #include <string>
  #include <utility>
  
@@ -503,21 +493,21 @@ index bc70538..9407780 100644
  
  namespace holoscan {
 diff --git a/modules/holoinfer/src/infer/onnx/CMakeLists.txt b/modules/holoinfer/src/infer/onnx/CMakeLists.txt
-index 76d6689..7cb58b8 100644
+index e739ee88..cf2ab237 100644
 --- a/modules/holoinfer/src/infer/onnx/CMakeLists.txt
 +++ b/modules/holoinfer/src/infer/onnx/CMakeLists.txt
-@@ -15,7 +15,9 @@
- # limitations under the License.
- #
+@@ -2,7 +2,9 @@
+ # SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # SPDX-License-Identifier: Apache-2.0
  
 -find_package(ONNXRuntime REQUIRED)
 +find_package(PkgConfig)
-+pkg_check_modules(libonnxruntime REQUIRED IMPORTED_TARGET GLOBAL libonnxruntime>=1.21.0)
-+find_package(dlpack 1.0 REQUIRED)
++pkg_check_modules(libonnxruntime REQUIRED IMPORTED_TARGET GLOBAL libonnxruntime>=1.24.2)
++find_package(dlpack 1.2 REQUIRED)
  add_library(holoinfer_ort SHARED core.cpp)
  add_library(holoscan::infer::onnx_runtime ALIAS holoinfer_ort)
  set_target_properties(holoinfer_ort PROPERTIES
-@@ -27,7 +29,7 @@ set_target_properties(holoinfer_ort PROPERTIES
+@@ -14,7 +16,7 @@ set_target_properties(holoinfer_ort PROPERTIES
  )
  target_link_libraries(holoinfer_ort
      PRIVATE
@@ -527,10 +517,10 @@ index 76d6689..7cb58b8 100644
          dlpack::dlpack
          holoscan::logger
 diff --git a/modules/holoinfer/src/infer/torch/CMakeLists.txt b/modules/holoinfer/src/infer/torch/CMakeLists.txt
-index 950c455..e2ed7e0 100644
+index ed280bf2..a8574497 100644
 --- a/modules/holoinfer/src/infer/torch/CMakeLists.txt
 +++ b/modules/holoinfer/src/infer/torch/CMakeLists.txt
-@@ -49,22 +49,9 @@ else()
+@@ -36,22 +36,9 @@ else()
  endif()
  message(STATUS "TORCH_CUDA_ARCH_LIST: ${TORCH_CUDA_ARCH_LIST}")
  
@@ -552,15 +542,28 @@ index 950c455..e2ed7e0 100644
 -set(CMAKE_MESSAGE_LOG_LEVEL ${_CMAKE_MESSAGE_LOG_LEVEL})
 +# Find dependencies
 +find_package(Torch REQUIRED)
-+find_package(dlpack 1.0 REQUIRED)
++find_package(dlpack 1.2 REQUIRED)
  
  # Create the holoinfer torch backend library
  add_library(holoinfer_torch SHARED core.cpp)
+diff --git a/modules/holoipc/src/transport/fastdds/fast_dds_idl_gen.cmake b/modules/holoipc/src/transport/fastdds/fast_dds_idl_gen.cmake
+index 37198fd4..03a9ecee 100644
+--- a/modules/holoipc/src/transport/fastdds/fast_dds_idl_gen.cmake
++++ b/modules/holoipc/src/transport/fastdds/fast_dds_idl_gen.cmake
+@@ -7,7 +7,7 @@
+ # Holoscan SDK Docker: FAST_DDS_GEN=/opt/fastdds-gen/<ver> with bin/fastddsgen (java -jar wrapper).
+ # See public/Dockerfile and modules/holoipc/docs/IDL_TYPES.md.
+ 
+-find_package(Python3 3.8 COMPONENTS Interpreter REQUIRED)
++find_package(Python3 COMPONENTS Interpreter REQUIRED)
+ 
+ set(_holoscan_fastddsgen_hints "")
+ if(DEFINED ENV{FAST_DDS_GEN})
 diff --git a/modules/holoviz/examples/demo/CMakeLists.txt b/modules/holoviz/examples/demo/CMakeLists.txt
-index 8b96a52..3f26fae 100644
+index 32d3a419..8f48bba4 100644
 --- a/modules/holoviz/examples/demo/CMakeLists.txt
 +++ b/modules/holoviz/examples/demo/CMakeLists.txt
-@@ -15,18 +15,6 @@
+@@ -3,18 +3,6 @@
  
  set(PROJECT_NAME holoviz_demo)
  
@@ -579,7 +582,7 @@ index 8b96a52..3f26fae 100644
  add_executable(${PROJECT_NAME})
  
  target_sources(${PROJECT_NAME}
-@@ -36,7 +24,7 @@ target_sources(${PROJECT_NAME}
+@@ -24,7 +12,7 @@ target_sources(${PROJECT_NAME}
  
  target_include_directories(${PROJECT_NAME}
      PRIVATE
@@ -589,10 +592,10 @@ index 8b96a52..3f26fae 100644
  
  target_link_libraries(${PROJECT_NAME}
 diff --git a/modules/holoviz/examples/depth_map/CMakeLists.txt b/modules/holoviz/examples/depth_map/CMakeLists.txt
-index af2b7a3..0f87a07 100644
+index e08c197e..36f0314e 100644
 --- a/modules/holoviz/examples/depth_map/CMakeLists.txt
 +++ b/modules/holoviz/examples/depth_map/CMakeLists.txt
-@@ -15,18 +15,6 @@
+@@ -3,18 +3,6 @@
  
  set(PROJECT_NAME holoviz_depth_map)
  
@@ -611,7 +614,7 @@ index af2b7a3..0f87a07 100644
  add_executable(${PROJECT_NAME})
  
  target_sources(${PROJECT_NAME}
-@@ -36,7 +24,7 @@ target_sources(${PROJECT_NAME}
+@@ -24,7 +12,7 @@ target_sources(${PROJECT_NAME}
  
  target_include_directories(${PROJECT_NAME}
      PRIVATE
@@ -621,10 +624,10 @@ index af2b7a3..0f87a07 100644
  
  target_link_libraries(${PROJECT_NAME}
 diff --git a/modules/holoviz/src/glfw_window.cpp b/modules/holoviz/src/glfw_window.cpp
-index f322139..2554510 100644
+index eddba379..2f910445 100644
 --- a/modules/holoviz/src/glfw_window.cpp
 +++ b/modules/holoviz/src/glfw_window.cpp
-@@ -677,7 +677,7 @@ vk::SurfaceKHR GLFWWindow::create_surface(vk::PhysicalDevice physical_device,
+@@ -665,7 +665,7 @@ vk::SurfaceKHR GLFWWindow::create_surface(vk::PhysicalDevice physical_device,
    VkSurfaceKHR surface;
    const vk::Result result =
        vk::Result(glfwCreateWindowSurface(instance, impl_->window_, nullptr, &surface));
@@ -634,10 +637,10 @@ index f322139..2554510 100644
  }
  
 diff --git a/modules/holoviz/src/vulkan/vulkan_app.cpp b/modules/holoviz/src/vulkan/vulkan_app.cpp
-index d8e4f77..116446d 100644
+index 049db828..c969afd5 100644
 --- a/modules/holoviz/src/vulkan/vulkan_app.cpp
 +++ b/modules/holoviz/src/vulkan/vulkan_app.cpp
-@@ -923,7 +923,7 @@ void Vulkan::Impl::end_transfer_pass() {
+@@ -943,7 +943,7 @@ void Vulkan::Impl::end_transfer_pass() {
    // submit staged transfers
    const vk::Result result =
        vk::Result(nvvk_.transfer_batch_submission_.execute(transfer_job.fence_.get(), 0b0000'0001));
@@ -646,7 +649,7 @@ index d8e4f77..116446d 100644
  
    // next graphics submission must wait for transfer completion
    nvvk_.batch_submission_.enqueueWait(transfer_job.semaphore_.get(),
-@@ -1000,7 +1000,7 @@ void Vulkan::Impl::cleanup_transfer_jobs() {
+@@ -1020,7 +1020,7 @@ void Vulkan::Impl::cleanup_transfer_jobs() {
  
          it->fence_triggered_ = true;
        } else if (result != vk::Result::eNotReady) {
@@ -655,7 +658,7 @@ index d8e4f77..116446d 100644
        }
      }
  
-@@ -1018,7 +1018,7 @@ void Vulkan::Impl::cleanup_transfer_jobs() {
+@@ -1038,7 +1038,7 @@ void Vulkan::Impl::cleanup_transfer_jobs() {
            it = next;
            continue;
          } else if (result != vk::Result::eNotReady) {
@@ -664,7 +667,7 @@ index d8e4f77..116446d 100644
          }
        } else {
          // this is a active transfer buffer, keep it; the frame fence will be set after the call to
-@@ -1052,7 +1052,7 @@ void Vulkan::Impl::prepare_frame() {
+@@ -1072,7 +1072,7 @@ void Vulkan::Impl::prepare_frame() {
    if (result != vk::Result::eSuccess) {
      // This allows Aftermath to do things and exit below
      usleep(1000);
@@ -673,7 +676,7 @@ index d8e4f77..116446d 100644
      exit(-1);
    }
  
-@@ -1090,7 +1090,7 @@ void Vulkan::Impl::submit_frame() {
+@@ -1110,7 +1110,7 @@ void Vulkan::Impl::submit_frame() {
  
    const vk::Result result =
        vk::Result(nvvk_.batch_submission_.execute(wait_fences_[image_index].get(), 0b0000'0001));
@@ -682,7 +685,7 @@ index d8e4f77..116446d 100644
  
    if (!(render_flags_ & RenderFlags::DONT_SWAP_BUFFERS)) {
      // Presenting frame
-@@ -2438,7 +2438,7 @@ void Vulkan::Impl::read_framebuffer(Vulkan* vulkan, ImageFormat fmt, uint32_t wi
+@@ -2489,7 +2489,7 @@ void Vulkan::Impl::read_framebuffer(Vulkan* vulkan, ImageFormat fmt, uint32_t wi
      if (result != vk::Result::eSuccess) {
        // This allows Aftermath to do things and exit below
        usleep(1000);
@@ -691,7 +694,7 @@ index d8e4f77..116446d 100644
        exit(-1);
      }
  
-@@ -2495,7 +2495,7 @@ void Vulkan::Impl::read_framebuffer(Vulkan* vulkan, ImageFormat fmt, uint32_t wi
+@@ -2546,7 +2546,7 @@ void Vulkan::Impl::read_framebuffer(Vulkan* vulkan, ImageFormat fmt, uint32_t wi
    // submit the command buffer
    const vk::Result result =
        vk::Result(nvvk_.batch_submission_.execute(read_job.fence_.get(), 0b0000'0001));
@@ -700,7 +703,7 @@ index d8e4f77..116446d 100644
  
    // copy the buffer to CUDA memory
    {
-@@ -2583,7 +2583,7 @@ bool Vulkan::Impl::wait_for_present(uint64_t present_id, uint64_t timeout_ns) {
+@@ -2634,7 +2634,7 @@ bool Vulkan::Impl::wait_for_present(uint64_t present_id, uint64_t timeout_ns) {
    if (result == vk::Result::eTimeout) {
      return false;
    }
@@ -709,20 +712,20 @@ index d8e4f77..116446d 100644
    return true;
  }
  
-@@ -2607,7 +2607,7 @@ bool Vulkan::Impl::wait_for_display_event(DisplayEventType display_event_type,
-   if (result == vk::Result::eTimeout) {
-     return false;
-   }
--  vk::resultCheck(result, "Failed to wait for display event");
-+  vk::detail::resultCheck(result, "Failed to wait for display event");
-   return true;
- }
- 
+@@ -2677,7 +2677,7 @@ bool Vulkan::Impl::wait_for_display_event(DisplayEventType display_event_type,
+     if (result == vk::Result::eTimeout) {
+       return false;
+     }
+-    vk::resultCheck(result, "Failed to wait for display event");
++    vk::detail::resultCheck(result, "Failed to wait for display event");
+     return true;
+   } catch (const vk::Error& e) {
+     // Catch is intentionally broad (any vk-hpp error, not just vk::UnknownError):
 diff --git a/modules/holoviz/tests/functional/CMakeLists.txt b/modules/holoviz/tests/functional/CMakeLists.txt
-index 9608c9a..0dfe511 100644
+index 9b2fd418..1076f101 100644
 --- a/modules/holoviz/tests/functional/CMakeLists.txt
 +++ b/modules/holoviz/tests/functional/CMakeLists.txt
-@@ -15,18 +15,6 @@
+@@ -3,18 +3,6 @@
  
  set(PROJECT_NAME holoviz_functionaltests)
  
@@ -741,7 +744,7 @@ index 9608c9a..0dfe511 100644
  find_package(CUDAToolkit REQUIRED)
  find_package(X11 REQUIRED)
  find_package(Vulkan REQUIRED)
-@@ -67,7 +55,7 @@ target_compile_definitions(${PROJECT_NAME}
+@@ -57,7 +45,7 @@ target_compile_definitions(${PROJECT_NAME}
  
  target_include_directories(${PROJECT_NAME}
      PRIVATE
@@ -751,10 +754,10 @@ index 9608c9a..0dfe511 100644
  
  target_link_libraries(${PROJECT_NAME}
 diff --git a/modules/holoviz/thirdparty/imgui/CMakeLists.txt b/modules/holoviz/thirdparty/imgui/CMakeLists.txt
-index 34bcc8b..86e86dc 100644
+index 30b1bfca..b8083998 100644
 --- a/modules/holoviz/thirdparty/imgui/CMakeLists.txt
 +++ b/modules/holoviz/thirdparty/imgui/CMakeLists.txt
-@@ -18,29 +18,17 @@ include(GNUInstallDirs)
+@@ -6,29 +6,17 @@ include(GNUInstallDirs)
  
  find_package(Vulkan REQUIRED)
  
@@ -787,7 +790,7 @@ index 34bcc8b..86e86dc 100644
    )
  
  target_compile_definitions(imgui_backend
-@@ -62,16 +50,16 @@ add_library(holoscan::viz::imgui ALIAS holoviz_imgui)
+@@ -50,16 +38,16 @@ add_library(holoscan::viz::imgui ALIAS holoviz_imgui)
  
  target_sources(holoviz_imgui
    PRIVATE
@@ -810,7 +813,7 @@ index 34bcc8b..86e86dc 100644
      $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>/holoviz/imgui
    )
  
-@@ -82,19 +70,19 @@ set_target_properties(holoviz_imgui
+@@ -70,19 +58,19 @@ set_target_properties(holoviz_imgui
  
  install(
    FILES
@@ -838,18 +841,18 @@ index 34bcc8b..86e86dc 100644
    COMPONENT "holoscan-dependencies"
    )
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 7c833e5..0c9ad7a 100644
+index a2316cc4..5022583b 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -75,6 +75,7 @@ endfunction()
+@@ -63,6 +63,7 @@ endfunction()
  # ##############################################################################
  # # Add library holoscan::spdlog_logger
  # ##############################################################################
-+find_package(spdlog 1.14.1 REQUIRED)
++find_package(spdlog REQUIRED)
  add_holoscan_library(spdlog_logger common/logger/spdlog_logger.cpp)
  target_link_libraries(spdlog_logger
      PUBLIC
-@@ -399,7 +400,7 @@ target_link_libraries(core
+@@ -387,7 +388,7 @@ target_link_libraries(core
          tl::expected
          yaml-cpp::yaml-cpp
      PRIVATE

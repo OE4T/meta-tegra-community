@@ -7,7 +7,7 @@ SRC_URI = " \
     git://github.com/nvidia-holoscan/holoscan-sdk.git;protocol=https;nobranch=1;tag=v${PV} \
     https://edge.urm.nvidia.com/artifactory/sw-holoscan-thirdparty-generic-local/data/racerx/racerx_20231009.zip;downloadfilename=racerx.zip;name=dataset;subdir=${S}/data/racerx"
 
-SRCREV = "1f6ef481348e03656bcf99e033cfef9899c378a6"
+SRCREV = "017eb05ebea9260d6e31653aa83ab68d80f4f50a"
 SRC_URI[dataset.sha256sum] = "7a334c01c11e9620053c88dc3e796501c21564d0e533ca17b1a4ef2ba3a4f041"
 
 SRC_URI += " \
