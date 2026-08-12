@@ -1,10 +1,11 @@
-From 707038b8c935a142782e23f3d091be8dd1ba31ba Mon Sep 17 00:00:00 2001
+From 15ccaa36cd58025e3491676d317e3155045db9c2 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 3 Mar 2026 09:00:48 -0800
+Date: Wed, 12 Aug 2026 08:20:06 -0700
 Subject: [PATCH 1/9] Add install rules
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
  applications/colonoscopy_segmentation/CMakeLists.txt  |  8 ++++++++
  .../cpp/CMakeLists.txt                                |  9 +++++++++
@@ -75,10 +76,10 @@ index 7f32762f7..bb3dbe7f7 100644
  if(BUILD_TESTING)
    # Configure the yaml file to only play 10 frames
 diff --git a/applications/endoscopy_tool_tracking/cpp/CMakeLists.txt b/applications/endoscopy_tool_tracking/cpp/CMakeLists.txt
-index 442217f49..270b6c33a 100644
+index f0925a3bc..2e4770abe 100644
 --- a/applications/endoscopy_tool_tracking/cpp/CMakeLists.txt
 +++ b/applications/endoscopy_tool_tracking/cpp/CMakeLists.txt
-@@ -56,6 +56,15 @@ add_custom_target(endoscopy_tool_tracking_deps
+@@ -57,6 +57,15 @@ add_custom_target(endoscopy_tool_tracking_deps
  )
  add_dependencies(endoscopy_tool_tracking endoscopy_tool_tracking_deps)
  
@@ -95,10 +96,10 @@ index 442217f49..270b6c33a 100644
  if(BUILD_TESTING)
  
 diff --git a/applications/endoscopy_tool_tracking/python/CMakeLists.txt b/applications/endoscopy_tool_tracking/python/CMakeLists.txt
-index 23d863d51..7a8c3e885 100644
+index d798178e2..a9c66a006 100644
 --- a/applications/endoscopy_tool_tracking/python/CMakeLists.txt
 +++ b/applications/endoscopy_tool_tracking/python/CMakeLists.txt
-@@ -31,6 +31,14 @@ add_custom_target(python_endoscopy_tool_tracking_deps
+@@ -32,6 +32,14 @@ add_custom_target(python_endoscopy_tool_tracking_deps
  
  add_dependencies(python_endoscopy_tool_tracking python_endoscopy_tool_tracking_deps)
  
@@ -414,10 +415,10 @@ index c1f82dc23..40a45d8b8 100644
 +  DESTINATION ${install_path}
 +)
 diff --git a/cmake/pybind11_add_holohub_module.cmake b/cmake/pybind11_add_holohub_module.cmake
-index a3ee8f0d2..27a94a65b 100644
+index 83bb80033..73ec6bd17 100644
 --- a/cmake/pybind11_add_holohub_module.cmake
 +++ b/cmake/pybind11_add_holohub_module.cmake
-@@ -89,4 +89,9 @@ function(pybind11_add_holohub_module)
+@@ -144,4 +144,9 @@ function(pybind11_add_holohub_module)
          OUTPUT_NAME _${MODULE_NAME}
      )
  

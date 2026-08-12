@@ -1,10 +1,11 @@
-From 2370120afdca449edc794655c7e4dbe36faa4f4b Mon Sep 17 00:00:00 2001
+From 6d79893bb880dd447d51bd3757bd39e58cafa5a9 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 22 Jan 2026 12:40:25 -0800
+Date: Wed, 12 Aug 2026 08:23:52 -0700
 Subject: [PATCH 4/9] Enable Emergent apps
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
  CMakeLists.txt                                | 1 +
  applications/CMakeLists.txt                   | 2 ++
@@ -12,7 +13,7 @@ Signed-off-by: Ian Stewart <istewart@nvidia.com>
  3 files changed, 9 insertions(+), 2 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 05996be47..d651421a4 100644
+index e25b3e839..3949e70ad 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -48,6 +48,7 @@ include(CTest)
@@ -24,10 +25,10 @@ index 05996be47..d651421a4 100644
  # Enable flow benchmarking
  option(FLOW_BENCHMARKING "Enable Flow Benchmarking" OFF)
 diff --git a/applications/CMakeLists.txt b/applications/CMakeLists.txt
-index 439dbdf9d..d87728710 100644
+index e22214d03..4644f9559 100644
 --- a/applications/CMakeLists.txt
 +++ b/applications/CMakeLists.txt
-@@ -72,8 +72,10 @@ add_subdirectory(gstreamer)
+@@ -85,8 +85,10 @@ add_subdirectory(gstreamer)
  
  add_subdirectory(h264)
  

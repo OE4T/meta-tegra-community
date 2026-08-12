@@ -15,7 +15,7 @@ SRC_URI = "\
     https://api.ngc.nvidia.com/v2/resources/nvidia/clara-holoscan/holoscan_ultrasound_sample_data/versions/20240801/zip;downloadfilename=holoscan_ultrasound_sample_data_20240801.zip;name=ultrasound;subdir=${S}/data/ultrasound_segmentation \
     https://api.ngc.nvidia.com/v2/resources/nvidia/clara-holoscan/holoscan_volume_rendering_sample_data/versions/20230628/zip;downloadfilename=holoscan_volume_rendering_sample_data_20230628.zip;name=rendering;subdir=${S}/data/volume_rendering \
 "
-SRCREV = "43cbe6f2c913f7ea926ec8c25a0bda3c8cdb00b9"
+SRCREV = "0a2f81ef978ccd83a676b1c3189cf5b201315a2b"
 SRCREV_niftiClib = "ff1371b24a859dbf8a3eaaed5b82dc4bc096a9b9"
 SRC_URI[colonoscopy.sha256sum] = "0334d292414d19e9700a1d9cf5cfc9464215b7fa961b0fe74c425dae30a036d6"
 SRC_URI[endoscopy.sha256sum] = "55f59e12f6cb9738d21e0cc1dea85d112d4278a02deeb234afbae9544af3afa3"

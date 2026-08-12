@@ -1,10 +1,11 @@
-From 6b29cf12315d6bb0a80ab472af384195a67313bb Mon Sep 17 00:00:00 2001
+From 3b4ca71380dda1f45ffcc7a91bbf8e7918e74e25 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Thu, 22 Jan 2026 12:41:41 -0800
+Date: Wed, 12 Aug 2026 08:24:47 -0700
 Subject: [PATCH 5/9] Fix default data paths in python apps
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ian Stewart <istewart@nvidia.com>
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
  .../colonoscopy_segmentation/colonoscopy_segmentation.py        | 2 +-
  .../endoscopy_tool_tracking/python/endoscopy_tool_tracking.py   | 2 +-
@@ -26,10 +27,10 @@ index 8441def75..85362c0f3 100644
          self.sample_data_path = data
  
 diff --git a/applications/endoscopy_tool_tracking/python/endoscopy_tool_tracking.py b/applications/endoscopy_tool_tracking/python/endoscopy_tool_tracking.py
-index 112b58735..e9074e9bb 100644
+index e6ecc69b8..fee3a4872 100644
 --- a/applications/endoscopy_tool_tracking/python/endoscopy_tool_tracking.py
 +++ b/applications/endoscopy_tool_tracking/python/endoscopy_tool_tracking.py
-@@ -93,7 +93,7 @@ class EndoscopyApp(Application):
+@@ -92,7 +92,7 @@ class EndoscopyApp(Application):
          self.source = source
          self.postprocessor = postprocessor
          if data == "none":
@@ -39,10 +40,10 @@ index 112b58735..e9074e9bb 100644
          self.sample_data_path = data
  
 diff --git a/applications/multiai_ultrasound/python/multiai_ultrasound.py b/applications/multiai_ultrasound/python/multiai_ultrasound.py
-index 85d4c77e9..2e5cdbb5d 100644
+index 64211e849..09057a61b 100644
 --- a/applications/multiai_ultrasound/python/multiai_ultrasound.py
 +++ b/applications/multiai_ultrasound/python/multiai_ultrasound.py
-@@ -36,7 +36,7 @@ class MultiAIICardio(Application):
+@@ -37,7 +37,7 @@ class MultiAIICardio(Application):
          super().__init__()
  
          if data == "none":

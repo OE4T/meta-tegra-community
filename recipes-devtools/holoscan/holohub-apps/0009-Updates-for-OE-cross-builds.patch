@@ -1,6 +1,6 @@
-From 3773d945cf6b976cbbf76332bd29341c725fac6b Mon Sep 17 00:00:00 2001
+From a4ea9f1a1a7b7f16cde3e95fac2e8a8a5606a532 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Tue, 3 Mar 2026 09:04:09 -0800
+Date: Wed, 12 Aug 2026 08:38:56 -0700
 Subject: [PATCH 9/9] Updates for OE cross builds
 
 Upstream-Status: Inappropriate [OE-specific]
@@ -14,7 +14,7 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  applications/object_detection_torch/CMakeLists.txt     |  4 ++++
  .../ultrasound_segmentation/cpp/CMakeLists.txt         |  4 ++++
  applications/volume_rendering/cpp/CMakeLists.txt       |  4 ++++
- cmake/pybind11_add_holohub_module.cmake                |  1 +
+ cmake/pybind11_add_holohub_module.cmake                |  3 ++-
  gxf_extensions/lstm_tensor_rt_inference/CMakeLists.txt |  4 ++++
  operators/aja_source/CMakeLists.txt                    |  3 +++
  operators/lstm_tensor_rt_inference/CMakeLists.txt      |  4 ++++
@@ -25,7 +25,7 @@ Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
  operators/volume_renderer/CMakeLists.txt               |  4 ++++
  operators/volume_renderer/dataset.cpp                  |  1 +
  operators/xr/CMakeLists.txt                            |  2 ++
- 19 files changed, 64 insertions(+), 8 deletions(-)
+ 19 files changed, 65 insertions(+), 9 deletions(-)
 
 diff --git a/applications/endoscopy_out_of_body_detection/CMakeLists.txt b/applications/endoscopy_out_of_body_detection/CMakeLists.txt
 index 941ad61b6..9609c4b53 100644
@@ -43,7 +43,7 @@ index 941ad61b6..9609c4b53 100644
               PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
  
 diff --git a/applications/endoscopy_tool_tracking/cpp/CMakeLists.txt b/applications/endoscopy_tool_tracking/cpp/CMakeLists.txt
-index 270b6c33a..9856854e6 100644
+index 2e4770abe..4435a1305 100644
 --- a/applications/endoscopy_tool_tracking/cpp/CMakeLists.txt
 +++ b/applications/endoscopy_tool_tracking/cpp/CMakeLists.txt
 @@ -16,6 +16,10 @@
@@ -148,17 +148,26 @@ index 763019780..00ad38c06 100644
               PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
  
 diff --git a/cmake/pybind11_add_holohub_module.cmake b/cmake/pybind11_add_holohub_module.cmake
-index cfa3496e7..f18d7e98e 100644
+index f66d218bd..20559496b 100644
 --- a/cmake/pybind11_add_holohub_module.cmake
 +++ b/cmake/pybind11_add_holohub_module.cmake
-@@ -27,6 +27,7 @@ function(pybind11_add_holohub_module)
-         ${ARGN}
-     )
+@@ -16,7 +16,7 @@
+ # Find pybind11
+ find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Module)
  
-+    set(_Python Python3 CACHE INTERNAL "" FORCE)
-     set(MODULE_NAME ${MODULE_CPP_CMAKE_TARGET})
-     set(target_name ${MODULE_NAME}_python)
-     pybind11_add_module(${target_name} MODULE ${MODULE_SOURCES})
+-find_package(pybind11 3.0.1 REQUIRED)
++find_package(pybind11 3.0.4 REQUIRED)
+ 
+ # Helper function to generate pybind11 operator modules
+ function(pybind11_add_holohub_module)
+@@ -34,6 +34,7 @@ function(pybind11_add_holohub_module)
+     if(MODULE_PYTHON_MODULE_NAME)
+         set(MODULE_NAME ${MODULE_PYTHON_MODULE_NAME})
+     else()
++        set(_Python Python3 CACHE INTERNAL "" FORCE)
+         set(MODULE_NAME ${MODULE_CPP_CMAKE_TARGET})
+     endif()
+ 
 diff --git a/gxf_extensions/lstm_tensor_rt_inference/CMakeLists.txt b/gxf_extensions/lstm_tensor_rt_inference/CMakeLists.txt
 index 6175810cc..d7a144d92 100644
 --- a/gxf_extensions/lstm_tensor_rt_inference/CMakeLists.txt
@@ -260,7 +269,7 @@ index 1aaa53aa2..81e1226fe 100644
               PATHS "/opt/nvidia/holoscan" "/workspace/holoscan-sdk/install")
  
 diff --git a/operators/volume_loader/CMakeLists.txt b/operators/volume_loader/CMakeLists.txt
-index c3ed9a2c4..89fe206d9 100644
+index 94aa1af6f..cfc411cbf 100644
 --- a/operators/volume_loader/CMakeLists.txt
 +++ b/operators/volume_loader/CMakeLists.txt
 @@ -15,6 +15,10 @@
