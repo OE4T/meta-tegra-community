@@ -10,7 +10,7 @@ SRC_URI = "\
     file://0001-Updates-for-OE-cross-builds.patch \
     file://10-hololink-mgbe0_0.network \
 "
-SRCREV = "f54091ba594bc936ade41dd78a531d82724d842e"
+SRCREV = "1df133d4c78a6921249be4b147d65554aa8efa68"
 
 DEPENDS += " \
     tegra-libraries-camera \
