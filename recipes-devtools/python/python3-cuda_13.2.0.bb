@@ -9,7 +9,7 @@ LIC_FILES_CHKSUM = " \
     file://cuda_bindings/LICENSE;md5=f96b9ded45a4d44d2db90c334b69fed6 \
 "
 
-DEPENDS = "python3-pyclibrary-native python3-cython-native python3-versioneer-native python3-setuptools-scm-native cuda-profiler-api"
+DEPENDS = "python3-pyclibrary-native python3-cython-native python3-versioneer-native python3-setuptools-scm-native python3-wheel-native cuda-profiler-api"
 
 SRC_URI = "\
     git://github.com/NVIDIA/cuda-python.git;protocol=https;nobranch=1;tag=v${PV} \
