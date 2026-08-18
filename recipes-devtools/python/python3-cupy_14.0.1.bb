@@ -13,7 +13,7 @@ SRCREV = "3df3b7e4695029652fec511b71351736bae97389"
 DEPENDS += " \
     jitify cuda-profiler-api cuda-cudart cuda-nvrtc cuda-nvtx \
     cuda-cccl libcublas libcufft libcurand libcusparse nccl \
-    dlpack python3-cython-native python3-numpy-native \
+    dlpack python3-cython-native python3-numpy-native python3-wheel-native \
 "
 
 CXXFLAGS:append = " -I${STAGING_DIR_TARGET}/usr/local/cuda-${CUDA_VERSION}/include/cccl"
