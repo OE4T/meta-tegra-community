@@ -1,0 +1,104 @@
+Subject: [PATCH] python: make the binding build work when cross compiling
+
+The Python bindings assume in three places that the interpreter being built
+against is the one running the build, which is never true when cross compiling.
+
+python/CMakeLists.txt located pybind11 by running the target interpreter and
+asking it for its cmake dir. A cross build cannot run that interpreter, and the
+pybind11 that matters lives in the target sysroot where no host interpreter
+could report it. Ask find_package first and fall back to the interpreter only
+when the CMake search path has nothing, so the existing pip-installed flow keeps
+working unchanged.
+
+BuildPython.cmake configures each binding as an ExternalProject without
+forwarding CMAKE_TOOLCHAIN_FILE. The sub-build therefore took the cross compiler
+from the CMAKE_CXX_COMPILER it does forward while keeping the host's sysroot and
+find-root configuration, so it compiled against the build machine's Python
+headers. Forward the toolchain, and ask pybind11 for FindPython rather than its
+legacy path, which reports whichever interpreter it happens to run instead of
+honouring the sysroot.
+
+Forwarding PYTHON_MODULE_EXTENSION unconditionally also replaced the suffix
+FindPython derives with an empty string whenever the caller had not set one,
+leaving a bare "_cvcuda" with no extension that Python cannot import. Only pass
+it on when it actually holds a value.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+
+diff --git a/cmake/BuildPython.cmake b/cmake/BuildPython.cmake
+index 98f8d07..65c81c6 100644
+--- a/cmake/BuildPython.cmake
++++ b/cmake/BuildPython.cmake
+@@ -43,14 +43,30 @@ list(APPEND PYPROJ_COMMON_ARGS
+     -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+ )
+ 
+-# It needs to overwrite the PYTHON_MODULE_EXTENSION to generate
+-# python module name with correct name when cross compiling
+-# example: set(PYTHON_MODULE_EXTENSION .cpython-py38-aarch64-linux-gnu.so)
++# The binding is a separate CMake project, so anything the outer build worked
++# out about the target has to be handed to it explicitly.
+ if (CMAKE_CROSSCOMPILING)
++    # Without the toolchain file the sub-build believes it is native: it takes the
++    # cross compiler from the CMAKE_CXX_COMPILER above but keeps the host's sysroot
++    # and find-root settings, so its lookups resolve against the build machine
++    # while it emits target objects. pybind11's legacy path compounds that by
++    # reporting whichever interpreter it happens to run, so ask for FindPython and
++    # tell it which interpreter and headers to use.
+     list(APPEND PYPROJ_COMMON_ARGS
++        -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+         -DCUDAToolkit_ROOT=${CUDAToolkit_ROOT}
+-        -DPYTHON_MODULE_EXTENSION=${PYTHON_MODULE_EXTENSION}
++        -DPYBIND11_FINDPYTHON=ON
++        -DPython_EXECUTABLE=${Python_EXECUTABLE}
++        -DPython_INCLUDE_DIR=${Python_INCLUDE_DIR}
+     )
++
++    # Override the module suffix only when one was actually supplied. Forwarding
++    # it unconditionally replaces the suffix FindPython derives with an empty
++    # string, which produces a bare "_cvcuda" that Python cannot import.
++    # example: set(PYTHON_MODULE_EXTENSION .cpython-py38-aarch64-linux-gnu.so)
++    if(PYTHON_MODULE_EXTENSION)
++        list(APPEND PYPROJ_COMMON_ARGS -DPYTHON_MODULE_EXTENSION=${PYTHON_MODULE_EXTENSION})
++    endif()
+ endif()
+ 
+ # The Python wheels build as concurrent ExternalProjects that each default to a
+diff --git a/python/CMakeLists.txt b/python/CMakeLists.txt
+index 5e2279b..95e91e6 100644
+--- a/python/CMakeLists.txt
++++ b/python/CMakeLists.txt
+@@ -27,15 +27,23 @@ set(CMAKE_POSITION_INDEPENDENT_CODE true)
+ 
+ string(REGEX MATCH "^[0-9]+\\.[0-9]+" CVCUDA_PYTHON_VERSION "${PYTHON_VERSION}")
+ set(PYBIND11_PYTHON_VERSION ${CVCUDA_PYTHON_VERSION})
+-execute_process(
+-    COMMAND python${CVCUDA_PYTHON_VERSION} -m pybind11 --cmakedir
+-    OUTPUT_VARIABLE pybind11_DIR
+-    OUTPUT_STRIP_TRAILING_WHITESPACE
+-    RESULT_VARIABLE pybind11_cmakedir_result
+-)
+-if(NOT pybind11_cmakedir_result EQUAL 0)
+-    message(FATAL_ERROR "Failed to find pybind11 cmake dir for python${CVCUDA_PYTHON_VERSION}. "
+-                        "Is pybind11 installed? Try: python${CVCUDA_PYTHON_VERSION} -m pip install pybind11")
++# Prefer a pybind11 the CMake search path can already see, and only ask the
++# interpreter where its copy lives when that fails. Asking python for the cmake
++# dir assumes the interpreter being built against is the one running the build,
++# which is not true when cross compiling: the target's pybind11 lives in the
++# sysroot and no host interpreter can report it.
++find_package(pybind11 QUIET CONFIG)
++if(NOT pybind11_FOUND)
++    execute_process(
++        COMMAND python${CVCUDA_PYTHON_VERSION} -m pybind11 --cmakedir
++        OUTPUT_VARIABLE pybind11_DIR
++        OUTPUT_STRIP_TRAILING_WHITESPACE
++        RESULT_VARIABLE pybind11_cmakedir_result
++    )
++    if(NOT pybind11_cmakedir_result EQUAL 0)
++        message(FATAL_ERROR "Failed to find pybind11 cmake dir for python${CVCUDA_PYTHON_VERSION}. "
++                            "Is pybind11 installed? Try: python${CVCUDA_PYTHON_VERSION} -m pip install pybind11")
++    endif()
+ endif()
+ find_package(pybind11 3.0.3 REQUIRED CONFIG)
+ 
