@@ -11,11 +11,12 @@ SRC_URI = " \
     git://github.com/NVIDIA/MatX.git;protocol=https;nobranch=1;tag=v${PV} \
     file://0001-Updates-for-OE-cross-builds.patch \
 "
-SRCREV = "ad55c6b894f0fdef65294858d9561ba31baa8734"
+SRCREV = "3a130ec5a0ee7b3328a8d042f4c5a998b7a5e06a"
 
 DEPENDS += "cuda-cccl cpm-cmake rapids-cmake"
 
 EXTRA_OECMAKE:append = " \
+    -DCMAKE_BUILD_TYPE=Release \
     -DCCCL_DIR=${RECIPE_SYSROOT}/usr/local/cuda-${CUDA_VERSION}/lib/cmake/cccl \
     -DCPM_SOURCE_CACHE=${RECIPE_SYSROOT}${datadir} \
     -DRAPIDS_CMAKE_DIR=${RECIPE_SYSROOT}/opt/nvidia/rapids-cmake \

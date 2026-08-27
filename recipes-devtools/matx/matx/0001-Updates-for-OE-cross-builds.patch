@@ -1,33 +1,32 @@
-From f75a888b57e8a956a7343d5ad8e506407f273cad Mon Sep 17 00:00:00 2001
+From 3cad340cc7c445c4e7201a6e493cb4de9f551980 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
-Date: Fri, 8 May 2026 18:04:03 -0700
+Date: Thu, 20 Aug 2026 16:06:10 -0700
 Subject: [PATCH] Updates for OE cross builds
 
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt | 56 +++++++++++++++++++++-----------------------------
- 1 file changed, 23 insertions(+), 33 deletions(-)
+ CMakeLists.txt | 53 ++++++++++++++++++++++----------------------------
+ 1 file changed, 23 insertions(+), 30 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 3c67ee0f..f33e69aa 100644
+index a29e6ff1..7864b340 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -9,25 +9,31 @@ else()
-   set(NOT_SUBPROJECT OFF)
+@@ -7,24 +7,31 @@ if(POLICY CMP0144)
  endif()
+ set(MATX_VERSION 1.1.0)
  
--# CMake 3.24 can auto-detect GPUs, but it's not standard on any distrobution. For now, rapids-cmake has a utility
--# function to do it, so we grab that as a dependency. The user can optionally override GPU_ARCH to specify
--# their own. We check if rapids-cmake exists for projects that already include it so we don't have conflicting
--# directories
+-# Use the vendored rapids-cmake copy for GPU architecture discovery unless a parent
+-# project already provided it. The user can optionally override GPU_ARCH to specify
+-# their own.
 -if(NOT DEFINED rapids-cmake-dir)
 -  include(FetchContent)
 -  # Tell FetchContent to just use the local copy of rapids-cmake:
 -  FetchContent_Declare(rapids-cmake SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/rapids-cmake")
 -
 -  # Tell FetchContent to download remote copy of rapids-cmake:
--  #FetchContent_Declare(rapids-cmake URL https://github.com/rapidsai/rapids-cmake/archive/refs/heads/branch-24.12.zip)
+-  #FetchContent_Declare(rapids-cmake URL https://github.com/rapidsai/rapids-cmake/archive/refs/tags/v26.04.00.zip)
 -  FetchContent_MakeAvailable(rapids-cmake)
 -else()
 -  # The include() commands below search the module path for the corresponding .cmake files
@@ -62,23 +61,21 @@ index 3c67ee0f..f33e69aa 100644
  include(rapids-cmake)
  include(rapids-cpm)
  include(rapids-cuda)
-@@ -36,13 +42,6 @@ include(rapids-find)
+@@ -33,11 +40,6 @@ include(rapids-find)
  
  rapids_cpm_init(OVERRIDE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json")
  
 -if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
--    include(rapids-cuda)
--    set(CMAKE_CUDA_ARCHITECTURES "NATIVE")
--    message(STATUS "Auto-detecting GPU architectures since CMAKE_CUDA_ARCHITECTURES not defined")
--    rapids_cuda_init_architectures(MATX)
+-    set(CMAKE_CUDA_ARCHITECTURES "native")
+-    message(STATUS "Using native GPU architecture since CMAKE_CUDA_ARCHITECTURES not defined")
 -endif()
 -
  # This needs to go after rapids initialization otherwise we get a rapids_export_parse_version error
  project(MATX
          LANGUAGES CUDA CXX
-@@ -50,9 +49,6 @@ project(MATX
-         VERSION ${MATX_VERSION}
-         HOMEPAGE_URL "https://github.com/NVIDIA/MatX")
+@@ -56,9 +58,6 @@ if (MATX_GENERATE_CONFIG)
+     set(MATX_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
+ endif()
  
 -if (NOT CMAKE_CUDA_ARCHITECTURES)
 -    set(CMAKE_CUDA_ARCHITECTURES "70;80")
@@ -86,7 +83,7 @@ index 3c67ee0f..f33e69aa 100644
  message(STATUS "Using GPU architectures ${CMAKE_CUDA_ARCHITECTURES}")
  
  rapids_cmake_write_version_file(include/matx/version_config.h)
-@@ -131,12 +127,6 @@ if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)
+@@ -157,12 +156,6 @@ if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)
      message(FATAL_ERROR "MatX requires CUDA 11.5 or higher. Please update before using.")
  endif()
  
@@ -97,8 +94,8 @@ index 3c67ee0f..f33e69aa 100644
 -)
 -
  target_link_libraries(matx INTERFACE CCCL::CCCL)
- 
- # Set flags for compiling tests faster (only for nvcc)
+ if(CCCL_SOURCE_DIR)
+     target_compile_definitions(matx INTERFACE MATX_CCCL_SOURCE_DIR="${CCCL_SOURCE_DIR}")
 -- 
 2.43.0
 
