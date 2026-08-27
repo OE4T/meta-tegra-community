@@ -13,7 +13,7 @@ SRC_URI = " \
 "
 SRCREV = "498dafcff72e45840f453f1f149ea734152283ee"
 
-DEPENDS += "cuda-cccl nvtx cpm-cmake rapids-cmake rapids-logger"
+DEPENDS += "cuda-cccl cuda-nvtx cpm-cmake rapids-cmake rapids-logger"
 
 OECMAKE_SOURCEPATH = "${S}/cpp"
 
@@ -23,6 +23,7 @@ EXTRA_OECMAKE:append = " \
     -DRAPIDS_CMAKE_DIR=${RECIPE_SYSROOT}/opt/nvidia/rapids-cmake \
     -DFETCHCONTENT_SOURCE_DIR_RAPIDS-CMAKE=${RECIPE_SYSROOT}/opt/nvidia/rapids-cmake \
     -DRMM_NVTX=ON \
+    -DRMM_OE_NVTX_INCLUDE_DIR=${RECIPE_SYSROOT}/usr/local/cuda-${CUDA_VERSION}/include \
     -DBUILD_TESTS=OFF \
 "
 
