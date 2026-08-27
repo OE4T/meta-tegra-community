@@ -1,0 +1,36 @@
+Subject: [PATCH] tests: skip the standalone NVCV tests when cross compiling
+
+The standalone NVCV tests build through ExternalProject_Add, which configures a
+nested CMake project. NVCV_STANDALONE_CMAKE_ARGS lists the seven arguments that
+sub-build receives and CMAKE_TOOLCHAIN_FILE is not among them, so the nested
+configure inherits the cross compiler from CC/CXX in the environment but none of
+the toolchain's CMAKE_FIND_ROOT_PATH or prefix settings. Its own
+find_package(GTest REQUIRED) therefore cannot see the target sysroot, falls back
+to module mode and fails on GTEST_LIBRARY, GTEST_INCLUDE_DIR and
+GTEST_MAIN_LIBRARY, taking the whole compile step down with it.
+
+The surrounding block is already conditional because these tests link a system
+libgtest and so are skipped below GCC 11. Add cross compilation as a second
+reason to skip, which keeps native builds building both standalone variants.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+
+diff --git a/tests/nvcv_types/CMakeLists.txt b/tests/nvcv_types/CMakeLists.txt
+--- a/tests/nvcv_types/CMakeLists.txt
++++ b/tests/nvcv_types/CMakeLists.txt
+@@ -54,7 +54,13 @@ if(BUILD_TESTS_CPP)
+ 
+     # Skip standalone tests with GCC-10 due to ABI incompatibility with system libgtest
+     # These tests use find_package(GTest) which requires system GTest, causing ABI issues with GCC-10
+-    if(NOT (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11.0))
++    if(CMAKE_CROSSCOMPILING)
++        # NVCV_STANDALONE_CMAKE_ARGS does not forward CMAKE_TOOLCHAIN_FILE, so the
++        # nested configure picks up the cross compiler from the environment but none
++        # of the toolchain's find-root settings. Its own find_package(GTest REQUIRED)
++        # cannot then see the target sysroot and the configure step fails.
++        message(STATUS "Cross compiling: skipping nvcv_test_standalone and nvcv_test_standalone_static")
++    elseif(NOT (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11.0))
+         # Test NVCV can be built as a shared library via the standalone test
+         ExternalProject_Add(
+             nvcv_standalone
