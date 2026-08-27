@@ -1,0 +1,138 @@
+Subject: [PATCH] python: let the packager choose where the module is installed
+
+The Python package's install location is hardcoded to lib/python, which is where
+the SDK's own tarballs keep it, beside the libraries it loads. A distribution has
+to put it where its interpreter actually looks - site-packages - and today the
+only way to get there is to move the files after installing, which also leaves
+the module's RPATH pointing at the layout it was moved out of.
+
+Give the location a cache variable, CVCUDA_PYTHON_INSTALL_DIR, defaulting to
+today's lib/python, and use it for the module, for the __init__.py beside it, and
+for the path the Debian control files refer to. BuildPython.cmake passes it down
+so the binding sub-build installs to the same place.
+
+The RPATH needs the same treatment, for the same reason. $ORIGIN/../.. reaches
+the libraries from lib/python/cvcuda/ and from nowhere else, so set it only when
+the packager has not named a CMAKE_INSTALL_RPATH of its own; the INSTALL_RPATH
+property already defaults to that variable. CMAKE_INSTALL_RPATH_USE_LINK_PATH
+has to give way as well: it exists so the module can find nvcv_types in the build
+tree, which is safe only because the outer install rewrites the RPATH
+afterwards, and a packager installing the sub-build's output as-is would ship
+the build path inside the shipped module.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+
+diff --git a/cmake/BuildPython.cmake b/cmake/BuildPython.cmake
+index 65c81c6..ceade74 100644
+--- a/cmake/BuildPython.cmake
++++ b/cmake/BuildPython.cmake
+@@ -15,6 +15,9 @@
+ 
+ include(ExternalProject)
+ 
++set(CVCUDA_PYTHON_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/python"
++    CACHE STRING "Directory the cvcuda Python package is installed into")
++
+ # Where our python module installed, it'll end up being in the same
+ # directory nvcv shared library resides
+ set(PYPROJ_COMMON_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}
+@@ -26,13 +29,26 @@ endif()
+ 
+ get_target_property(NVCV_TYPES_SOURCE_DIR nvcv_types SOURCE_DIR)
+ 
++# Adding the link paths to the installed RPATH drops this build tree into it,
++# which is harmless only because the outer install then overwrites the RPATH. A
++# packager that named its own CMAKE_INSTALL_RPATH keeps what the sub-build
++# produced, so the build tree would ship inside the module; hand the packager's
++# choice down instead of the link paths.
++if(DEFINED CMAKE_INSTALL_RPATH)
++    list(APPEND PYPROJ_COMMON_ARGS
++        -DCMAKE_INSTALL_RPATH=${CMAKE_INSTALL_RPATH}
++        -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=false)
++else()
++    list(APPEND PYPROJ_COMMON_ARGS -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=true)
++endif()
++
+ # Needed so that nvcv_types library's build path gets added
+ # as RPATH to the plugin module. When outer project gets installed,
+ # it shall overwrite the RPATH with the final installation path.
+ list(APPEND PYPROJ_COMMON_ARGS
+-    -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=true
+     -DCMAKE_BUILD_RPATH_USE_ORIGIN=true
+     -DCMAKE_INSTALL_LIBDIR=${CMAKE_INSTALL_LIBDIR}
++    -DCVCUDA_PYTHON_INSTALL_DIR=${CVCUDA_PYTHON_INSTALL_DIR}
+     -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
+     -DCMAKE_MODULE_PATH=${CMAKE_CURRENT_BINARY_DIR}/cmake
+     -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
+@@ -175,7 +191,7 @@ from ._cvcuda import _C_API, _test  # noqa: F401")
+     install(FILES
+             "${CMAKE_BINARY_DIR}/python3/cvcuda/__init__.py"
+             "${CMAKE_CURRENT_SOURCE_DIR}/python/py.typed"
+-            DESTINATION ${CMAKE_INSTALL_LIBDIR}/python/cvcuda
++            DESTINATION ${CVCUDA_PYTHON_INSTALL_DIR}/cvcuda
+             COMPONENT lib)
+ 
+     # BUILD_PYTHON must leave an importable build-tree package even when wheel
+diff --git a/python/CMakeLists.txt b/python/CMakeLists.txt
+index 95e91e6..d63befa 100644
+--- a/python/CMakeLists.txt
++++ b/python/CMakeLists.txt
+@@ -63,6 +63,13 @@ set(PYTHON_MODULE_NAME python${CVCUDA_PYTHON_VERSION})
+ string(REPLACE "." "" PYTHON_MODULE_NAME "${PYTHON_MODULE_NAME}")
+ 
+ include(GNUInstallDirs)
++
++# The SDK's own tarballs keep the package beside the libraries, under
++# lib/python. A distribution installs it where its interpreter looks instead,
++# so let the packager say where that is.
++set(CVCUDA_PYTHON_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/python"
++    CACHE STRING "Directory the cvcuda Python package is installed into")
++
+ set(PYTHON_MODULE_FILENAME_LIST "" CACHE INTERNAL "")
+ 
+ function(cvcuda_python_add_module)
+@@ -88,11 +95,19 @@ function(cvcuda_python_add_module)
+         # lives at $ORIGIN/../.. (two dirs up). Without this, tar-installed Python
+         # modules fail to load libcvcuda.so on systems where the build tree no
+         # longer exists (anything other than the build pod itself).
++        #
++        # That reasoning only holds for the tarball layout. Once the package goes
++        # somewhere else, CMAKE_INSTALL_RPATH is how the packager says what the
++        # module should look for its libraries along, and INSTALL_RPATH defaults
++        # to it, so only fill in the tarball value when nothing was chosen.
+         BUILD_RPATH "$ORIGIN/../.."
+-        INSTALL_RPATH "$ORIGIN/../.."
+         BUILD_RPATH_USE_ORIGIN ON
+     )
+ 
++    if(NOT DEFINED CMAKE_INSTALL_RPATH)
++        set_target_properties(${ARG_TARGET} PROPERTIES INSTALL_RPATH "$ORIGIN/../..")
++    endif()
++
+     if(ARG_OUTPUT_NAME)
+         set_target_properties(${ARG_TARGET} PROPERTIES
+             OUTPUT_NAME "${ARG_OUTPUT_NAME}"
+@@ -133,11 +148,11 @@ function(cvcuda_python_add_module)
+ 
+     # Determine install destination - use package subdirectory if specified
+     if(ARG_PACKAGE_DIR)
+-        set(install_dest "${CMAKE_INSTALL_LIBDIR}/python/${ARG_PACKAGE_DIR}")
++        set(install_dest "${CVCUDA_PYTHON_INSTALL_DIR}/${ARG_PACKAGE_DIR}")
+         set(PYTHON_MODULE_FILENAME_LIST
+             "${PYTHON_MODULE_FILENAME_LIST};${ARG_PACKAGE_DIR}/${prefix}${ARG_OUTPUT_NAME}${suffix}" CACHE INTERNAL "")
+     else()
+-        set(install_dest "${CMAKE_INSTALL_LIBDIR}/python")
++        set(install_dest "${CVCUDA_PYTHON_INSTALL_DIR}")
+         set(PYTHON_MODULE_FILENAME_LIST
+             "${PYTHON_MODULE_FILENAME_LIST};${prefix}${ARG_OUTPUT_NAME}${suffix}" CACHE INTERNAL "")
+     endif()
+@@ -152,7 +167,7 @@ add_subdirectory(common)
+ add_subdirectory(mod_cvcuda)
+ 
+ # Set up debian control files
+-set(SRC_PYTHON_MODULE_PATH ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/python)
++set(SRC_PYTHON_MODULE_PATH ${CMAKE_INSTALL_PREFIX}/${CVCUDA_PYTHON_INSTALL_DIR})
+ set(DST_PYTHON_MODULE_PATH /usr/lib/python3/dist-packages)
+ 
+ # Add package files to the list before converting to string.
