@@ -7,8 +7,10 @@ SRC_URI = " \
     git://github.com/dmlc/dlpack.git;protocol=https;branch=main;tag=v${PV} \
     file://0001-update-dlpack-project-version.patch \
 "
-SRCREV = "93c8f2a3c774b84af6f652b1992c48164fae60fc"
+SRCREV = "84d107bf416c6bab9ae68ad285876600d230490d"
 
 inherit cmake
+
+EXTRA_OECMAKE = "-DBUILD_MOCK=OFF"
 
 ALLOW_EMPTY:${PN} = "1"
