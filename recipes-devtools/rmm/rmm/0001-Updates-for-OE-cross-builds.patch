@@ -3,8 +3,9 @@ From: Ilies CHERGUI <ichergui@nvidia.com>
 Date: Fri, 19 Jun 2026 20:25:34 -0700
 Subject: [PATCH] Updates for OE cross builds
 
-- Use sysroot-provided rapids-cmake, CCCL and NVTX via find_package
-  instead of CPM downloads.
+- Use sysroot-provided rapids-cmake and CCCL via find_package instead
+  of CPM downloads, and declare NVTX targets by hand against
+  cuda-nvtx's headers, since it carries no nvtx3 CMake package.
 - Make NVTX linkage conditional on RMM_NVTX.
 - Define LIBCUDACXX_ENABLE_EXPERIMENTAL_MEMORY_RESOURCE and
   CCCL_IGNORE_DEPRECATED_STREAM_REF_HEADER on the rmm target.
@@ -12,13 +13,6 @@ Subject: [PATCH] Updates for OE cross builds
 Upstream-Status: Inappropriate [OE-specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- cmake/rapids_config.cmake            |  9 +++++++++
- cpp/CMakeLists.txt                   | 10 +++++++---
- cpp/cmake/thirdparty/get_cccl.cmake  | 13 ++++---------
- cpp/cmake/thirdparty/get_nvtx.cmake  | 10 +---------
- cpp/include/rmm/cuda_stream_view.hpp |  3 +++
- 5 files changed, 24 insertions(+), 21 deletions(-)
-
 diff --git a/cmake/rapids_config.cmake b/cmake/rapids_config.cmake
 index 2099a762..74ff7c7e 100644
 --- a/cmake/rapids_config.cmake
@@ -105,23 +99,40 @@ index e7972e41..6426dbe4 100644
 +find_package(libcudacxx REQUIRED)
 +find_package(Thrust REQUIRED)
 diff --git a/cpp/cmake/thirdparty/get_nvtx.cmake b/cpp/cmake/thirdparty/get_nvtx.cmake
-index 2bbf8277..75d667be 100644
+index 2bbf8277..0be29a89 100644
 --- a/cpp/cmake/thirdparty/get_nvtx.cmake
 +++ b/cpp/cmake/thirdparty/get_nvtx.cmake
-@@ -5,12 +5,4 @@
+@@ -5,12 +5,23 @@
  # cmake-format: on
  # =============================================================================
  
 -# Use CPM to find or clone NVTX3
 -function(find_and_configure_nvtx3)
--
++# cuda-nvtx ships the CUDA toolkit's own NVTX headers rather than a versioned
++# nvtx3 CMake package, so declare the targets NVTX's own nvtxImportedTargets.cmake
++# would - bare nvtx3-c/nvtx3-cpp plus the nvtx3:: aliases this tree links against.
++if(NOT RMM_OE_NVTX_INCLUDE_DIR)
++  message(FATAL_ERROR "RMM_OE_NVTX_INCLUDE_DIR was not passed to the configure step")
++endif()
+ 
 -  include(${rapids-cmake-dir}/cpm/nvtx3.cmake)
 -  rapids_cpm_nvtx3(BUILD_EXPORT_SET rmm-exports INSTALL_EXPORT_SET rmm-exports)
--
++if(NOT TARGET nvtx3-c)
++  add_library(nvtx3-c INTERFACE IMPORTED GLOBAL)
++  set_target_properties(nvtx3-c PROPERTIES
++      INTERFACE_INCLUDE_DIRECTORIES "${RMM_OE_NVTX_INCLUDE_DIR}"
++  )
++  add_library(nvtx3::nvtx3-c ALIAS nvtx3-c)
+ 
 -endfunction()
 -
 -find_and_configure_nvtx3()
-+find_package(nvtx3 3.3.0 REQUIRED)
++  add_library(nvtx3-cpp INTERFACE IMPORTED GLOBAL)
++  set_target_properties(nvtx3-cpp PROPERTIES
++      INTERFACE_LINK_LIBRARIES nvtx3-c
++  )
++  add_library(nvtx3::nvtx3-cpp ALIAS nvtx3-cpp)
++endif()
 diff --git a/cpp/include/rmm/cuda_stream_view.hpp b/cpp/include/rmm/cuda_stream_view.hpp
 index 071ac454..eaedcf5a 100644
 --- a/cpp/include/rmm/cuda_stream_view.hpp
