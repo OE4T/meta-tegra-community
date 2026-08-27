@@ -1,0 +1,121 @@
+From c0c9cbb1aaafddfa0ee4d6cb831a4888726a376e Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Tue, 1 Sep 2026 10:06:15 -0700
+Subject: [PATCH 5/7] python: Include tensor strides in the Python tensor cache
+ key
+
+The Python tensor cache keys its entries on shape, layout and data type only.
+Those three do not determine the memory layout: the `rowalign` argument of the
+Python `Tensor` constructors is expressed purely as row padding in the strides,
+so a tightly packed tensor and a row-padded one of the same shape, layout and
+data type produce keys that compare equal.
+
+The consequence is that once a padded tensor has been released into the cache, a
+subsequent request for `rowalign=1` is satisfied from the cache and comes back
+padded, with no error and no warning:
+
+    t = cvcuda.Tensor((1, 4, 4, 1), U8, NHWC)              # padded, strides (128, 32, 1, 1)
+    del t                                                  # released into the cache
+    p = cvcuda.Tensor((1, 4, 4, 1), U8, NHWC, rowalign=1)  # asks for packed rows
+    cvcuda.reshape(p, (1, 2, 8, 1), NHWC)                  # fails: strides (128, 32, 1, 1)
+
+The caller then hits a failure in an operator that requires packed input -
+`reshape`, `findhomography` and `minarearect` all reject padded tensors - and the
+diagnostic points at the tensor rather than at the allocation that produced it.
+Because it depends on what the process allocated and freed earlier, the same
+function works or fails depending on unrelated history.
+
+The allocation path itself is correct; `Tensor::CalcRequirements` honours the
+requested alignment and records it in `Requirements::strides`. Only the cache
+lookup is wrong, because `Tensor::Key`'s constructor drops those strides. Keep
+them in the key and include them in the hash and the compatibility test, so a
+request for a different alignment misses the cache instead of aliasing an
+incompatible buffer.
+
+The `Key(shape, dtype)` constructor is removed: it existed only as the delegate
+of the `Requirements` constructor, and it can no longer express a complete key.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ python/mod_cvcuda/nvcv/Tensor.cpp | 15 +++++----------
+ python/mod_cvcuda/nvcv/Tensor.hpp | 15 +++++++++++++--
+ 2 files changed, 18 insertions(+), 12 deletions(-)
+
+diff --git a/python/mod_cvcuda/nvcv/Tensor.cpp b/python/mod_cvcuda/nvcv/Tensor.cpp
+index 828a2a84..b2f08c0d 100644
+--- a/python/mod_cvcuda/nvcv/Tensor.cpp
++++ b/python/mod_cvcuda/nvcv/Tensor.cpp
+@@ -317,14 +317,9 @@ int Tensor::rank() const
+ }
+ 
+ Tensor::Key::Key(const nvcv::Tensor::Requirements &reqs)
+-    : Key(nvcv::TensorShape(reqs.shape, reqs.rank, nvcv::TensorLayout{reqs.layout}),
+-          static_cast<nvcv::DataType>(reqs.dtype))
+-{
+-}
+-
+-Tensor::Key::Key(const nvcv::TensorShape &shape, nvcv::DataType dtype)
+-    : m_shape(shape)
+-    , m_dtype(dtype)
++    : m_shape(reqs.shape, reqs.rank, nvcv::TensorLayout{reqs.layout})
++    , m_dtype(static_cast<nvcv::DataType>(reqs.dtype))
++    , m_strides(reqs.strides, reqs.strides + reqs.rank)
+     , m_wrapper(false)
+ {
+ }
+@@ -338,7 +333,7 @@ size_t Tensor::Key::doGetHash() const
+     else
+     {
+         using util::ComputeHash;
+-        return ComputeHash(m_shape, m_dtype);
++        return ComputeHash(m_shape, m_dtype, m_strides);
+     }
+ }
+ 
+@@ -359,7 +354,7 @@ bool Tensor::Key::doIsCompatible(const IKey &that_) const
+     }
+     else
+     {
+-        return std::tie(m_shape, m_dtype) == std::tie(that.m_shape, that.m_dtype);
++        return std::tie(m_shape, m_dtype, m_strides) == std::tie(that.m_shape, that.m_dtype, that.m_strides);
+     }
+ }
+ 
+diff --git a/python/mod_cvcuda/nvcv/Tensor.hpp b/python/mod_cvcuda/nvcv/Tensor.hpp
+index 1e746326..5db235c1 100644
+--- a/python/mod_cvcuda/nvcv/Tensor.hpp
++++ b/python/mod_cvcuda/nvcv/Tensor.hpp
+@@ -27,6 +27,8 @@
+ #include <pybind11/numpy.h>
+ #include <pybind11/pytypes.h>
+ 
++#include <vector>
++
+ namespace nvcvpy::priv {
+ namespace py = pybind11;
+ 
+@@ -73,12 +75,21 @@ public:
+         }
+ 
+         explicit Key(const nvcv::Tensor::Requirements &reqs);
+-        explicit Key(const nvcv::TensorShape &shape, nvcv::DataType dtype);
+ 
+     private:
+         nvcv::TensorShape m_shape;
+         nvcv::DataType    m_dtype;
+-        bool              m_wrapper;
++
++        // Distance in bytes between consecutive elements of each dimension, one entry per
++        // dimension of m_shape.  Two tensors can agree on shape, layout and data type and
++        // still have incompatible memory layouts, because the requested row alignment
++        // (the `rowalign` argument of the Python constructors) is expressed purely as row
++        // padding in the strides.  The strides therefore have to take part in the cache
++        // key, otherwise a request for tightly packed rows can be satisfied from the cache
++        // by a padded tensor, and the caller silently gets a layout it did not ask for.
++        std::vector<int64_t> m_strides;
++
++        bool m_wrapper;
+ 
+         size_t doGetHash() const override;
+         bool   doIsCompatible(const IKey &that) const override;

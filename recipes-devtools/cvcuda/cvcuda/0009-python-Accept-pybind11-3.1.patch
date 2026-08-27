@@ -1,0 +1,28 @@
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Subject: [PATCH] python: Accept pybind11 3.1
+
+The binding build refuses any pybind11 at or above 3.1 because versions.env
+pins 3.0.3 for the wheel builds. The pin is a CI reproducibility choice, not
+an API requirement: the bindings build against 3.1 unchanged. A distribution
+that ships 3.1 has no 3.0.x to offer, so drop the upper bound and keep the
+3.0.3 minimum.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+--- a/python/CMakeLists.txt
++++ b/python/CMakeLists.txt
+@@ -47,13 +47,6 @@
+ endif()
+ find_package(pybind11 3.0.3 REQUIRED CONFIG)
+ 
+-if(pybind11_VERSION VERSION_GREATER_EQUAL 3.1)
+-    message(FATAL_ERROR "pybind11 ${pybind11_VERSION} found at ${pybind11_DIR}, but this "
+-                        "source tree supports >= 3.0.3 and < 3.1 (see versions.env). "
+-                        "Install the pinned version: "
+-                        "python${CVCUDA_PYTHON_VERSION} -m pip install 'pybind11==3.0.3'")
+-endif()
+-
+ find_package(nvcv_types REQUIRED)
+ 
+ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../src/nvcv/util nvcv_util)

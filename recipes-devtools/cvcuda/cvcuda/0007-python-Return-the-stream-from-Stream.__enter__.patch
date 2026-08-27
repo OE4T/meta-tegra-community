@@ -1,0 +1,46 @@
+From ad63b49b50bf1984f3356e6970187a47c8e61e03 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Tue, 1 Sep 2026 10:06:15 -0700
+Subject: [PATCH 7/7] python: Return the stream from Stream.__enter__
+
+`__enter__` is bound directly to `Stream::activate`, which returns void, so
+pybind11 gives back None and the documented idiom binds nothing:
+
+    with cvcuda.Stream() as s:
+        s.sync()    # AttributeError: 'NoneType' object has no attribute 'sync'
+
+Bind a lambda that activates the stream and returns it. It takes and returns
+`py::object` rather than `Stream &` so that the caller gets back the very object
+it entered rather than a second wrapper around the same stream.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ python/mod_cvcuda/nvcv/Stream.cpp | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/python/mod_cvcuda/nvcv/Stream.cpp b/python/mod_cvcuda/nvcv/Stream.cpp
+index 61c5485..725946c 100644
+--- a/python/mod_cvcuda/nvcv/Stream.cpp
++++ b/python/mod_cvcuda/nvcv/Stream.cpp
+@@ -882,7 +882,19 @@ void Stream::Export(py::module &m)
+ 
+     fflush(stdout);
+ 
+-    stream.def("__enter__", &Stream::activate, "Activate the CUDA stream as the current stream for this thread.")
++    // __enter__ has to hand the stream back, so that `with cvcuda.Stream() as s` binds the stream
++    // to s.  Binding Stream::activate directly would return None, since it returns void.  The
++    // lambda takes and returns py::object rather than Stream& so that the caller gets the very
++    // object it entered, not a second wrapper around the same stream.
++    stream
++        .def(
++            "__enter__",
++            [](py::object self)
++            {
++                self.cast<Stream &>().activate();
++                return self;
++            },
++            "Activate the CUDA stream as the current stream for this thread and return it.")
+         .def("__exit__", &Stream::deactivate,
+              "Deactivate the CUDA stream as the current stream for this thread. Raises RuntimeError if it is "
+              "not the current stream on this thread, unless an exception is already propagating out of the "

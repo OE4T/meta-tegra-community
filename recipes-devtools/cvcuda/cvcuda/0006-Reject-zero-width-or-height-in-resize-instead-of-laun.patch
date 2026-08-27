@@ -1,0 +1,61 @@
+From 16ccd1571d99c0823d1f53d2d1dd4275e9811304 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Tue, 1 Sep 2026 10:06:15 -0700
+Subject: [PATCH 6/7] Reject zero width or height in resize instead of
+ launching an empty grid
+
+Resize validates its extents from above - against `kIntMax`, and for linear
+interpolation it requires a source of at least 2x2 - but never from below. A
+tensor with a zero spatial extent therefore reaches the launch configuration,
+where the grid is computed as
+
+    dim3 blocks1(util::DivUp(dstSize.x, threads1.x * NIX<T>), util::DivUp(dstSize.y, threads1.y), batchSize);
+
+`DivUp` of zero is zero, so the kernel is launched with a zero grid dimension.
+The CUDA runtime rejects that launch, but nothing in this function checks the
+result, so the error stays pending in the runtime and is reported against
+whichever operator happens to be submitted next:
+
+    cvcuda.resize(t, (2, 0, 0, 3), cvcuda.Interp.LINEAR)   # accepted, no error
+    cvcuda.invert(t)                                       # fails: cudaErrorInvalidValue
+    cvcuda.invert(t)                                       # succeeds again
+
+The failure is thus charged to an innocent call on unrelated tensors, and it is
+invisible to the caller's own error checking. In a pipeline where the resize
+target is computed from data - a region of interest, a detection box that
+collapsed to nothing - this presents as a single spurious failure in a stage that
+has nothing to do with the resize.
+
+Add the missing lower bound next to the existing upper bound, so the degenerate
+extent is reported against the call that supplied it.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ src/cvcuda/priv/OpResize.cu | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/src/cvcuda/priv/OpResize.cu b/src/cvcuda/priv/OpResize.cu
+index 32d1a165..cc4ac6e6 100644
+--- a/src/cvcuda/priv/OpResize.cu
++++ b/src/cvcuda/priv/OpResize.cu
+@@ -1642,6 +1642,19 @@ void Resize::RunResize(cudaStream_t stream, const nvcv::TensorDataStridedCuda &s
+     int2 srcSize{(int)srcAccess->numCols(), (int)srcAccess->numRows()};
+     int2 dstSize{(int)dstAccess->numCols(), (int)dstAccess->numRows()};
+ 
++    // The check above bounds the extents from above; they need a lower bound as well.  Every
++    // resize kernel below is launched on a grid of DivUp(dstSize.x, ...) by DivUp(dstSize.y, ...)
++    // blocks, and DivUp of zero is zero, so a zero extent produces a launch with a zero grid
++    // dimension.  The CUDA runtime rejects that launch, and because nothing here checks for it
++    // the error stays pending and is then reported against whichever operator is submitted
++    // next, on unrelated tensors.  Rejecting the degenerate extent here keeps the failure
++    // attributed to the call that supplied it.
++    if (srcSize.x < 1 || srcSize.y < 1 || dstSize.x < 1 || dstSize.y < 1)
++    {
++        throw nvcv::Exception(nvcv::Status::ERROR_INVALID_ARGUMENT,
++                              "Input and output width and height must be at least 1");
++    }
++
+     if (interpolation == NVCV_INTERP_LINEAR && (srcSize.x < 2 || srcSize.y < 2))
+     {
+         throw nvcv::Exception(nvcv::Status::ERROR_INVALID_ARGUMENT,
