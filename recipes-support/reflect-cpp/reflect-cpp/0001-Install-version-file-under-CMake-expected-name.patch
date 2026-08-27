@@ -1,0 +1,37 @@
+From d7e259c85a05f1ba81880cf50b05d95232f879c7 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Thu, 27 Aug 2026 10:18:03 -0700
+Subject: [PATCH] Install version file under CMake-expected name
+
+Upstream writes the package version file as reflectcpp-version.cmake,
+which is not a name find_package() consults, so any versioned
+find_package(reflectcpp 0.25.0) rejects the package as unversioned.
+Write it under the name CMake actually looks for instead.
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ CMakeLists.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index fb1069f..2da4cd2 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -517,14 +517,14 @@ if (REFLECTCPP_INSTALL)
+         INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/reflectcpp
+     )
+     write_basic_package_version_file(
+-        ${CMAKE_CURRENT_BINARY_DIR}/reflectcpp-version.cmake
++        ${CMAKE_CURRENT_BINARY_DIR}/reflectcpp-config-version.cmake
+         COMPATIBILITY SameMinorVersion
+     )
+ 
+     install(
+         FILES
+             "${CMAKE_CURRENT_BINARY_DIR}/reflectcpp-config.cmake"
+-            "${CMAKE_CURRENT_BINARY_DIR}/reflectcpp-version.cmake"
++            "${CMAKE_CURRENT_BINARY_DIR}/reflectcpp-config-version.cmake"
+         DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/reflectcpp"
+     )
+ 
