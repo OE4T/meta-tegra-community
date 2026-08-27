@@ -1,0 +1,48 @@
+#!/bin/sh
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+# SPDX-License-Identifier: MIT
+#
+# Run the CV-CUDA gtest suites, reporting each case to ptest-runner rather than
+# collapsing a suite of several hundred cases into one result. gtest repeats its
+# failures in a trailing summary without the "(N ms)" suffix, so anchoring on that
+# suffix counts each case once. Suites are globbed so upstream can add or remove
+# one without editing this script.
+
+cd "$(dirname "$(readlink -f "$0")")" || exit 1
+
+rc=0
+log=$(mktemp) || exit 1
+trap 'rm -f "$log"' EXIT
+
+for suite in nvcv_test_* cvcuda_test_*; do
+    [ -x "$suite" ] || continue
+
+    # Upstream's run_tests.sh makes a detected leak fatal; keep that.
+    NVCV_LEAK_DETECTION=abort "./$suite" >"$log" 2>&1
+    status=$?
+
+    reported_failure=0
+    awk -v suite="$suite" '
+        # A failing parameterized case reads "[  FAILED  ] Suite.Case/3, where
+        # GetParam() = (...) (3 ms)", so the name arrives with a trailing comma.
+        function case_name() { name = $4; sub(/,$/, "", name); return suite ":" name }
+
+        /^\[ *OK *\] .* \([0-9]+ ms\)$/      { print "PASS: " case_name(); next }
+        /^\[ *FAILED *\] .* \([0-9]+ ms\)$/  { print "FAIL: " case_name(); failed++; next }
+        /^\[ *SKIPPED *\] .* \([0-9]+ ms\)$/ { print "SKIP: " case_name(); next }
+        END { exit (failed > 0 ? 1 : 0) }
+    ' "$log" || reported_failure=1
+
+    if [ $status -ne 0 ]; then
+        rc=1
+        # A suite that dies partway leaves its remaining cases unreported, so
+        # report the suite itself rather than dropping them from the tally.
+        if [ $reported_failure -eq 0 ]; then
+            echo "FAIL: $suite (exited $status without reporting a failing case)"
+        fi
+        # The prefix keeps gtest's summary lines from being read as results.
+        sed 's/^/  | /' "$log"
+    fi
+done
+
+exit $rc

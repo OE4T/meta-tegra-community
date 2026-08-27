@@ -1,0 +1,53 @@
+Subject: [PATCH] tests: skip the CUDA architecture policy test when cross compiling
+
+tests/cmake does not build a test binary. It installs
+tests/cmake/test_cuda_architecture_policy.py into bindir as
+cvcuda_test_cuda_architecture_policy, together with a copy of
+cmake/CUDAArchitecturePolicy.cmake under ${datadir}/cvcuda/tests/cmake. The
+script is a Python unittest that shells out to cmake to configure a series of
+throwaway projects and then asserts which CUDA_ARCHITECTURES
+cvcuda_configure_cuda_architecture_policy() picked for each simulated
+processor. It therefore tests the build system, and only means anything on the
+machine that runs the build.
+
+When cross compiling, those two files are staged for the target image instead,
+where there is no cmake and no toolchain, so every case fails with
+
+    FileNotFoundError: [Errno 2] No such file or directory: 'cmake'
+
+Adding cmake and a cross toolchain to a runtime image to satisfy a build-system
+test is not reasonable, so skip the subdirectory when cross compiling.
+
+Guarding add_subdirectory(cmake) rather than deleting the installed files
+afterwards also means nvcv_add_test() is never reached for this test, so the
+generated run_tests.sh driver does not gain a "run
+cvcuda_test_cuda_architecture_policy cmake" line for a program that is not
+present. (That driver would skip it anyway, since it treats the trailing cmake
+argument as a required tool, but it is better not to reference it at all.)
+
+Native builds are unaffected and keep running the test.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -117,7 +117,16 @@ endif()
+ 
+ # Create build tree
+ 
+-add_subdirectory(cmake)
++if(CMAKE_CROSSCOMPILING)
++    # tests/cmake installs a Python unittest that shells out to cmake to check
++    # which CUDA_ARCHITECTURES the policy function selects, plus the .cmake
++    # module it reads. That exercises the build system rather than the runtime,
++    # so when cross compiling the pair would only land in the target image,
++    # where cmake is absent and every case fails.
++    message(STATUS "Cross compiling: skipping cvcuda_test_cuda_architecture_policy")
++else()
++    add_subdirectory(cmake)
++endif()
+ 
+ if(BUILD_TESTS_CPP OR BUILD_TESTS_PYTHON)
+     add_subdirectory(common)

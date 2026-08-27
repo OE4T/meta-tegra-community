@@ -1,0 +1,21 @@
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Subject: [PATCH] python: Accept pybind11 3.0.1
+
+The 3.0.3 minimum comes from the versions.env pin for the wheel builds,
+not from an API the bindings use. meta-python on wrynose ships 3.0.1, so
+ask for any 3.0 release.
+
+Upstream-Status: Inappropriate [wrynose-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+--- a/python/CMakeLists.txt
++++ b/python/CMakeLists.txt
+@@ -45,7 +45,7 @@
+                             "Is pybind11 installed? Try: python${CVCUDA_PYTHON_VERSION} -m pip install pybind11")
+     endif()
+ endif()
+-find_package(pybind11 3.0.3 REQUIRED CONFIG)
++find_package(pybind11 3.0 REQUIRED CONFIG)
+ 
+ find_package(nvcv_types REQUIRED)
+ 

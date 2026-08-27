@@ -1,0 +1,103 @@
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Subject: [PATCH] tests: Give the hue channel its own tolerance
+
+The HSV comparison applies one maxDiff to all three channels. That works for
+8-bit HSV, where every channel is an integer in a comparable range and maxDiff
+is one quantization step, but not for floating-point HSV, where hue is in
+degrees while saturation and value are in [0, 1]. The float32 rows pass
+maxDiff = 2/1024, sized for the latter, so hue near 337 is asked for a relative
+precision of about 6e-6 -- finer than float32 holds at that magnitude. Any
+difference in how the device orders the divide-and-scale arithmetic then shows
+up as a failure:
+
+  The difference between refVec.data()[i] and dstVec.data()[i] is
+  0.0022430419921875, which exceeds maxDiff, where
+  refVec.data()[i] evaluates to 67.040985107421875,
+  dstVec.data()[i] evaluates to 67.043228149414062, and
+  maxDiff evaluates to 0.001953125.
+
+Give hue its own tolerance and scale it to the hue range for floating-point
+formats, leaving integer HSV and the saturation and value channels as they
+were. BGR2HSV and RGB2HSV on BGRf32/RGBf32 fail on an aarch64 iGPU without
+this.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+diff --git a/tests/cvcuda/system/TestUtils.hpp b/tests/cvcuda/system/TestUtils.hpp
+index 3886504..ec95805 100644
+--- a/tests/cvcuda/system/TestUtils.hpp
++++ b/tests/cvcuda/system/TestUtils.hpp
+@@ -144,8 +144,10 @@ inline void generateAllHSV(std::vector<T> &dst, unsigned int wdth, unsigned int
+ //--------------------------------------------------------------------------------------------------------------------//
+ 
+ //--------------------------------------------------------------------------------------------------------------------//
++// Hue takes its own tolerance, hueDiff: floating-point HSV keeps hue in degrees while saturation
++// and value stay in [0, 1], so a single tolerance cannot serve both.
+ // clang-format off
+-#define EXPECT_NEAR_HSV_ARR_CNT(data1, data2, size, range, maxDiff, maxCnt, passes)                                   \
++#define EXPECT_NEAR_HSV_ARR_CNT(data1, data2, size, range, hueDiff, maxDiff, maxCnt, passes)                          \
+     do                                                                                                                \
+     {                                                                                                                 \
+         ASSERT_EQ(size % 3, 0);                                                                                       \
+@@ -156,13 +158,13 @@ inline void generateAllHSV(std::vector<T> &dst, unsigned int wdth, unsigned int
+             double val1 = static_cast<double>(data1[i]);                                                              \
+             double val2 = static_cast<double>(data2[i]);                                                              \
+             if (val2 >= val1 && val2 - val1 > half)                                                                   \
+-                EXPECT_NEAR(data1[i] + range, data2[i], maxDiff) << "At index " << i                                  \
++                EXPECT_NEAR(data1[i] + range, data2[i], hueDiff) << "At index " << i                                  \
+                                                                  << " (error count = " << ++cnt << ")";               \
+             else if (val1 - val2 > half)                                                                              \
+-                EXPECT_NEAR(data1[i], data2[i] + range, maxDiff) << "At index " << i                                  \
++                EXPECT_NEAR(data1[i], data2[i] + range, hueDiff) << "At index " << i                                  \
+                                                                  << " (error count = " << ++cnt << ")";               \
+             else                                                                                                      \
+-                EXPECT_NEAR(data1[i], data2[i], maxDiff) << "At index " << i   << " (error count = " << ++cnt << ")"; \
++                EXPECT_NEAR(data1[i], data2[i], hueDiff) << "At index " << i   << " (error count = " << ++cnt << ")"; \
+             EXPECT_NEAR(data1[i+1], data2[i+1], maxDiff) << "At index " << i+1 << " (error count = " << ++cnt << ")"; \
+             EXPECT_NEAR(data1[i+2], data2[i+2], maxDiff) << "At index " << i+2 << " (error count = " << ++cnt << ")"; \
+         }                                                                                                             \
+@@ -172,12 +174,13 @@ inline void generateAllHSV(std::vector<T> &dst, unsigned int wdth, unsigned int
+ 
+ // clang-format on
+ //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - //
+-#define EXPECT_NEAR_HSV_VEC_CNT(vec1, vec2, range, maxDiff, maxCnt, passes)                             \
+-    do                                                                                                  \
+-    {                                                                                                   \
+-        ASSERT_EQ(vec1.size(), vec2.size());                                                            \
+-        EXPECT_NEAR_HSV_ARR_CNT(vec1.data(), vec2.data(), vec1.size(), range, maxDiff, maxCnt, passes); \
+-    }                                                                                                   \
++#define EXPECT_NEAR_HSV_VEC_CNT(vec1, vec2, range, hueDiff, maxDiff, maxCnt, passes)                             \
++    do                                                                                                           \
++    {                                                                                                            \
++        ASSERT_EQ(vec1.size(), vec2.size());                                                                     \
++        EXPECT_NEAR_HSV_ARR_CNT(vec1.data(), vec2.data(), vec1.size(), range, hueDiff, maxDiff, maxCnt,          \
++                                passes);                                                                         \
++    }                                                                                                            \
+     while (false)
+ 
+ //--------------------------------------------------------------------------------------------------------------------//
+diff --git a/tests/cvcuda/system/TestOpCvtColor.cpp b/tests/cvcuda/system/TestOpCvtColor.cpp
+index 653b294..29fbcc0 100644
+--- a/tests/cvcuda/system/TestOpCvtColor.cpp
++++ b/tests/cvcuda/system/TestOpCvtColor.cpp
+@@ -461,12 +461,17 @@ static void verifyOutput(nvcv::Tensor srcTensor, nvcv::ImageFormat srcFrmt,
+         {
+             const bool full = (code == NVCV_COLOR_BGR2HSV_FULL || code == NVCV_COLOR_RGB2HSV_FULL);
+             double     range = 360.0;
++            // maxDiff is sized for saturation and value, which are in [0, 1] here, so
++            // scale it to the hue range. Integer HSV holds every channel in the same
++            // units, where maxDiff is already one quantization step.
++            double hueDiff = maxDiff * range;
+             if constexpr (sizeof(T) == 1)
+             {
+-                range = full ? 256.0 : 180.0;
++                range   = full ? 256.0 : 180.0;
++                hueDiff = maxDiff;
+             }
+ 
+-            EXPECT_NEAR_HSV_VEC_CNT(refVec, dstVec, range, maxDiff, maxErrCnt, success);
++            EXPECT_NEAR_HSV_VEC_CNT(refVec, dstVec, range, hueDiff, maxDiff, maxErrCnt, success);
+         }
+         else
+             EXPECT_NEAR_VEC_CNT(refVec, dstVec, maxDiff, maxErrCnt, success);
