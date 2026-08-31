@@ -1,0 +1,124 @@
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Tue, 1 Sep 2026 00:00:00 +0000
+Subject: [PATCH] cmake: do not require glslang's CMake package for the system
+ build
+
+SLANG_USE_SYSTEM_GLSLANG went through find_package(glslang), which pulls in
+glslang-targets.cmake. That file declares glslang's command-line tool as an
+imported executable and ends with a blanket existence check over every target
+it exports, so a missing ${bindir}/glslang aborts configuration with
+
+  The imported target "glslang::glslang-standalone" references the file
+     "<prefix>/bin/glslang"
+  but this file does not exist.
+
+even though nothing here uses the tool: source/slang-glslang links glslang and
+its SPIR-V back end and nothing else. A cross-compilation sysroot routinely
+stages libraries and headers without tools, and the check has no opt-out, so
+distributions building against a system glslang cannot use the package at all.
+
+Locate the two libraries with find_path()/find_library() instead and declare
+the imported targets here, carrying the same properties glslang's own exported
+targets set. This also subsumes the include-directory fixup the system path
+previously had to apply after find_package().
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+
+---
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -593,16 +593,15 @@
+ endif()
+ 
+ if(${SLANG_USE_SYSTEM_GLSLANG})
+-    find_package(glslang REQUIRED)
+-    if(NOT TARGET glslang)
+-        add_library(glslang ALIAS glslang::glslang)
+-    endif()
+-    # source/slang-glslang links glslang's SPIR-V back end as plain `SPIRV`, which
+-    # is the target name inside glslang's own build tree. An installed glslang
+-    # exports only the namespaced glslang::SPIRV, so alias it back.
+-    if(NOT TARGET SPIRV)
+-        add_library(SPIRV ALIAS glslang::SPIRV)
+-    endif()
++    # Deliberately not find_package(glslang): glslang's exported CMake package
++    # declares its command-line tool as an imported executable, and the generated
++    # targets file fails the whole find_package() when that file is missing. A
++    # cross-compilation sysroot commonly stages libraries and headers but no
++    # tools, so the check fires there even though nothing in this build runs the
++    # tool -- source/slang-glslang links glslang's libraries and nothing else.
++    find_path(GLSLANG_INCLUDE_DIR glslang/Public/ShaderLang.h REQUIRED)
++    find_library(GLSLANG_LIBRARY glslang REQUIRED)
++    find_library(GLSLANG_SPIRV_LIBRARY SPIRV REQUIRED)
+ 
+     # source/slang-glslang/slang-glslang.cpp includes glslang two different ways:
+     #
+@@ -613,27 +612,46 @@
+     # end up on the include path: glslang's own source root, which is what
+     # "SPIRV/..." resolves against, and its parent, which is what "glslang/..."
+     # resolves against. An installed glslang instead puts every header under
+-    # <prefix>/include/glslang and its imported targets advertise only
+-    # <prefix>/include, so the second spelling still resolves while the first fails
+-    # with "SPIRV/GlslangToSpv.h: No such file or directory". Adding the glslang
+-    # subdirectory alongside the prefix restores the pair. Only one linked target
+-    # has to carry it, since include directories accumulate over all of them.
+-    get_target_property(
+-        _slang_glslang_include_dirs
+-        glslang::glslang
+-        INTERFACE_INCLUDE_DIRECTORIES
++    # <prefix>/include/glslang, so both directories are needed here as well.
++    set(_slang_glslang_includes
++        "${GLSLANG_INCLUDE_DIR};${GLSLANG_INCLUDE_DIR}/glslang"
+     )
+-    foreach(_slang_glslang_dir IN LISTS _slang_glslang_include_dirs)
+-        if(IS_DIRECTORY "${_slang_glslang_dir}/glslang")
+-            set_property(
+-                TARGET glslang::glslang
+-                APPEND
+-                PROPERTY
+-                    INTERFACE_INCLUDE_DIRECTORIES
+-                        "${_slang_glslang_dir}/glslang"
+-            )
+-        endif()
+-    endforeach()
++
++    # The properties below mirror the ones glslang's own exported targets carry.
++    # SPIRV-Tools-opt and Threads are left out: they are transitive dependencies
++    # of the installed glslang, and source/slang-glslang already links
++    # SPIRV-Tools-opt and SPIRV-Tools-link itself.
++    if(NOT TARGET glslang::glslang)
++        add_library(glslang::glslang SHARED IMPORTED)
++        set_target_properties(
++            glslang::glslang
++            PROPERTIES
++                IMPORTED_LOCATION "${GLSLANG_LIBRARY}"
++                INTERFACE_COMPILE_DEFINITIONS "GLSLANG_IS_SHARED_LIBRARY=1"
++                INTERFACE_INCLUDE_DIRECTORIES "${_slang_glslang_includes}"
++        )
++    endif()
++    if(NOT TARGET glslang::SPIRV)
++        add_library(glslang::SPIRV SHARED IMPORTED)
++        set_target_properties(
++            glslang::SPIRV
++            PROPERTIES
++                IMPORTED_LOCATION "${GLSLANG_SPIRV_LIBRARY}"
++                INTERFACE_COMPILE_DEFINITIONS "GLSLANG_IS_SHARED_LIBRARY=1"
++                INTERFACE_INCLUDE_DIRECTORIES "${_slang_glslang_includes}"
++                INTERFACE_LINK_LIBRARIES "glslang::glslang"
++        )
++    endif()
++
++    # source/slang-glslang links glslang itself as plain `glslang` and its SPIR-V
++    # back end as plain `SPIRV`, which are the target names inside glslang's own
++    # build tree.
++    if(NOT TARGET glslang)
++        add_library(glslang ALIAS glslang::glslang)
++    endif()
++    if(NOT TARGET SPIRV)
++        add_library(SPIRV ALIAS glslang::SPIRV)
++    endif()
+ endif()
+ 
+ if(${SLANG_USE_SYSTEM_CMARK})
