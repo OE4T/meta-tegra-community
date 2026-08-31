@@ -1,0 +1,26 @@
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Subject: [PATCH] python: Build the testing module with NOSTRIP
+
+holoscan.testing._testing is the only installed nanobind module built
+without NOSTRIP, so nanobind links it with -Wl,-s. A distribution that
+splits debug symbols out of what it installs then finds it already
+stripped, and gets no debug information for it.
+
+Build it with NOSTRIP, as holoscan._core and the module bindings are.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+diff --git a/python/holoscan/testing/CMakeLists.txt b/python/holoscan/testing/CMakeLists.txt
+index f988b8825..9152df55e 100644
+--- a/python/holoscan/testing/CMakeLists.txt
++++ b/python/holoscan/testing/CMakeLists.txt
+@@ -1,7 +1,7 @@
+ # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # SPDX-License-Identifier: Apache-2.0
+ 
+-nanobind_add_module(holoscan_testing_python STABLE_ABI harness.cpp adapters.cpp registered_adapters.cpp)
++nanobind_add_module(holoscan_testing_python STABLE_ABI NOSTRIP harness.cpp adapters.cpp registered_adapters.cpp)
+ target_link_libraries(holoscan_testing_python PRIVATE holoscan::testing holoscan::params)
+ target_include_directories(holoscan_testing_python PRIVATE
+     "${HOLOSCAN_PYTHON_BINDING_SERVICES_INCLUDE_DIR}")

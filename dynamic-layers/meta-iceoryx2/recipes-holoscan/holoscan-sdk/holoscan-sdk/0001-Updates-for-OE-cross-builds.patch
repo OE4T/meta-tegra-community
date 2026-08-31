@@ -1,0 +1,1097 @@
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Subject: [PATCH] Updates for OE cross builds
+
+A cross build has no network during configure, and a distribution wants
+one copy of each library, so take every dependency from the platform
+instead of fetching a private copy.
+
+- get_cmake_cuda_archs.py checked platform.machine(), the build host,
+  so cross builds for Thor from x86_64 got no CUDA architecture. Use
+  the target machine.
+- Align requests with what the layers ship: cccl, nanobind, googletest
+  and MatX by version; spdlog and GoogleTest through find_package
+  (GoogleTest GLOBAL, as holoscan_add_dependency() scopes imported
+  targets away from the test directories); iceoryx2 by probing for the
+  publisher callbacks HoloMQ needs.
+- Fetch yyjson and reflect-cpp only when no provider target is
+  declared. With a declared provider, config_io, its tests and the
+  parameter web tuner link the library instead of compiling its
+  sources, and leave yyjson_api alone so its symbols stay visible.
+- Guard install rules that only apply to a fetched copy: flatbuffers on
+  Flatbuffers_ADDED, bundled CV-CUDA on HOLOSCAN_VISION_BUNDLE_CVCUDA
+  (new, default ON), the dataset download scripts on
+  HOLOSCAN_INSTALL_DATA_DOWNLOAD_SCRIPTS (new, default ON).
+- Exempt imported yaml-cpp from the static archive check: config_io
+  links it PRIVATE behind $<BUILD_INTERFACE:>, so it is never exported.
+- In the installed package, keep the normal package root for fmt,
+  dlpack and FlatBuffers when the provider was found rather than
+  fetched, since the private root holds only fetched copies, and find
+  CCCL when no fetched CCCL recorded it.
+- HOLOSCAN_USE_CUDA_TOOLKIT_NVTX (new, default OFF) maps nvtx3 to
+  CUDA::nvtx3 instead of fetching NVTX, since no toolkit ships an nvtx3
+  package.
+- Move the example source behind the existing
+  HOLOSCAN_INSTALL_EXAMPLE_SOURCE, but keep the test driver scripts and
+  the holomq_main and plan_artifacts_workspace_test binaries, so the
+  installed tree can replay the example ctests.
+- Install each benchmark binary beside its source under
+  share/benchmark, and move the benchmark source behind
+  HOLOSCAN_INSTALL_BENCHMARK_SOURCE (new, default ON).
+- Add NOSTRIP to nanobind_add_module: nanobind links release builds
+  with -Wl,-s, leaving nothing to split into -dbg.
+
+Upstream-Status: Inappropriate [OE-specific]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 63cd8c7de..fc2249af5 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -22,6 +22,8 @@ option(HOLOSCAN_BUILD_PYTHON_STUBS "Generate and install Holoscan Python typing
+ set(HOLOSCAN_PYTHON_WHEEL_COMPONENTS "" CACHE INTERNAL
+     "Wheel components available in this native build" FORCE)
+ option(HOLOSCAN_DOWNLOAD_DATASETS "Download SDK Datasets" ON)
++# The download helpers need bash, wget or curl and unzip on the target.
++option(HOLOSCAN_INSTALL_DATA_DOWNLOAD_SCRIPTS "Install the dataset download helpers" ON)
+ option(HOLOSCAN_BUILD_TESTS "Build Holoscan SDK Tests" ON)
+ option(HOLOSCAN_BUILD_TESTING_LIBRARY "Build the optional Holoscan operator testing library" ON)
+ option(HOLOSCAN_BUILD_BENCHMARKS "Build Holoscan SDK Benchmarks" ON)
+@@ -439,7 +441,10 @@ holoscan_add_dependency(magic_enum)
+ holoscan_add_dependency(dlpack_rapids)
+ # CCCL provides <cuda/stream> (cuda::stream_ref) used by the Tensor stream-aware API.
+ holoscan_add_dependency(cccl COMPONENT holoscan-dependencies)
+-# NVTX C++ wrappers used by public profiler helpers. Pin separately from CUDA Toolkit NVTX headers.
++# NVTX C++ wrappers used by public profiler helpers. Pin separately from CUDA Toolkit NVTX headers,
++# unless the toolkit's own copy is known to be new enough (see cmake/deps/nvtx3.cmake).
++option(HOLOSCAN_USE_CUDA_TOOLKIT_NVTX "Use the CUDA Toolkit NVTX headers instead of fetching NVTX" OFF)
++mark_as_advanced(HOLOSCAN_USE_CUDA_TOOLKIT_NVTX)
+ holoscan_add_dependency(nvtx3)
+ # spdlog backs the holoscan logger; built static with header-only fmt (see cmake/deps/spdlog.cmake).
+ holoscan_add_dependency(spdlog)
+@@ -516,40 +521,53 @@ if(HOLOSCAN_BUILD_TESTS AND BUILD_TESTING)
+   # neither a production parse pass nor a production package/build dependency.
+   holoscan_add_dependency(reflectcpp)
+ endif()
++# Only a fetched provider has to be the static archive config_io absorbs; an
++# imported one is linked PRIVATE behind $<BUILD_INTERFACE:> and never exported.
++get_target_property(_holoscan_config_yaml_imported yaml-cpp::yaml-cpp IMPORTED)
+ get_target_property(_holoscan_config_yaml_target_type yaml-cpp::yaml-cpp TYPE)
+-if(NOT _holoscan_config_yaml_target_type STREQUAL "STATIC_LIBRARY")
++if(NOT _holoscan_config_yaml_imported
++   AND NOT _holoscan_config_yaml_target_type STREQUAL "STATIC_LIBRARY")
+   message(FATAL_ERROR
+       "The private config_io parser provider must be a static yaml-cpp archive; got "
+       "${_holoscan_config_yaml_target_type}"
+   )
+ endif()
++unset(_holoscan_config_yaml_imported)
+ unset(_holoscan_config_yaml_target_type)
+ # Build yyjson once as private position-independent objects. The production config_io library
+ # absorbs these objects, while the reflect-cpp differential test adapter reuses them without
+-# turning reflect-cpp into a production dependency or exporting a yyjson package contract.
+-add_library(holoscan_config_yyjson_private_objects OBJECT
+-    "${yyjson_SOURCE_DIR}/src/yyjson.c"
+-)
+-target_include_directories(holoscan_config_yyjson_private_objects
+-    SYSTEM PRIVATE "${yyjson_SOURCE_DIR}/src"
+-)
+-# yyjson intentionally marks its C API with default ELF visibility. Override that configurable
+-# declaration macro so the embedded provider obeys the owning target's hidden-symbol policy.
+-target_compile_definitions(holoscan_config_yyjson_private_objects PRIVATE yyjson_api=)
+-set_target_properties(holoscan_config_yyjson_private_objects PROPERTIES
+-    C_CLANG_TIDY ""
+-    C_EXTENSIONS NO
+-    C_STANDARD 11
+-    C_STANDARD_REQUIRED YES
+-    C_VISIBILITY_PRESET hidden
+-    POSITION_INDEPENDENT_CODE ON
+-)
++# turning reflect-cpp into a production dependency or exporting a yyjson package contract. A
++# declared provider leaves no source to compile, and supplies the backend as a library that
++# config_io links instead; the object library's existence is what tells the two apart below.
++set(_holoscan_config_yyjson_objects)
++if(yyjson_SOURCE_DIR)
++  add_library(holoscan_config_yyjson_private_objects OBJECT
++      "${yyjson_SOURCE_DIR}/src/yyjson.c"
++  )
++  target_include_directories(holoscan_config_yyjson_private_objects
++      SYSTEM PRIVATE "${yyjson_SOURCE_DIR}/src"
++  )
++  # yyjson intentionally marks its C API with default ELF visibility. Override that configurable
++  # declaration macro so the embedded provider obeys the owning target's hidden-symbol policy.
++  target_compile_definitions(holoscan_config_yyjson_private_objects PRIVATE yyjson_api=)
++  set_target_properties(holoscan_config_yyjson_private_objects PROPERTIES
++      C_CLANG_TIDY ""
++      C_EXTENSIONS NO
++      C_STANDARD 11
++      C_STANDARD_REQUIRED YES
++      C_VISIBILITY_PRESET hidden
++      POSITION_INDEPENDENT_CODE ON
++  )
++  set(_holoscan_config_yyjson_objects
++      $<TARGET_OBJECTS:holoscan_config_yyjson_private_objects>)
++endif()
+ add_library(config_io
+     src/config/io.cpp
+     src/config/json_yyjson.cpp
+-    $<TARGET_OBJECTS:holoscan_config_yyjson_private_objects>
++    ${_holoscan_config_yyjson_objects}
+ )
+-if(HOLOSCAN_BUILD_TESTS AND BUILD_TESTING)
++unset(_holoscan_config_yyjson_objects)
++if(HOLOSCAN_BUILD_TESTS AND BUILD_TESTING AND reflectcpp_SOURCE_DIR)
+   add_library(holoscan_config_reflect_private_objects OBJECT
+       "${reflectcpp_SOURCE_DIR}/src/reflectcpp.cpp"
+       "${reflectcpp_SOURCE_DIR}/src/reflectcpp_json.cpp"
+@@ -576,9 +594,18 @@ target_include_directories(config_io
+         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
+         $<INSTALL_INTERFACE:include>
+ )
+-target_include_directories(config_io SYSTEM PRIVATE
+-    ${yyjson_SOURCE_DIR}/src
+-)
++if(TARGET holoscan_config_yyjson_private_objects)
++  # Emptying the declaration macro leaves these translation units agreeing with the hidden
++  # visibility the absorbed objects were compiled with.
++  target_include_directories(config_io SYSTEM PRIVATE
++      ${yyjson_SOURCE_DIR}/src
++  )
++  target_compile_definitions(config_io PRIVATE yyjson_api=)
++else()
++  # A declared provider is a separate library, so its declarations have to keep the default
++  # visibility that makes them resolvable across that boundary: leave yyjson_api alone.
++  target_link_libraries(config_io PRIVATE $<BUILD_INTERFACE:yyjson::yyjson>)
++endif()
+ target_link_libraries(config_io
+     PUBLIC holoscan::config
+     PRIVATE
+@@ -589,7 +616,6 @@ target_link_libraries(config_io
+ target_compile_definitions(config_io
+     PRIVATE
+         HOLOSCAN_CONFIG_IO_USE_YAML_CPP=1
+-        yyjson_api=
+ )
+ target_compile_definitions(config_io
+     PUBLIC $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:HOLOSCAN_CONFIG_IO_STATIC_DEFINE>
+@@ -1613,14 +1639,17 @@ install(FILES "${holoscan_SOURCE_DIR}/LICENSE.txt"
+ 
+ # The packaged example-data helper invokes this command through PATH. Keep the
+ # command in the standard bindir and the wrapper alongside the installed examples.
+-install(PROGRAMS "${holoscan_SOURCE_DIR}/scripts/download_ngc_data"
+-    DESTINATION ${CMAKE_INSTALL_BINDIR}
+-    COMPONENT holoscan-core
+-)
+-install(PROGRAMS "${holoscan_SOURCE_DIR}/scripts/download_example_data"
+-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/holoscan/examples
+-    COMPONENT holoscan-core-examples
+-)
++if(HOLOSCAN_INSTALL_DATA_DOWNLOAD_SCRIPTS)
++    install(PROGRAMS "${holoscan_SOURCE_DIR}/scripts/download_ngc_data"
++        DESTINATION ${CMAKE_INSTALL_BINDIR}
++        COMPONENT holoscan-core
++    )
++    install(PROGRAMS "${holoscan_SOURCE_DIR}/scripts/download_example_data"
++        DESTINATION ${CMAKE_INSTALL_LIBDIR}/holoscan/examples
++        COMPONENT holoscan-core-examples
++    )
++endif()
++
+ if(HOLOSCAN_BUILD_PYTHON)
+     add_subdirectory(python/holoscan)
+     add_subdirectory(src/sensor_io/python)
+@@ -1729,6 +1758,11 @@ foreach(_holoscan_cccl_cmake_dir
+   endif()
+ endforeach()
+ unset(_holoscan_cccl_cmake_dir)
++# A build that used an existing CCCL, rather than fetching one, has no find_dependency(CCCL)
++# in holoscan-dependencies.cmake, but core still links CCCL::CCCL.
++if(NOT TARGET CCCL::CCCL)
++  find_dependency(CCCL CONFIG)
++endif()
+ 
+ get_filename_component(_holoscan_install_prefix "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+ if(NOT _holoscan_install_prefix IN_LIST CMAKE_PREFIX_PATH)
+@@ -1758,6 +1792,27 @@ set(_holoscan_install_packages
+     Flatbuffers
+ )
+ set(_holoscan_private_install_packages fmt nvtx3 dlpack Flatbuffers)
++if(HOLOSCAN_USE_CUDA_TOOLKIT_NVTX)
++    list(REMOVE_ITEM _holoscan_install_packages nvtx3)
++endif()
++# Only a fetched copy lives under the private third-party root; a provider found
++# on the system is an IMPORTED target and keeps the ordinary package root.
++foreach(_holoscan_provider IN ITEMS
++        "fmt|fmt::fmt-header-only" "dlpack|dlpack::dlpack" "Flatbuffers|flatbuffers::flatbuffers")
++    string(REPLACE "|" ";" _holoscan_provider "${_holoscan_provider}")
++    list(GET _holoscan_provider 0 _holoscan_provider_package)
++    list(GET _holoscan_provider 1 _holoscan_provider_target)
++    if(TARGET ${_holoscan_provider_target})
++        get_target_property(_holoscan_provider_imported ${_holoscan_provider_target} IMPORTED)
++        if(_holoscan_provider_imported)
++            list(REMOVE_ITEM _holoscan_private_install_packages ${_holoscan_provider_package})
++        endif()
++    endif()
++endforeach()
++unset(_holoscan_provider)
++unset(_holoscan_provider_package)
++unset(_holoscan_provider_target)
++unset(_holoscan_provider_imported)
+ if(NOT BUILD_SHARED_LIBS)
+     # Static archives propagate private libraries as link-only requirements. HoloMQ is in
+     # the SDK export set; only its external dependencies need separate package roots.
+diff --git a/benchmark/CMakeLists.txt b/benchmark/CMakeLists.txt
+index 842739c05..9a6fc9f91 100644
+--- a/benchmark/CMakeLists.txt
++++ b/benchmark/CMakeLists.txt
+@@ -88,17 +88,53 @@ if(TARGET core AND DEFINED holoscan_SOURCE_DIR)
+ endif()
+ add_subdirectory(holomq)
+ 
+-install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/"
+-    DESTINATION "${CMAKE_INSTALL_DATADIR}/holoscan/benchmark"
+-    COMPONENT holoscan-benchmarks
+-    FILES_MATCHING
+-        PATTERN "CMakeLists.txt"
+-        PATTERN "README.md"
+-        PATTERN "*.cmake"
+-        PATTERN "*.cpp"
+-        PATTERN "*.hpp"
+-        PATTERN "*.fbs"
+-        PATTERN "*.py"
+-        PATTERN "*.sh"
+-    PATTERN "__pycache__" EXCLUDE
+-)
++include(GNUInstallDirs)
++set(HOLOSCAN_BENCHMARKS_INSTALL_DIR "${CMAKE_INSTALL_DATADIR}/benchmark")
++
++# Install each benchmark beside its own sources, keeping the SDK-wide
++# CMAKE_INSTALL_RPATH. Targets come from the buildsystem rather than
++# holoscan-benchmark-targets, which the HoloMQ benchmarks never register with.
++get_property(_holoscan_benchmark_directories DIRECTORY PROPERTY SUBDIRECTORIES)
++foreach(_holoscan_benchmark_directory IN LISTS _holoscan_benchmark_directories)
++    get_property(_holoscan_benchmark_targets
++        DIRECTORY "${_holoscan_benchmark_directory}" PROPERTY BUILDSYSTEM_TARGETS)
++    foreach(_holoscan_benchmark_target IN LISTS _holoscan_benchmark_targets)
++        get_target_property(_holoscan_benchmark_type "${_holoscan_benchmark_target}" TYPE)
++        if(NOT _holoscan_benchmark_type STREQUAL "EXECUTABLE")
++            continue()
++        endif()
++        file(RELATIVE_PATH _holoscan_benchmark_relative_directory
++            "${CMAKE_CURRENT_SOURCE_DIR}" "${_holoscan_benchmark_directory}")
++        install(TARGETS ${_holoscan_benchmark_target}
++            RUNTIME DESTINATION
++                "${HOLOSCAN_BENCHMARKS_INSTALL_DIR}/${_holoscan_benchmark_relative_directory}"
++            COMPONENT holoscan-benchmarks
++        )
++    endforeach()
++endforeach()
++unset(_holoscan_benchmark_directories)
++unset(_holoscan_benchmark_directory)
++unset(_holoscan_benchmark_relative_directory)
++unset(_holoscan_benchmark_target)
++unset(_holoscan_benchmark_targets)
++unset(_holoscan_benchmark_type)
++
++# Named the way HOLOSCAN_INSTALL_EXAMPLE_SOURCE is, and declared here because this
++# directory is also a standalone project, where a parent-only option would read OFF.
++option(HOLOSCAN_INSTALL_BENCHMARK_SOURCE "Install the benchmark source code" ON)
++if(HOLOSCAN_INSTALL_BENCHMARK_SOURCE)
++    install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/"
++        DESTINATION "${HOLOSCAN_BENCHMARKS_INSTALL_DIR}"
++        COMPONENT holoscan-benchmarks
++        FILES_MATCHING
++            PATTERN "CMakeLists.txt"
++            PATTERN "README.md"
++            PATTERN "*.cmake"
++            PATTERN "*.cpp"
++            PATTERN "*.hpp"
++            PATTERN "*.fbs"
++            PATTERN "*.py"
++            PATTERN "*.sh"
++        PATTERN "__pycache__" EXCLUDE
++    )
++endif()
+diff --git a/cmake/HoloscanParameterTools.cmake b/cmake/HoloscanParameterTools.cmake
+index aa71e0401..569491157 100644
+--- a/cmake/HoloscanParameterTools.cmake
++++ b/cmake/HoloscanParameterTools.cmake
+@@ -101,11 +101,18 @@ list(APPEND HOLOSCAN_INSTALL_TARGETS params_io)
+ 
+ if(HOLOSCAN_BUILD_EXPERIMENTAL_PARAMS_WEB_TUNER)
+     # Keep the tuner's strict JSON grammar behind the same pinned, source-only yyjson
+-    # provider used by config_io, reusing its private objects.
++    # provider used by config_io, reusing its private objects. A declared provider leaves
++    # none to reuse; the tuner then links its library, as config_io does.
++    set(_holoscan_tuner_yyjson_objects)
++    if(TARGET holoscan_config_yyjson_private_objects)
++        set(_holoscan_tuner_yyjson_objects
++            $<TARGET_OBJECTS:holoscan_config_yyjson_private_objects>)
++    endif()
+     add_library(experimental_params_web_tuner
+         src/params/web_tuner.cpp
+-        $<TARGET_OBJECTS:holoscan_config_yyjson_private_objects>
++        ${_holoscan_tuner_yyjson_objects}
+     )
++    unset(_holoscan_tuner_yyjson_objects)
+     add_library(${HOLOSCAN_PACKAGE_NAME}::experimental_params_web_tuner
+                 ALIAS experimental_params_web_tuner)
+     holoscan_configure_cxx20_target(experimental_params_web_tuner PUBLIC)
+@@ -118,15 +125,24 @@ if(HOLOSCAN_BUILD_EXPERIMENTAL_PARAMS_WEB_TUNER)
+             $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
+             $<INSTALL_INTERFACE:include>
+     )
+-    target_include_directories(experimental_params_web_tuner SYSTEM PRIVATE
+-        ${yyjson_SOURCE_DIR}/src
+-    )
++    if(TARGET holoscan_config_yyjson_private_objects)
++        # Emptying the declaration macro leaves these translation units agreeing with the
++        # hidden visibility the absorbed objects were compiled with.
++        target_include_directories(experimental_params_web_tuner SYSTEM PRIVATE
++            ${yyjson_SOURCE_DIR}/src
++        )
++        target_compile_definitions(experimental_params_web_tuner PRIVATE yyjson_api=)
++    else()
++        # A declared provider is a separate library, so its declarations have to keep the
++        # default visibility that makes them resolvable across that boundary.
++        target_link_libraries(experimental_params_web_tuner
++            PRIVATE $<BUILD_INTERFACE:yyjson::yyjson>)
++    endif()
+     target_link_libraries(experimental_params_web_tuner
+         PUBLIC holoscan::params
+         PRIVATE Threads::Threads
+     )
+     target_compile_definitions(experimental_params_web_tuner
+-        PRIVATE yyjson_api=
+         PUBLIC
+             $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:
+                 HOLOSCAN_EXPERIMENTAL_PARAMS_WEB_TUNER_STATIC_DEFINE>
+diff --git a/cmake/deps/cccl.cmake b/cmake/deps/cccl.cmake
+index af69ccb45..f29f32715 100644
+--- a/cmake/deps/cccl.cmake
++++ b/cmake/deps/cccl.cmake
+@@ -4,7 +4,7 @@
+ include_guard(GLOBAL)
+ 
+ # CCCL is a dependency of MatX.
+-set(CCCL_REQUESTED_VERSION 3.3.3)
++set(CCCL_REQUESTED_VERSION 3.2.0)
+ 
+ # Try to find system CCCL in the build container first.
+ # Subsequent RAPIDS CPM components (MatX) can get confused
+diff --git a/cmake/deps/flatbuffers.cmake b/cmake/deps/flatbuffers.cmake
+index 70ae5aaf3..415c4f8a5 100644
+--- a/cmake/deps/flatbuffers.cmake
++++ b/cmake/deps/flatbuffers.cmake
+@@ -133,14 +133,18 @@ if(NOT _holoscan_flatbuffers_include_root)
+   )
+ endif()
+ include(GNUInstallDirs)
+-install(DIRECTORY "${_holoscan_flatbuffers_include_root}/flatbuffers"
+-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+-  COMPONENT holoscan-dependencies
+-)
+-install(PROGRAMS "$<TARGET_FILE:flatbuffers::flatc>"
+-  DESTINATION "${HOLOSCAN_THIRD_PARTY_INSTALL_BIN_DIR}"
+-  COMPONENT holoscan-dependencies
+-)
++# Only when CPM fetched FlatBuffers: a platform provider ships its own headers and
++# flatc, and in a cross build that flatc must be a build-host binary.
++if(Flatbuffers_ADDED)
++  install(DIRECTORY "${_holoscan_flatbuffers_include_root}/flatbuffers"
++    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
++    COMPONENT holoscan-dependencies
++  )
++  install(PROGRAMS "$<TARGET_FILE:flatbuffers::flatc>"
++    DESTINATION "${HOLOSCAN_THIRD_PARTY_INSTALL_BIN_DIR}"
++    COMPONENT holoscan-dependencies
++  )
++endif()
+ 
+ # FlatBuffers' Kotlin code generators have duplicate symbols in anonymous
+ # namespaces that break unity builds.
+diff --git a/cmake/deps/gtest_rapids.cmake b/cmake/deps/gtest_rapids.cmake
+index 4495492f1..9220709a1 100644
+--- a/cmake/deps/gtest_rapids.cmake
++++ b/cmake/deps/gtest_rapids.cmake
+@@ -13,7 +13,20 @@ if(TARGET GTest::gtest
+     return()
+ endif()
+ 
+-set(version 1.17.0)
++set(version 1.18.0)
++
++# rapids_cpm_find below asks for "googletest", which an installed GoogleTest never
++# advertises - it is GTest - so try the real name first. GLOBAL matches the
++# GLOBAL_TARGETS it passes: this runs inside holoscan_add_dependency(), so a scoped
++# imported target would be gone before a test directory links it.
++find_package(GTest ${version} EXACT CONFIG QUIET GLOBAL)
++if(TARGET GTest::gtest
++   AND TARGET GTest::gtest_main
++   AND TARGET GTest::gmock
++   AND TARGET GTest::gmock_main)
++    return()
++endif()
++
+ rapids_cpm_find(googletest ${version}
+     GLOBAL_TARGETS GTest::gtest GTest::gmock GTest::gtest_main GTest::gmock_main
+     CPM_ARGS FIND_PACKAGE_ARGUMENTS "EXACT"
+diff --git a/cmake/deps/iceoryx2.cmake b/cmake/deps/iceoryx2.cmake
+index ad2983cc9..349418eb5 100644
+--- a/cmake/deps/iceoryx2.cmake
++++ b/cmake/deps/iceoryx2.cmake
+@@ -34,6 +34,32 @@ endfunction()
+ 
+ include(${rapids-cmake-dir}/cpm/find.cmake)
+ 
++include(CheckCXXSourceCompiles)
++
++# Ask a candidate package what it can do rather than what it is called. The marker
++# this replaces turned away every provider but this exact vendored build.
++function(holomq_iceoryx2_require_sample_handlers cxx_target)
++    set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
++    set(CMAKE_REQUIRED_LIBRARIES ${cxx_target})
++    check_cxx_source_compiles([[
++#include "iox2/sample_released_handler.hpp"
++#include "iox2/sample_replaced_handler.hpp"
++int main() {
++    (void) sizeof(iox2::SampleReleasedHandler);
++    (void) sizeof(iox2::SampleReplacedHandler);
++    return 0;
++}
++]] HOLOMQ_ICEORYX2_HAS_SAMPLE_HANDLERS)
++    if(NOT HOLOMQ_ICEORYX2_HAS_SAMPLE_HANDLERS)
++        message(FATAL_ERROR
++            "The iceoryx2-cxx package HoloMQ found does not provide the publisher "
++            "sample-release and sample-replacement handlers that HoloMQ requires. Apply the "
++            "HoloMQ iceoryx2 patch series to it, or set HOLOMQ_ICEORYX2_PREFIX to an "
++            "installation that carries them."
++        )
++    endif()
++endfunction()
++
+ if(BUILD_SHARED_LIBS)
+     set(_holomq_iceoryx2_cxx_target iceoryx2-cxx::shared-lib-cxx)
+     set(_holomq_iceoryx2_cxx_unqualified_target shared-lib-cxx)
+@@ -43,6 +69,7 @@ else()
+ endif()
+ 
+ if(TARGET ${_holomq_iceoryx2_cxx_target})
++    holomq_iceoryx2_require_sample_handlers(${_holomq_iceoryx2_cxx_target})
+     unset(_holomq_iceoryx2_cxx_target)
+     unset(_holomq_iceoryx2_cxx_unqualified_target)
+     return()
+@@ -62,14 +89,23 @@ set(HOLOMQ_ICEORYX2_PATCHES
+     "${HOLOMQ_ICEORYX2_PATCH_DIR}/0007-add-soname-to-iceoryx2-ffi.patch"
+ )
+ 
++# HOLOMQ_ICEORYX2_PREFIX stays an override; without one, search normally.
++if(HOLOMQ_ICEORYX2_PREFIX OR DEFINED ENV{HOLOMQ_ICEORYX2_PREFIX})
++    set(_holomq_iceoryx2_find_args
++        HINTS
++            "${HOLOMQ_ICEORYX2_PREFIX}"
++            "$ENV{HOLOMQ_ICEORYX2_PREFIX}"
++        NO_DEFAULT_PATH
++    )
++endif()
++
+ find_package(iceoryx2-cxx ${HOLOMQ_ICEORYX2_CXX_VERSION} CONFIG QUIET
+-    HINTS
+-        "${HOLOMQ_ICEORYX2_PREFIX}"
+-        "$ENV{HOLOMQ_ICEORYX2_PREFIX}"
+-    NO_DEFAULT_PATH
++    ${_holomq_iceoryx2_find_args}
+ )
++unset(_holomq_iceoryx2_find_args)
+ 
+ if(TARGET ${_holomq_iceoryx2_cxx_target})
++    holomq_iceoryx2_require_sample_handlers(${_holomq_iceoryx2_cxx_target})
+     unset(_holomq_iceoryx2_cxx_target)
+     unset(_holomq_iceoryx2_cxx_unqualified_target)
+     return()
+diff --git a/cmake/deps/matx.cmake b/cmake/deps/matx.cmake
+index 6bbc925e9..d9e8b3c9f 100644
+--- a/cmake/deps/matx.cmake
++++ b/cmake/deps/matx.cmake
+@@ -4,12 +4,11 @@
+ # https://docs.rapids.ai/api/rapids-cmake/stable/command/rapids_find_package.html#
+ include(${rapids-cmake-dir}/cpm/find.cmake)
+ 
+-# Pin to latest post-v1.0.0 MatX commit that includes owned
+-# DLManagedTensorVersioned import/export support and the upstream parent-CPM
+-# reuse fix. Keep the fallback download in
+-# examples/hello_matx/cpp/CMakeLists.min.txt on the same commit.
+-set(HOLOSCAN_MATX_VERSION 1.0.0)
+-set(HOLOSCAN_MATX_GIT_TAG 186c72d4794ead29527f45ca4a6f59caa7a08caf)
++# v1.1.0 is the first release carrying the owned DLManagedTensorVersioned
++# import/export support and the upstream parent-CPM reuse fix that the pinned
++# post-v1.0.0 commit was here for.
++set(HOLOSCAN_MATX_VERSION 1.1.0)
++set(HOLOSCAN_MATX_GIT_TAG v${HOLOSCAN_MATX_VERSION})
+ holoscan_generate_dependency_patch_command(_holoscan_matx_patch_command
+     PATCHES
+         "${CMAKE_CURRENT_LIST_DIR}/patches/matx/0001-generate-matx-version-header-in-the-build-tree.patch"
+diff --git a/cmake/deps/nanobind.cmake b/cmake/deps/nanobind.cmake
+index d6c8fc746..020cb6bbb 100644
+--- a/cmake/deps/nanobind.cmake
++++ b/cmake/deps/nanobind.cmake
+@@ -8,7 +8,7 @@ endif()
+ 
+ include(${rapids-cmake-dir}/cpm/find.cmake)
+ 
+-set(nanobind_VERSION 3.0.1)
++set(nanobind_VERSION 3.0.0)
+ rapids_cpm_find(nanobind ${nanobind_VERSION}
+     CPM_ARGS
+         GITHUB_REPOSITORY wjakob/nanobind
+diff --git a/cmake/deps/nvtx3.cmake b/cmake/deps/nvtx3.cmake
+index 4d4dbe247..117c033bb 100644
+--- a/cmake/deps/nvtx3.cmake
++++ b/cmake/deps/nvtx3.cmake
+@@ -12,6 +12,15 @@ set(CMAKE_INSTALL_LIBDIR "${HOLOSCAN_THIRD_PARTY_INSTALL_LIB_DIR}")
+ # Pin NVTX independently of the CUDA Toolkit copy. CUDA 13.0 currently ships NVTX C++ wrapper
+ # 1.0, which lacks structured-payload helpers used by Holoscan profiler annotations.
+ set(nvtx3_VERSION 3.3.0)
++
++# Aliases rather than wrapper targets: the export then names CUDA::nvtx3 itself, which installed
++# consumers get from the package's find_dependency(CUDAToolkit), so no nvtx3 package is recorded.
++if(HOLOSCAN_USE_CUDA_TOOLKIT_NVTX)
++  add_library(nvtx3::nvtx3-c ALIAS CUDA::nvtx3)
++  add_library(nvtx3::nvtx3-cpp ALIAS CUDA::nvtx3)
++  return()
++endif()
++
+ rapids_cpm_find(nvtx3 ${nvtx3_VERSION}
+     GLOBAL_TARGETS nvtx3-c nvtx3-cpp
+     BUILD_EXPORT_SET ${HOLOSCAN_DEPEND_EXPORT_SET}
+diff --git a/cmake/deps/reflectcpp.cmake b/cmake/deps/reflectcpp.cmake
+index b122fb000..bb84f18fa 100644
+--- a/cmake/deps/reflectcpp.cmake
++++ b/cmake/deps/reflectcpp.cmake
+@@ -7,18 +7,23 @@ include(${rapids-cmake-dir}/cpm/find.cmake)
+ # or expose rfl types in installed headers. YAML remains owned by the separately packaged yaml-cpp
+ # adapter so this dependency only supplies its generic JSON representation and typed conversion.
+ set(reflectcpp_VERSION 0.25.0)
+-rapids_cpm_find(reflectcpp "${reflectcpp_VERSION}"
+-    GLOBAL_TARGETS reflectcpp
+-    CPM_ARGS
+-        GITHUB_REPOSITORY getml/reflect-cpp
+-        GIT_TAG "v${reflectcpp_VERSION}"
+-        GIT_SHALLOW TRUE
+-        # Holoscan builds reflect-cpp directly; its development-only vcpkg submodule is unused.
+-        GIT_CONFIG "submodule.vcpkg.update=none"
+-    OPTIONS
+-        "REFLECTCPP_BUILD_TESTS OFF"
+-        "REFLECTCPP_USE_VCPKG OFF"
+-        "REFLECTCPP_YAML OFF"
+-    # CPM reads EXCLUDE_FROM_ALL as a one-value option; a bare keyword is treated as false.
+-    EXCLUDE_FROM_ALL YES
+-)
++if(NOT TARGET reflectcpp::reflectcpp)
++  rapids_cpm_find(reflectcpp "${reflectcpp_VERSION}"
++      GLOBAL_TARGETS reflectcpp
++      CPM_ARGS
++          GITHUB_REPOSITORY getml/reflect-cpp
++          GIT_TAG "v${reflectcpp_VERSION}"
++          GIT_SHALLOW TRUE
++          # Holoscan builds reflect-cpp directly; its development-only vcpkg submodule is unused.
++          GIT_CONFIG "submodule.vcpkg.update=none"
++      OPTIONS
++          "REFLECTCPP_BUILD_TESTS OFF"
++          "REFLECTCPP_USE_VCPKG OFF"
++          "REFLECTCPP_YAML OFF"
++      # CPM reads EXCLUDE_FROM_ALL as a one-value option; a bare keyword is treated as false.
++      EXCLUDE_FROM_ALL YES
++  )
++endif()
++# As with yyjson, the owning scope needs the source location to survive the enclosing function,
++# and reads its emptiness as "a declared provider already compiled these translation units".
++set(reflectcpp_SOURCE_DIR "${reflectcpp_SOURCE_DIR}" PARENT_SCOPE)
+diff --git a/cmake/deps/spdlog.cmake b/cmake/deps/spdlog.cmake
+index 5c51fd544..22333f2c7 100644
+--- a/cmake/deps/spdlog.cmake
++++ b/cmake/deps/spdlog.cmake
+@@ -11,6 +11,11 @@ include(${rapids-cmake-dir}/cpm/find.cmake)
+ # override the default options.
+ set(version 1.17.0)
+ 
++# Prefer a platform spdlog: a cross build has no network during configure.
++find_package(spdlog ${version} QUIET)
++
++if(NOT spdlog_FOUND)
++
+ include(FetchContent)
+ 
+ # We will ignore the default value of BUILD_SHARED_LIBS for spdlog and
+@@ -42,6 +47,8 @@ FetchContent_MakeAvailable(spdlog)
+ 
+ set(BUILD_SHARED_LIBS "${_PREV_BUILD_SHARED_LIBS}")
+ 
++endif()
++
+ if(spdlog_ADDED)
+     # Hide public spdlog symbols in Holoscan SDK ELF libraries to mitigate downstream symbol
+     # conflicts. Native MSVC and clang-cl use different archive/linker semantics.
+diff --git a/cmake/deps/yaml-cpp_rapids.cmake b/cmake/deps/yaml-cpp_rapids.cmake
+index 26bb9c521..0653ee4d6 100644
+--- a/cmake/deps/yaml-cpp_rapids.cmake
++++ b/cmake/deps/yaml-cpp_rapids.cmake
+@@ -35,13 +35,19 @@ endif()
+ 
+ # This provider is absorbed into Holoscan shared libraries and repackaged privately for static
+ # config_io consumers, so it must be a static PIC archive regardless of its acquisition source.
++# An imported provider belongs to the enclosing build, which is entitled to keep its own library
++# whole; config_io and inference link it PRIVATE behind $<BUILD_INTERFACE:> either way, so no
++# exported target names it.
++get_target_property(_holoscan_yaml_cpp_imported yaml-cpp::yaml-cpp IMPORTED)
+ get_target_property(_holoscan_yaml_cpp_target_type yaml-cpp::yaml-cpp TYPE)
+-if(NOT _holoscan_yaml_cpp_target_type STREQUAL "STATIC_LIBRARY")
++if(NOT _holoscan_yaml_cpp_imported
++   AND NOT _holoscan_yaml_cpp_target_type STREQUAL "STATIC_LIBRARY")
+   message(FATAL_ERROR
+       "yaml-cpp ${YAML_CPP_VERSION} provider must supply yaml-cpp::yaml-cpp as a static library; "
+       "got ${_holoscan_yaml_cpp_target_type}"
+   )
+ endif()
++unset(_holoscan_yaml_cpp_imported)
+ unset(_holoscan_yaml_cpp_target_type)
+ if(TARGET yaml-cpp)
+   set_target_properties(yaml-cpp PROPERTIES
+diff --git a/cmake/deps/yyjson.cmake b/cmake/deps/yyjson.cmake
+index a7b6b654d..2331a94b4 100644
+--- a/cmake/deps/yyjson.cmake
++++ b/cmake/deps/yyjson.cmake
+@@ -3,30 +3,35 @@
+ 
+ include(${rapids-cmake-dir}/cpm/find.cmake)
+ 
+-# yyjson is a source-only, private config_io parser backend. Force the pinned upstream source
+-# instead of accepting a system package so Holoscan controls the implementation compiled into the
+-# component without exporting a yyjson target, header, archive, or downstream package dependency.
++# yyjson is a private config_io parser backend. Force the pinned upstream source rather than
++# looking for a system package, so Holoscan controls the implementation compiled into the
++# component, unless the enclosing build has already declared a yyjson provider of its own. Neither
++# path exports a yyjson target, header, archive, or downstream package dependency.
+ set(yyjson_VERSION 0.12.0)
+-set(_holoscan_yyjson_saved_download "${CPM_DOWNLOAD_yyjson}")
+-set(_holoscan_yyjson_had_download FALSE)
+-if(DEFINED CPM_DOWNLOAD_yyjson)
+-  set(_holoscan_yyjson_had_download TRUE)
++if(NOT TARGET yyjson::yyjson)
++  set(_holoscan_yyjson_saved_download "${CPM_DOWNLOAD_yyjson}")
++  set(_holoscan_yyjson_had_download FALSE)
++  if(DEFINED CPM_DOWNLOAD_yyjson)
++    set(_holoscan_yyjson_had_download TRUE)
++  endif()
++  set(CPM_DOWNLOAD_yyjson ON)
++  rapids_cpm_find(yyjson "${yyjson_VERSION}"
++      CPM_ARGS
++          GITHUB_REPOSITORY ibireme/yyjson
++          GIT_TAG "${yyjson_VERSION}"
++          GIT_SHALLOW TRUE
++          DOWNLOAD_ONLY ON
++  )
++  if(_holoscan_yyjson_had_download)
++    set(CPM_DOWNLOAD_yyjson "${_holoscan_yyjson_saved_download}")
++  else()
++    unset(CPM_DOWNLOAD_yyjson)
++  endif()
++  unset(_holoscan_yyjson_had_download)
++  unset(_holoscan_yyjson_saved_download)
+ endif()
+-set(CPM_DOWNLOAD_yyjson ON)
+-rapids_cpm_find(yyjson "${yyjson_VERSION}"
+-    CPM_ARGS
+-        GITHUB_REPOSITORY ibireme/yyjson
+-        GIT_TAG "${yyjson_VERSION}"
+-        GIT_SHALLOW TRUE
+-        DOWNLOAD_ONLY ON
+-)
+ # `holoscan_add_dependency()` is a function, so source-only CPM outputs otherwise disappear when the
+-# helper returns. Propagate only the private source location needed by the owning CMake scope.
++# helper returns. Propagate only the private source location needed by the owning CMake scope. It
++# stays empty for a declared provider, which supplies the backend as a library instead, and the
++# owning scope reads that emptiness as the difference between the two.
+ set(yyjson_SOURCE_DIR "${yyjson_SOURCE_DIR}" PARENT_SCOPE)
+-if(_holoscan_yyjson_had_download)
+-  set(CPM_DOWNLOAD_yyjson "${_holoscan_yyjson_saved_download}")
+-else()
+-  unset(CPM_DOWNLOAD_yyjson)
+-endif()
+-unset(_holoscan_yyjson_had_download)
+-unset(_holoscan_yyjson_saved_download)
+diff --git a/cmake/modules/SetupCUDA.cmake b/cmake/modules/SetupCUDA.cmake
+index bb7d329ce..672d1d4dc 100644
+--- a/cmake/modules/SetupCUDA.cmake
++++ b/cmake/modules/SetupCUDA.cmake
+@@ -37,6 +37,10 @@ else()
+         "--nvcc-path" "${CMAKE_CUDA_COMPILER}"
+         "--min-arch" "70" # Holoscan requirement
+         "--verbose"       # Enable debug logging from script
++        # The script drops iGPU architectures on an x86_64 build. Without this it would
++        # judge that by the machine it runs on, and so drop them from a cross build
++        # targeting an iGPU.
++        "--target-machine" "${CMAKE_SYSTEM_PROCESSOR}"
+         OUTPUT_VARIABLE _script_output
+         ERROR_VARIABLE _script_error
+         RESULT_VARIABLE _script_result
+diff --git a/examples/CMakeLists.txt b/examples/CMakeLists.txt
+index 6ce09b083..303426f1e 100644
+--- a/examples/CMakeLists.txt
++++ b/examples/CMakeLists.txt
+@@ -85,7 +85,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/cmake/setup_dependencies.cmake")
+ # CMAKE_LIBRARY_ARCHITECTURE is set. MatX's find_dependency(CCCL) reuses
+ # CMAKE_PREFIX_PATH (extended by holoscan-config.cmake), so CCCL must resolve
+ # before MatX.
+-find_package(CCCL 3.3.3 CONFIG REQUIRED
++find_package(CCCL ${CCCL_REQUESTED_VERSION} CONFIG REQUIRED
+     PATHS
+         "${CUDAToolkit_TARGET_DIR}/lib/cmake"
+         "${CUDAToolkit_TARGET_DIR}/lib64/cmake"
+@@ -186,4 +186,14 @@ if(HOLOSCAN_INSTALL_EXAMPLE_SOURCE)
+         DESTINATION "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/testing"
+         COMPONENT holoscan-core-examples
+     )
++elseif(BUILD_TESTING)
++    # Test drivers rather than example source; the source install above ships them otherwise.
++    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/common/run_with_workspace.sh"
++        DESTINATION "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/common"
++        COMPONENT holoscan-core-examples
++    )
++    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/holomq/holomq_main/test_holomq_main.sh"
++        DESTINATION "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/holomq/holomq_main"
++        COMPONENT holoscan-core-examples
++    )
+ endif()
+diff --git a/examples/experimental/plan_artifacts/cpp/CMakeLists.txt b/examples/experimental/plan_artifacts/cpp/CMakeLists.txt
+index f40ba2d28..c4fc5c5d2 100644
+--- a/examples/experimental/plan_artifacts/cpp/CMakeLists.txt
++++ b/examples/experimental/plan_artifacts/cpp/CMakeLists.txt
+@@ -27,6 +27,14 @@ if(BUILD_TESTING)
+ 
+     add_executable(plan_artifacts_workspace_test plan_artifacts_workspace_test.cpp)
+     holoscan_configure_example_test_workspace(plan_artifacts_workspace_test)
++    # As for holomq_main: the test program, installed when no source ships to rebuild it.
++    if(NOT HOLOSCAN_INSTALL_EXAMPLE_SOURCE)
++        holoscan_configure_example_install(plan_artifacts_workspace_test)
++        install(TARGETS plan_artifacts_workspace_test
++            RUNTIME DESTINATION "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/experimental/plan_artifacts/cpp"
++            COMPONENT holoscan-core-examples
++        )
++    endif()
+     add_test(
+         NAME EXAMPLE_CPP_PLAN_ARTIFACTS_WORKSPACE_COLLISION_TEST
+         COMMAND plan_artifacts_workspace_test)
+diff --git a/examples/flatbuffer_schemas/custom_schema/cpp/CMakeLists.txt b/examples/flatbuffer_schemas/custom_schema/cpp/CMakeLists.txt
+index 28acad44d..e6736a268 100644
+--- a/examples/flatbuffer_schemas/custom_schema/cpp/CMakeLists.txt
++++ b/examples/flatbuffer_schemas/custom_schema/cpp/CMakeLists.txt
+@@ -33,8 +33,10 @@ install(TARGETS custom_schema
+     RUNTIME DESTINATION "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/flatbuffer_schemas/custom_schema/cpp"
+     COMPONENT holoscan-core-examples
+ )
+-install(FILES
+-    custom_control.fbs
+-    DESTINATION "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/flatbuffer_schemas/custom_schema/cpp"
+-    COMPONENT holoscan-core-examples
+-)
++if(HOLOSCAN_INSTALL_EXAMPLE_SOURCE)
++    install(FILES
++        custom_control.fbs
++        DESTINATION "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/flatbuffer_schemas/custom_schema/cpp"
++        COMPONENT holoscan-core-examples
++    )
++endif()
+diff --git a/examples/flatbuffer_schemas/descriptor_tensor_external_topic/cpp/CMakeLists.txt b/examples/flatbuffer_schemas/descriptor_tensor_external_topic/cpp/CMakeLists.txt
+index 6d43efece..818f6da36 100644
+--- a/examples/flatbuffer_schemas/descriptor_tensor_external_topic/cpp/CMakeLists.txt
++++ b/examples/flatbuffer_schemas/descriptor_tensor_external_topic/cpp/CMakeLists.txt
+@@ -98,19 +98,21 @@ install(TARGETS ${DESCRIPTOR_TOPIC_TARGETS}
+         "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/flatbuffer_schemas/descriptor_tensor_external_topic/cpp"
+     COMPONENT holoscan-core-examples
+ )
+-# The examples source install matches only C++, CMake, schema, and document extensions, so every
+-# Python file this directory's tests read must be installed explicitly. test_run_example.py imports
+-# run_example as a sibling module, so both stay in the same installed directory.
+-install(FILES external_frame.fbs external_topic_common.hpp test_run_example.py
+-    DESTINATION
+-        "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/flatbuffer_schemas/descriptor_tensor_external_topic/cpp"
+-    COMPONENT holoscan-core-examples
+-)
+-install(PROGRAMS run_example.py
+-    DESTINATION
+-        "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/flatbuffer_schemas/descriptor_tensor_external_topic/cpp"
+-    COMPONENT holoscan-core-examples
+-)
++if(HOLOSCAN_INSTALL_EXAMPLE_SOURCE)
++    # The examples source install matches only C++, CMake, schema, and document extensions, so every
++    # Python file this directory's tests read must be installed explicitly. test_run_example.py imports
++    # run_example as a sibling module, so both stay in the same installed directory.
++    install(FILES external_frame.fbs external_topic_common.hpp test_run_example.py
++        DESTINATION
++            "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/flatbuffer_schemas/descriptor_tensor_external_topic/cpp"
++        COMPONENT holoscan-core-examples
++    )
++    install(PROGRAMS run_example.py
++        DESTINATION
++            "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/flatbuffer_schemas/descriptor_tensor_external_topic/cpp"
++        COMPONENT holoscan-core-examples
++    )
++endif()
+ if(HOLOSCAN_BUILD_PYTHON_EXAMPLES
+    AND HOLOSCAN_EXAMPLES_IN_SDK_BUILD
+    AND HOLOSCAN_INSTALL_EXAMPLE_SOURCE)
+diff --git a/examples/flatbuffer_schemas/descriptor_tensor_schema/cpp/CMakeLists.txt b/examples/flatbuffer_schemas/descriptor_tensor_schema/cpp/CMakeLists.txt
+index 362b695d8..6742bed9b 100644
+--- a/examples/flatbuffer_schemas/descriptor_tensor_schema/cpp/CMakeLists.txt
++++ b/examples/flatbuffer_schemas/descriptor_tensor_schema/cpp/CMakeLists.txt
+@@ -38,7 +38,9 @@ install(TARGETS descriptor_tensor_schema
+     RUNTIME DESTINATION "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/flatbuffer_schemas/descriptor_tensor_schema/cpp"
+     COMPONENT holoscan-core-examples
+ )
+-install(FILES descriptor_frame.fbs
+-    DESTINATION "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/flatbuffer_schemas/descriptor_tensor_schema/cpp"
+-    COMPONENT holoscan-core-examples
+-)
++if(HOLOSCAN_INSTALL_EXAMPLE_SOURCE)
++    install(FILES descriptor_frame.fbs
++        DESTINATION "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/flatbuffer_schemas/descriptor_tensor_schema/cpp"
++        COMPONENT holoscan-core-examples
++    )
++endif()
+diff --git a/examples/flatbuffer_schemas/multi_tensor_schema/cpp/CMakeLists.txt b/examples/flatbuffer_schemas/multi_tensor_schema/cpp/CMakeLists.txt
+index 311fb8452..a168717f1 100644
+--- a/examples/flatbuffer_schemas/multi_tensor_schema/cpp/CMakeLists.txt
++++ b/examples/flatbuffer_schemas/multi_tensor_schema/cpp/CMakeLists.txt
+@@ -41,7 +41,9 @@ install(TARGETS multi_tensor_schema
+     RUNTIME DESTINATION "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/flatbuffer_schemas/multi_tensor_schema/cpp"
+     COMPONENT holoscan-core-examples
+ )
+-install(FILES stereo_frame.fbs native_bounds.json
+-    DESTINATION "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/flatbuffer_schemas/multi_tensor_schema/cpp"
+-    COMPONENT holoscan-core-examples
+-)
++if(HOLOSCAN_INSTALL_EXAMPLE_SOURCE)
++    install(FILES stereo_frame.fbs native_bounds.json
++        DESTINATION "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/flatbuffer_schemas/multi_tensor_schema/cpp"
++        COMPONENT holoscan-core-examples
++    )
++endif()
+diff --git a/examples/holomq/holomq_main/CMakeLists.txt b/examples/holomq/holomq_main/CMakeLists.txt
+index 2a4ae3df6..0d85607c0 100644
+--- a/examples/holomq/holomq_main/CMakeLists.txt
++++ b/examples/holomq/holomq_main/CMakeLists.txt
+@@ -28,6 +28,15 @@ if(BUILD_TESTING)
+         RUN_SERIAL TRUE
+         TIMEOUT 60
+     )
++    # Without the example source there is nothing to rebuild it from, so install the
++    # binary the test above drives.
++    if(NOT HOLOSCAN_INSTALL_EXAMPLE_SOURCE)
++        holoscan_configure_example_install(holomq_main)
++        install(TARGETS holomq_main
++            RUNTIME DESTINATION "${HOLOSCAN_EXAMPLES_INSTALL_DIR}/holomq/holomq_main"
++            COMPONENT holoscan-core-examples
++        )
++    endif()
+ endif()
+ 
+ install(TARGETS holomq_main
+diff --git a/modules/inference/python/CMakeLists.txt b/modules/inference/python/CMakeLists.txt
+index e6d709cc1..edb66de63 100644
+--- a/modules/inference/python/CMakeLists.txt
++++ b/modules/inference/python/CMakeLists.txt
+@@ -15,7 +15,8 @@ if(HOLOSCAN_BUILD_PYTHON_STUBS)
+     endforeach()
+ endif()
+ 
+-nanobind_add_module(holoscan_inference_python NB_STATIC STABLE_ABI _inference.cpp)
++# NOSTRIP, as for holoscan.core: keep the symbols for the debug package.
++nanobind_add_module(holoscan_inference_python NB_STATIC STABLE_ABI NOSTRIP _inference.cpp)
+ target_link_libraries(holoscan_inference_python PRIVATE holoscan::op_inference)
+ file(RELATIVE_PATH _inference_install_lib_relative
+     "/${_inference_install}" "/${CMAKE_INSTALL_LIBDIR}")
+diff --git a/modules/vision/CMakeLists.txt b/modules/vision/CMakeLists.txt
+index 042e611b3..39987f761 100644
+--- a/modules/vision/CMakeLists.txt
++++ b/modules/vision/CMakeLists.txt
+@@ -142,7 +142,11 @@ holoscan_configure_linux_shared_link(vision)
+ # The CV-CUDA project publishes Debian archives as release assets, not through an APT repository.
+ # Bundle the exact shared objects selected for this build with the shared Vision payload so its
+ # Debian package remains installable from an APT repository containing only Holoscan packages.
+-if(BUILD_SHARED_LIBS AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
++# A distribution packaging CV-CUDA already ships these; such builds turn this off.
++option(HOLOSCAN_VISION_BUNDLE_CVCUDA
++    "Install the CV-CUDA runtime alongside the shared Vision library" ON)
++mark_as_advanced(HOLOSCAN_VISION_BUNDLE_CVCUDA)
++if(HOLOSCAN_VISION_BUNDLE_CVCUDA AND BUILD_SHARED_LIBS AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+     set(_holoscan_vision_cvcuda_install_dir "${HOLOSCAN_INSTALL_LIB_DIR}/holoscan/cvcuda")
+     set_property(TARGET vision APPEND PROPERTY INSTALL_RPATH "\$ORIGIN/holoscan/cvcuda")
+     include(HoloscanImportedInstall)
+@@ -155,6 +159,12 @@ if(BUILD_SHARED_LIBS AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+     unset(_holoscan_vision_cvcuda_install_dir)
+ endif()
+ 
++# configure_package_config_file and write_basic_package_version_file below come
++# from here. modules/visualization is added first and includes the same module,
++# whose commands are global once defined, so this is only reachable in a build
++# that has vision without visualization.
++include(CMakePackageConfigHelpers)
++
+ set(_holoscan_vision_package_dir
+     "${CMAKE_CURRENT_BINARY_DIR}/holoscan-vision-package"
+ )
+diff --git a/modules/vision/python/CMakeLists.txt b/modules/vision/python/CMakeLists.txt
+index 112c07d92..0d3096084 100644
+--- a/modules/vision/python/CMakeLists.txt
++++ b/modules/vision/python/CMakeLists.txt
+@@ -23,7 +23,8 @@ if(HOLOSCAN_BUILD_PYTHON_STUBS)
+         COPYONLY)
+ endif()
+ 
+-nanobind_add_module(holoscan_vision_python NB_STATIC STABLE_ABI _vision.cpp)
++# NOSTRIP, as for holoscan.core: keep the symbols for the debug package.
++nanobind_add_module(holoscan_vision_python NB_STATIC STABLE_ABI NOSTRIP _vision.cpp)
+ target_link_libraries(holoscan_vision_python PRIVATE holoscan::vision)
+ file(RELATIVE_PATH _vision_install_lib_relative "/${_vision_install}" "/${CMAKE_INSTALL_LIBDIR}")
+ set_target_properties(holoscan_vision_python PROPERTIES
+diff --git a/modules/visualization/python/CMakeLists.txt b/modules/visualization/python/CMakeLists.txt
+index 6e80aa9bf..5a62b236f 100644
+--- a/modules/visualization/python/CMakeLists.txt
++++ b/modules/visualization/python/CMakeLists.txt
+@@ -15,7 +15,8 @@ if(HOLOSCAN_BUILD_PYTHON_STUBS)
+     endforeach()
+ endif()
+ 
+-nanobind_add_module(holoscan_visualization_python NB_STATIC STABLE_ABI _visualization.cpp)
++# NOSTRIP, as for holoscan.core: keep the symbols for the debug package.
++nanobind_add_module(holoscan_visualization_python NB_STATIC STABLE_ABI NOSTRIP _visualization.cpp)
+ target_link_libraries(holoscan_visualization_python PRIVATE holoscan::visualization::op_holoviz)
+ file(RELATIVE_PATH _visualization_install_lib_relative
+     "/${_visualization_install}" "/${CMAKE_INSTALL_LIBDIR}")
+diff --git a/python/holoscan/core/CMakeLists.txt b/python/holoscan/core/CMakeLists.txt
+index 91da032f0..77572fc9f 100644
+--- a/python/holoscan/core/CMakeLists.txt
++++ b/python/holoscan/core/CMakeLists.txt
+@@ -86,7 +86,9 @@ if(HOLOSCAN_PYTHON_NANOBIND_SPLIT_MODE_PROTOTYPE)
+         ${_HOLOSCAN_PYTHON_CORE_SOURCES}
+     )
+ else()
+-    nanobind_add_module(holoscan_core_python STABLE_ABI NOMINSIZE ${_HOLOSCAN_PYTHON_CORE_SOURCES})
++    # NOSTRIP: nanobind strips release builds with -Wl,-s, which leaves the module with no
++    # symbols for a packaging system to split into a debug package.
++    nanobind_add_module(holoscan_core_python STABLE_ABI NOMINSIZE NOSTRIP ${_HOLOSCAN_PYTHON_CORE_SOURCES})
+ endif()
+ set(CMAKE_CXX_CLANG_TIDY "${_holoscan_core_saved_tidy}")
+ set_target_properties(holoscan_core_python PROPERTIES CXX_CLANG_TIDY "${CMAKE_CXX_CLANG_TIDY}")
+diff --git a/scripts/get_cmake_cuda_archs.py b/scripts/get_cmake_cuda_archs.py
+index 69dbc7107..2d639d96a 100755
+--- a/scripts/get_cmake_cuda_archs.py
++++ b/scripts/get_cmake_cuda_archs.py
+@@ -82,9 +82,14 @@ def filter_archs_with_min_arch(archs: list[str], min_arch: int | None) -> list[s
+     return filtered_list
+ 
+ 
+-def filter_archs_for_platform(archs: list[str]) -> list[str]:
+-    """Filters out architectures not suitable for the current platform (iGPUs on x86_64)."""
+-    current_platform = platform.machine().lower()
++def filter_archs_for_platform(archs: list[str], target_machine: str | None = None) -> list[str]:
++    """Filters out architectures not suitable for the target platform (iGPUs on x86_64).
++
++    The machine that runs this script is the machine the build runs on, which is not the
++    machine the build targets when cross compiling. Callers that know the target should
++    pass it in; without one, assume a native build.
++    """
++    current_platform = (target_machine or platform.machine()).lower()
+ 
+     if current_platform not in ["x86_64", "amd64"]:
+         return list(archs)  # Return a copy for consistency
+@@ -300,6 +305,15 @@ def main() -> None:
+             "which are normally filtered out by default."
+         ),
+     )
++    parser.add_argument(
++        "--target-machine",
++        type=str,
++        default=None,
++        help=(
++            "Machine the build targets, e.g. x86_64 or aarch64. Defaults to the machine "
++            "running this script, which is only correct for a native build."
++        ),
++    )
+ 
+     args = parser.parse_args()
+ 
+@@ -335,7 +349,7 @@ def main() -> None:
+     # Get supported architectures
+     nvcc_supported_archs = get_nvcc_archs(nvcc_path)
+     min_filtered_archs = filter_archs_with_min_arch(nvcc_supported_archs, args.min_arch)
+-    platform_filtered_archs = filter_archs_for_platform(min_filtered_archs)
++    platform_filtered_archs = filter_archs_for_platform(min_filtered_archs, args.target_machine)
+     final_filtered_archs = remove_excluded_archs(platform_filtered_archs)
+ 
+     # Filter based on requested architectures
+@@ -361,7 +375,8 @@ def main() -> None:
+     if not target_archs:
+         error_msg = (
+             f"No valid CUDA architectures could be determined for request '{args.requested_archs}' "
+-            f"with current filters (min_arch={args.min_arch}, platform={platform.machine()}, "
++            f"with current filters (min_arch={args.min_arch}, "
++            f"platform={args.target_machine or platform.machine()}, "
+             f"force={args.force})."
+         )
+         die(error_msg)
+diff --git a/tests/config/CMakeLists.txt b/tests/config/CMakeLists.txt
+index d40a8ebbe..b6a527766 100644
+--- a/tests/config/CMakeLists.txt
++++ b/tests/config/CMakeLists.txt
+@@ -34,23 +34,43 @@ target_link_libraries(config_test
+         GTest::gtest_main
+ )
+ 
+-add_executable(config_io_test
++# Absorbing the fetched objects and linking a declared provider are mutually
++# exclusive: doing both would define every backend symbol twice.
++set(_holoscan_config_io_test_sources
+     test_io.cpp
+     ${holoscan_SOURCE_DIR}/src/config/reflect_backend.cpp
+-    $<TARGET_OBJECTS:holoscan_config_reflect_private_objects>
+-    $<TARGET_OBJECTS:holoscan_config_yyjson_private_objects>
+ )
++set(_holoscan_config_io_test_libraries holoscan::config_io GTest::gtest_main)
++if(TARGET holoscan_config_reflect_private_objects)
++  list(APPEND _holoscan_config_io_test_sources
++      $<TARGET_OBJECTS:holoscan_config_reflect_private_objects>)
++else()
++  list(APPEND _holoscan_config_io_test_libraries reflectcpp::reflectcpp)
++endif()
++if(TARGET holoscan_config_yyjson_private_objects)
++  list(APPEND _holoscan_config_io_test_sources
++      $<TARGET_OBJECTS:holoscan_config_yyjson_private_objects>)
++else()
++  list(APPEND _holoscan_config_io_test_libraries yyjson::yyjson)
++endif()
++add_executable(config_io_test ${_holoscan_config_io_test_sources})
+ holoscan_configure_test_clang_tidy(config_io_test)
+-target_compile_definitions(config_io_test PRIVATE yyjson_api=)
++if(TARGET holoscan_config_yyjson_private_objects)
++  target_compile_definitions(config_io_test PRIVATE yyjson_api=)
++endif()
+ target_include_directories(config_io_test
+     PRIVATE ${holoscan_SOURCE_DIR}/src
+-    SYSTEM PRIVATE "${reflectcpp_SOURCE_DIR}/include"
+ )
++if(reflectcpp_SOURCE_DIR)
++  target_include_directories(config_io_test
++      SYSTEM PRIVATE "${reflectcpp_SOURCE_DIR}/include"
++  )
++endif()
+ target_link_libraries(config_io_test
+-    PRIVATE
+-        holoscan::config_io
+-        GTest::gtest_main
++    PRIVATE ${_holoscan_config_io_test_libraries}
+ )
++unset(_holoscan_config_io_test_sources)
++unset(_holoscan_config_io_test_libraries)
+ gtest_discover_tests(config_io_test
+     DISCOVERY_MODE PRE_TEST
+     TEST_PREFIX CONFIG_IO.
