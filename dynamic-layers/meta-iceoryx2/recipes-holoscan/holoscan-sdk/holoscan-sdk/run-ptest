@@ -1,0 +1,478 @@
+#!/bin/sh
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+# SPDX-License-Identifier: MIT
+#
+# Run the Holoscan SDK test payload: the gtest suites installed beside this
+# script, then the packaged examples and benchmarks, which live under ${datadir}
+# and are already on the target.
+
+cd "$(dirname "$(readlink -f "$0")")" || exit 1
+here=$(pwd)
+
+rc=0
+log=$(mktemp) || exit 1
+results=$(mktemp) || exit 1
+trap 'restore_display; rm -f "$log" "$results"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+# Exclusive scanout needs the monitor free of every other DRM master: the
+# desktop session and the framebuffer console bound to it. Stop what is running
+# and record it, so restore_display puts back exactly that.
+stopped_units=""
+unbound_consoles=""
+
+release_display() {
+    if command -v systemctl >/dev/null 2>&1; then
+        for unit in xserver-nodm weston lightdm gdm sddm; do
+            systemctl is-active --quiet "$unit" 2>/dev/null &&
+                systemctl stop "$unit" 2>/dev/null &&
+                stopped_units="$stopped_units $unit"
+        done
+    fi
+    for console in /sys/class/vtconsole/vtcon*; do
+        case $(cat "$console/name" 2>/dev/null) in
+            *frame*)
+                [ "$(cat "$console/bind" 2>/dev/null)" = 1 ] &&
+                    echo 0 >"$console/bind" 2>/dev/null &&
+                    unbound_consoles="$unbound_consoles $console"
+                ;;
+        esac
+    done
+    [ -n "$stopped_units$unbound_consoles" ] &&
+        echo "  | display released:${stopped_units:+ stopped$stopped_units}${unbound_consoles:+ unbound framebuffer console}" &&
+        sleep 2
+    true
+}
+
+# Wait for the session, since the windowed suites that follow need it back.
+restore_display() {
+    for console in $unbound_consoles; do echo 1 >"$console/bind" 2>/dev/null; done
+    for unit in $stopped_units; do systemctl start "$unit" 2>/dev/null; done
+    if [ -n "$stopped_units" ]; then
+        tries=0
+        while [ $tries -lt 15 ]; do
+            up=1
+            for unit in $stopped_units; do
+                systemctl is-active --quiet "$unit" 2>/dev/null || up=0
+            done
+            [ $up -eq 1 ] && break
+            tries=$((tries + 1))
+            sleep 1
+        done
+        sleep 2
+    fi
+    stopped_units=""
+    unbound_consoles=""
+}
+
+# HoloViz selects its display path from the session variables:
+# prefer_x11_display_path() in modules/holoviz/src/rhi/vulkan/vk_display_util.hpp
+# takes the X11/RandR overlay (VK_EXT_acquire_xlib_display) when DISPLAY is set
+# and the session is not Wayland, and plain DRM (VK_EXT_acquire_drm_display)
+# otherwise. ptest-runner starts with none of them set, and that is the one
+# combination that misleads it: an X server holds DRM master device-wide, so
+# acquiring a display through DRM cannot work while X is running, yet nothing
+# tells holoviz to use the X11 overlay instead. The windowed suites would also
+# skip for want of a window system. So describe whichever session is actually
+# running, and leave an inherited one untouched.
+#
+# Wayland is looked for first because holoviz treats a set WAYLAND_DISPLAY as
+# authoritative: an XWayland DISPLAY exposes RandR outputs that
+# vkGetRandROutputDisplayEXT cannot resolve, so a Wayland session has to stay on
+# the DRM path even though an X socket exists alongside it. Preferring Wayland
+# also avoids an XWayland that cannot be opened at all: a compositor that starts
+# it without an authority file, as Weston does, leaves every client refused with
+# "Authorization required, but no authorization protocol specified", and the
+# examples then abort on the window they could not create.
+#
+# The compositor runs as its own unprivileged user while ptest-runner runs as
+# root, so its socket is not under root's XDG_RUNTIME_DIR. Search an inherited
+# or own runtime directory first, then the other sessions': Wayland has no
+# authorization protocol, reaching a socket is a matter of that socket's file
+# permissions, and root has them.
+if [ -z "$WAYLAND_DISPLAY" ] && [ -z "$DISPLAY" ]; then
+    for socket in "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/wayland-[0-9]* \
+                  /run/user/*/wayland-[0-9]*; do
+        [ -S "$socket" ] || continue
+        XDG_RUNTIME_DIR=$(dirname "$socket")
+        WAYLAND_DISPLAY=$(basename "$socket")
+        XDG_SESSION_TYPE=wayland
+        export XDG_RUNTIME_DIR WAYLAND_DISPLAY XDG_SESSION_TYPE
+        echo "  | session: wayland, WAYLAND_DISPLAY=$WAYLAND_DISPLAY" \
+             "in $XDG_RUNTIME_DIR"
+        break
+    done
+fi
+
+if [ -z "$WAYLAND_DISPLAY" ] && [ -z "$DISPLAY" ]; then
+    for socket in /tmp/.X11-unix/X[0-9]*; do
+        [ -S "$socket" ] || continue
+        DISPLAY=:${socket#/tmp/.X11-unix/X}
+        XDG_SESSION_TYPE=x11
+        export DISPLAY XDG_SESSION_TYPE
+        echo "  | session: x11, DISPLAY=$DISPLAY"
+        break
+    done
+fi
+
+if [ -z "$WAYLAND_DISPLAY" ] && [ -z "$DISPLAY" ]; then
+    # No display server, so DRM can take a connector: the direct-display path
+    # works here, and the windowed suites report themselves skipped.
+    echo "  | session: none, holoviz falls back to the DRM display path"
+fi
+
+# Translate one suite's gtest output into a result per case, rather than
+# collapsing a suite of several hundred cases into one. gtest repeats its
+# failures in a trailing summary without the "(N ms)" suffix, so anchoring on
+# that suffix counts each case once. Exits nonzero if any case failed.
+gtest_report() {
+    awk -v suite="$1" '
+        # A failing parameterized case reads "[  FAILED  ] Suite.Case/3, where
+        # GetParam() = (...) (3 ms)", so the name arrives with a trailing comma.
+        function case_name() { name = $4; sub(/,$/, "", name); return suite ":" name }
+
+        /^\[ *OK *\] .* \([0-9]+ ms\)$/      { print "PASS: " case_name(); next }
+        /^\[ *FAILED *\] .* \([0-9]+ ms\)$/  { print "FAIL: " case_name(); failed++; next }
+        /^\[ *SKIPPED *\] .* \([0-9]+ ms\)$/ { print "SKIP: " case_name(); next }
+        END { exit (failed > 0 ? 1 : 0) }
+    ' "$2"
+}
+
+# ---------------------------------------------------------------------------
+# The gtest suites upstream registers through gtest_discover_tests(), from
+# gtest.manifest.json, which gen-ctest-manifest.py wrote from the build tree's
+# discovery scripts. As ctest does, ctest-replay.py lists each suite's cases on
+# the target and runs every case in a process of its own, with the suite's
+# properties and ctest's default timeout where the suite sets none. A case can
+# leave process-wide state behind, such as a quarantined device claim, which a
+# later case in the same process would trip over; upstream never runs them
+# together.
+# ---------------------------------------------------------------------------
+
+# timeout only sends SIGTERM, which a test blocked in a driver call can sit
+# through; SIGKILL it this much later so the run continues. ptest-runner's own
+# timeout SIGKILLs the whole script instead, so no trap restores the display.
+kill_after=30
+
+discovered=""
+if [ -f "$here/gtest.manifest.json" ]; then
+    python3 "$here/ctest-replay.py" --kill-after "$kill_after" \
+        "$here/gtest.manifest.json" || rc=1
+    discovered=$(python3 -c 'import json, os, sys
+for suite in json.load(open(sys.argv[1]))["discoveries"]:
+    print(os.path.basename(suite["executable"]))' "$here/gtest.manifest.json")
+fi
+
+# ---------------------------------------------------------------------------
+# The gtest suites upstream registers as one test per program, run whole as
+# upstream does: the holoviz suites, and rate_no_exceptions_test.
+# ---------------------------------------------------------------------------
+
+# ctest's own default, which is what upstream leaves these suites with: the
+# holoviz ones register no TIMEOUT. Creating a window or acquiring a swapchain
+# image can block indefinitely; without this, one stuck suite stalls the run
+# until ptest-runner kills it and every later result is lost.
+gtest_timeout=1500
+
+# Why a timeout(1) run ended, or nothing if it did not time out: 124 is the
+# SIGTERM at the limit, 137 the SIGKILL kill_after seconds later.
+timeout_detail() {
+    case $1 in
+        124) echo "timed out after ${2}s" ;;
+        137) echo "timed out after ${2}s, killed after another ${kill_after}s" ;;
+    esac
+}
+
+for suite in *; do
+    # Anything that is not a gtest program: this script, the manifests, the
+    # benchmark replayer run further down, the plugin that parameter_dso_test
+    # loads, and any asset directory.
+    [ -f "$suite" ] && [ -x "$suite" ] || continue
+    case $suite in
+        run-ptest | *.manifest | *.manifest.json | *.py | *.so | *.so.*) continue ;;
+    esac
+    # Run case by case above.
+    if echo "$discovered" | grep -qxF "$suite"; then
+        continue
+    fi
+
+    if [ "$suite" = holoviz_test_display_surface ]; then
+        # DisplaySurfaceHardwareTest takes a monitor for exclusive scanout, which
+        # a running desktop session holds; the rest of the suite runs as usual.
+        exclusive='DisplaySurfaceHardwareTest.*'
+        HOLOVIZ_VALIDATION=1 timeout -k "$kill_after" "$gtest_timeout" \
+            "./$suite" --gtest_filter="-$exclusive" >"$log" 2>&1
+        status=$?
+        release_display
+        HOLOVIZ_VALIDATION=1 timeout -k "$kill_after" "$gtest_timeout" \
+            "./$suite" --gtest_filter="$exclusive" >>"$log" 2>&1
+        exclusive_status=$?
+        restore_display
+        [ $status -eq 77 ] && status=$exclusive_status
+        [ $exclusive_status -ne 0 ] && [ $exclusive_status -ne 77 ] && status=$exclusive_status
+    elif [ "$suite" = holoviz_test_vulkan_init_order ]; then
+        # Vulkan instance initialization runs once per process, so upstream
+        # registers each case as its own ctest entry, both with
+        # HOLOVIZ_VALIDATION=1; run together, the second finds the instance
+        # already initialized and skips. Run each alone. The suite skips (77)
+        # only if every case did, and fails with the last failing case.
+        status=77
+        : >"$log"
+        for vk_case in SurfaceCreationOverlapsFirstInit CallbackReentryOverlapsFirstInit; do
+            HOLOVIZ_VALIDATION=1 timeout -k "$kill_after" "$gtest_timeout" \
+                "./$suite" --gtest_filter="VulkanInitOrder.$vk_case" >>"$log" 2>&1
+            case_status=$?
+            if [ $case_status -eq 0 ]; then
+                [ $status -eq 77 ] && status=0
+            elif [ $case_status -ne 77 ]; then
+                status=$case_status
+            fi
+        done
+    else
+        # Upstream sets HOLOVIZ_VALIDATION=1 on the holoviz suites only.
+        case $suite in
+            holoviz_test_*) validation=1 ;;
+            *) validation= ;;
+        esac
+        HOLOVIZ_VALIDATION=$validation timeout -k "$kill_after" "$gtest_timeout" \
+            "./$suite" >"$log" 2>&1
+        status=$?
+    fi
+
+    reported_failure=0
+    gtest_report "$suite" "$log" >"$results" || reported_failure=1
+    cat "$results"
+
+    # The holoviz suites exit 77 when every case they selected skipped, which is
+    # the SKIP_RETURN_CODE upstream registers for them: a machine without a
+    # usable GPU has to report Skipped, not a silent pass. The skipped cases have
+    # already been reported individually, so this is not a failure.
+    [ $status -eq 77 ] && continue
+
+    detail=$(timeout_detail $status "$gtest_timeout")
+    if [ -n "$detail" ]; then
+        echo "FAIL: $suite ($detail)"
+        rc=1
+        sed 's/^/  | /' "$log"
+        continue
+    fi
+
+    if [ ! -s "$results" ]; then
+        # Not every binary is a gtest suite: rate_no_exceptions_test is a
+        # conformance program compiled with -fno-exceptions that prints no cases,
+        # so its exit status is the whole result.
+        if [ $status -eq 0 ]; then
+            echo "PASS: $suite"
+        else
+            echo "FAIL: $suite (exited $status)"
+        fi
+    elif [ $status -ne 0 ] && [ $reported_failure -eq 0 ]; then
+        # A suite that dies partway leaves its remaining cases unreported, so
+        # report the suite itself rather than dropping them from the tally.
+        echo "FAIL: $suite (exited $status without reporting a failing case)"
+    fi
+
+    if [ $status -ne 0 ]; then
+        rc=1
+        # The prefix keeps gtest's summary lines from being read as results.
+        sed 's/^/  | /' "$log"
+    fi
+done
+
+# ---------------------------------------------------------------------------
+# The packaged examples, replaying upstream's own example ctest definitions from
+# examples.manifest.json, which gen-ctest-manifest.py wrote at build time, with
+# the same replayer as the benchmarks below. The Python examples are in
+# python.manifest.json instead.
+# ---------------------------------------------------------------------------
+if [ -f "$here/examples.manifest.json" ]; then
+    python3 "$here/ctest-replay.py" "$here/examples.manifest.json" || rc=1
+fi
+
+# Run one HoloViz example below and apply ctest's verdict rules: a matched FAIL_REGULAR_
+# EXPRESSION fails; otherwise a PASS_REGULAR_EXPRESSION decides on its own and
+# the exit status is ignored, exactly as ctest treats it; with neither, the exit
+# status decides.
+example_test() {
+    name=$1
+    workdir=$2
+    limit=$3
+    skip_status=$4
+    pass_re=$5
+    fail_re=$6
+    shift 6
+    [ "$1" = "--" ] && shift
+
+    (cd "$workdir" && timeout -k "$kill_after" "$limit" "$@") >"$log" 2>&1
+    status=$?
+
+    if [ -n "$skip_status" ] && [ "$status" -eq "$skip_status" ]; then
+        echo "SKIP: $name"
+        return
+    fi
+
+    verdict=PASS
+    detail=""
+    if [ -n "$fail_re" ] && grep -Eq -- "$fail_re" "$log"; then
+        verdict=FAIL
+        detail="matched the failure pattern"
+    elif [ -n "$pass_re" ]; then
+        grep -Eq -- "$pass_re" "$log" || {
+            verdict=FAIL
+            detail="did not print the expected output"
+        }
+    elif [ $status -ne 0 ]; then
+        verdict=FAIL
+        detail="exited $status"
+    fi
+
+    if [ $verdict = PASS ]; then
+        echo "PASS: $name"
+    else
+        timed_out=$(timeout_detail $status "$limit")
+        [ -n "$timed_out" ] && detail=$timed_out
+        echo "FAIL: $name ($detail)"
+        rc=1
+        sed 's/^/  | /' "$log"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# The HoloViz examples, which the manifest above does not cover: the only ctest
+# entries upstream registers for them run a host cmake, so they are dropped as
+# unreplayable. 5.0 installs each one as
+# ${libdir}/holoscan/examples/holoviz/<name>/cpp/<name>, having dropped the
+# _rhi_/_layers_/_text_ infixes the names used to carry.
+#
+# Each entry names a mode that returns on its own. Left alone, most of these
+# examples run a window loop until someone closes the window, which a ptest
+# cannot wait on, so the bounded mode is chosen deliberately in every case:
+# render_to_cuda returns on its own, cuda_interop_benchmark and
+# text_minimal --benchmark stop after a fixed measurement period, and the two
+# --print-resource-path runs are upstream's own smoke tests, checking that an
+# installed example resolves its assets when invoked through PATH. That leaves
+# holoviz_imgui, which has no such mode. holoviz_layers_backend_seam is gone in
+# 5.0 and has no replacement, so nothing here covers it.
+#
+# The scratch directory is the working directory because render_to_cuda writes
+# its output image there, and the ptest directory is not ours to litter.
+# ---------------------------------------------------------------------------
+holoviz_scratch=$(mktemp -d) || exit 1
+trap 'restore_display; rm -f "$log" "$results"; rm -rf "$holoviz_scratch"' EXIT
+
+holoviz_root=@LIBDIR@/holoscan/examples/holoviz
+
+# A binary missing from an installed examples tree is a failure, not a silent
+# skip: these guards used to return 0, so a relocation upstream would have run
+# nothing and still passed. A tree that is not installed at all is a build
+# without the examples PACKAGECONFIG, which is not a failure.
+holoviz_example() {
+    name=$1
+    limit=$2
+    binary=$3
+    shift 3
+    if [ ! -d "$holoviz_root" ]; then
+        echo "SKIP: holoviz:$name (holoscan-sdk-examples is not installed)"
+        return 0
+    fi
+    path="$holoviz_root/$binary/cpp/$binary"
+    if [ ! -x "$path" ]; then
+        echo "FAIL: holoviz:$name ($path is missing or not executable)"
+        rc=1
+        return 0
+    fi
+    example_test "holoviz:$name" "$holoviz_scratch" "$limit" "" "" "" -- "$path" "$@"
+}
+
+holoviz_example textured_quad_path_smoke          60 holoviz_textured_quad --print-resource-path
+holoviz_example cuda_interop_benchmark_path_smoke 60 holoviz_cuda_interop_benchmark --print-resource-path
+holoviz_example render_to_cuda                   120 holoviz_render_to_cuda
+holoviz_example text_minimal_benchmark           180 holoviz_text_minimal --benchmark
+holoviz_example cuda_interop_benchmark           180 holoviz_cuda_interop_benchmark
+holoviz_example direct_display_list               60 holoviz_direct_display --list
+
+echo "SKIP: holoviz:imgui (interactive only, runs until the window is closed)"
+
+# ---------------------------------------------------------------------------
+# HoloInfer. Upstream's HoloInferExample_Smoke drives holoinfer_example through
+# cmake -P, because add_test() runs a single command and the check is several
+# runs: each config for --ticks 2, asserting exit 0, from the example root where
+# the configs' relative model_path_map entries resolve. Every installed config is
+# run rather than the three that script happens to name, so a config the package
+# gains later is covered without editing this list.
+# ---------------------------------------------------------------------------
+# 5.0 installs the binary under cpp/ while configs and models stay at the
+# example root, which is still the working directory the relative model_path_map
+# entries resolve against.
+holoinfer=@LIBDIR@/holoscan/examples/inference
+if [ ! -d "$holoinfer" ]; then
+    echo "SKIP: holoinfer (holoscan-sdk-examples is not installed)"
+elif [ ! -x "$holoinfer/cpp/holoinfer_example" ]; then
+    echo "FAIL: holoinfer ($holoinfer/cpp/holoinfer_example is missing or not executable)"
+    rc=1
+else
+    for config in "$holoinfer"/configs/*.yaml; do
+        [ -f "$config" ] || continue
+        name="holoinfer:$(basename "$config" .yaml)"
+
+        (cd "$holoinfer" && timeout -k "$kill_after" 180 ./cpp/holoinfer_example \
+            --config "$config" --ticks 2) >"$log" 2>&1
+        status=$?
+
+        if [ $status -eq 0 ]; then
+            echo "PASS: $name"
+        else
+            detail=$(timeout_detail $status 180)
+            echo "FAIL: $name (${detail:-exited $status})"
+            rc=1
+            sed 's/^/  | /' "$log"
+        fi
+    done
+fi
+
+# ---------------------------------------------------------------------------
+# The packaged benchmarks, replaying upstream's own benchmark ctest definitions
+# from benchmarks.manifest.json, which gen-ctest-manifest.py wrote at build time.
+# ctest-replay.py judges each one exactly as ctest does, including WILL_FAIL and
+# the expressions searched across the whole output, and reports the tests the
+# target cannot run as skipped with the reason.
+# ---------------------------------------------------------------------------
+if [ -f "$here/benchmarks.manifest.json" ]; then
+    python3 "$here/ctest-replay.py" --prefix benchmark: \
+        "$here/benchmarks.manifest.json" || rc=1
+fi
+
+# ---------------------------------------------------------------------------
+# Upstream's Python ctests the same way, from python.manifest.json: the Python
+# examples, the core Python suite and the module suites.
+# ---------------------------------------------------------------------------
+if [ -f "$here/python.manifest.json" ]; then
+    python3 "$here/ctest-replay.py" --prefix python: \
+        "$here/python.manifest.json" || rc=1
+fi
+
+# ---------------------------------------------------------------------------
+# Every other upstream ctest entry, from tests.manifest.json: the C++ test
+# directories' entries that run a probe, a smoke program, a cmake -P driver or a
+# suite under a filter or environment of its own, and the modules' entries the
+# manifests above do not cover. The entries the target cannot run, such as
+# those that configure or compile a consumer project, are reported skipped with
+# the reason.
+# ---------------------------------------------------------------------------
+if [ -f "$here/tests.manifest.json" ]; then
+    python3 "$here/ctest-replay.py" --prefix tests: \
+        "$here/tests.manifest.json" || rc=1
+fi
+
+# ---------------------------------------------------------------------------
+# The HoloMQ suites in holomq/, from holomq.manifest.json: upstream registers
+# them as one ctest entry per gtest filter, with the child programs run
+# standalone, so they are replayed that way rather than run whole above.
+# ---------------------------------------------------------------------------
+if [ -f "$here/holomq.manifest.json" ]; then
+    python3 "$here/ctest-replay.py" --prefix holomq: \
+        "$here/holomq.manifest.json" || rc=1
+fi
+
+exit $rc
