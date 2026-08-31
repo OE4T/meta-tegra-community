@@ -1,0 +1,214 @@
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Subject: [PATCH] tests: Allow installing the C++ ctest entries' programs
+
+Beside the gtest suites, the C++ test directories register ctest entries
+that run other programs by build-tree path: smoke programs, process probes
+driven with a scenario argument, and the preload libraries some benchmark
+and Python entries inject. HOLOSCAN_INSTALL_TESTS_DIR installs none of them,
+so a distribution replaying those entries on a target has nothing to run.
+
+Install them with holoscan_install_test_helpers(), at their build-tree path
+under helpers/, where a runner maps each build-tree path onto the installed
+copy by prefix: every program tests/system builds other than its suites, the
+probes of tests/compiler and tests/runtime, the readiness portability check
+of tests/channel, the two example test programs that are not examples
+themselves (the bounded result recorder and the forced-unsupported
+notification bridge), the Python CUDA event counter and the control-loop
+sched_yield shim.
+
+interprocess_runtime_smoke execs its child, and the schema evolution
+characterization reads its .bfbs schemas, by compiled-in build-tree path,
+which an installed program cannot reach and which a distribution's QA
+rejects. Install the schemas beside the program and compile in the installed
+paths instead.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+diff --git a/benchmark/runtime/CMakeLists.txt b/benchmark/runtime/CMakeLists.txt
+index b868a4c08..749e15918 100644
+--- a/benchmark/runtime/CMakeLists.txt
++++ b/benchmark/runtime/CMakeLists.txt
+@@ -266,6 +266,10 @@ target_link_libraries(runtime_control_loop_benchmark PRIVATE
+ add_library(control_loop_yield_shim SHARED control_loop_yield_shim.cpp)
+ add_dependencies(holoscan-benchmark-targets control_loop_yield_shim)
+ target_link_libraries(control_loop_yield_shim PRIVATE ${CMAKE_DL_LIBS})
++# BENCHMARK_CONTROL_LOOP_SPLIT_RCB_YIELD_SHIM preloads it by path.
++if(COMMAND holoscan_install_test_helpers)
++    holoscan_install_test_helpers(TARGETS control_loop_yield_shim)
++endif()
+ 
+ if(BUILD_TESTING)
+     if(Python3_Interpreter_FOUND)
+diff --git a/examples/external_clients/recorder/cpp/CMakeLists.txt b/examples/external_clients/recorder/cpp/CMakeLists.txt
+index dcec6f919..b9d9ae6cd 100644
+--- a/examples/external_clients/recorder/cpp/CMakeLists.txt
++++ b/examples/external_clients/recorder/cpp/CMakeLists.txt
+@@ -25,6 +25,11 @@ if(BUILD_TESTING)
+             PASS_REGULAR_EXPRESSION "bounded recorder complete"
+             TIMEOUT 15
+     )
++    # Not an example of its own, so not installed with them; ship it where a runner
++    # replaying EXAMPLE_RESULT_RECORDER_BOUNDED_TEST finds it.
++    if(COMMAND holoscan_install_test_helpers)
++        holoscan_install_test_helpers(TARGETS result_recorder_bounded_test)
++    endif()
+ endif()
+ 
+ install(TARGETS result_recorder
+diff --git a/examples/notification_bridge/cpp/CMakeLists.txt b/examples/notification_bridge/cpp/CMakeLists.txt
+index 006857faf..b438c7f50 100644
+--- a/examples/notification_bridge/cpp/CMakeLists.txt
++++ b/examples/notification_bridge/cpp/CMakeLists.txt
+@@ -59,6 +59,11 @@ if(BUILD_TESTING)
+             LABELS "examples;readiness;lifecycle;portability"
+             TIMEOUT 30
+     )
++    # Not installed with the examples; ship it where a runner replaying
++    # EXAMPLE_CPP_NOTIFICATION_BRIDGE_UNSUPPORTED_TEST finds it.
++    if(COMMAND holoscan_install_test_helpers)
++        holoscan_install_test_helpers(TARGETS notification_bridge_unsupported)
++    endif()
+ endif()
+ 
+ install(TARGETS notification_bridge
+diff --git a/python/tests/core/CMakeLists.txt b/python/tests/core/CMakeLists.txt
+index 84e531463..0f75e563a 100644
+--- a/python/tests/core/CMakeLists.txt
++++ b/python/tests/core/CMakeLists.txt
+@@ -582,6 +582,10 @@ endif()
+ add_library(python_cuda_event_record_counter SHARED cuda_event_record_counter.cpp)
+ target_link_libraries(python_cuda_event_record_counter PRIVATE CUDA::cudart ${CMAKE_DL_LIBS})
+ add_dependencies(holoscan-python-tests python_cuda_event_record_counter)
++# The PYTHON_CUPY_* tests preload it by path.
++if(COMMAND holoscan_install_test_helpers)
++    holoscan_install_test_helpers(TARGETS python_cuda_event_record_counter)
++endif()
+ # REQ: TENSOR-STORAGE-010
+ foreach(policy IN ITEMS shared per_partition)
+     # Append so an existing preload, such as a sanitizer runtime, stays first.
+diff --git a/tests/channel/CMakeLists.txt b/tests/channel/CMakeLists.txt
+index 8e67baaf6..107d476f4 100644
+--- a/tests/channel/CMakeLists.txt
++++ b/tests/channel/CMakeLists.txt
+@@ -104,6 +104,9 @@ holoscan_configure_readiness_portability_target(channel_readiness_unsupported_po
+ add_test(NAME CMAKE_PORTABILITY.readiness_unsupported_symbols
+     COMMAND channel_readiness_unsupported_portability
+ )
++if(COMMAND holoscan_install_test_helpers)
++    holoscan_install_test_helpers(TARGETS channel_readiness_unsupported_portability)
++endif()
+ 
+ # The optimized positive fixture above must retain real references to both implementation files.
+ # Omitting those files from an otherwise identical target must therefore fail at link time.
+diff --git a/tests/compiler/CMakeLists.txt b/tests/compiler/CMakeLists.txt
+index 1d2741730..ecc454656 100644
+--- a/tests/compiler/CMakeLists.txt
++++ b/tests/compiler/CMakeLists.txt
+@@ -295,3 +295,8 @@ set_tests_properties(COMPILE_PURITY.no_forbidden_mutation_calls
+ 
+ # Ship this suite when the build opts into installing tests.
+ holoscan_install_test_targets(TARGETS compile_test)
++
++# The probe the COMPILE.* process tests run, where a runner replaying them finds it.
++if(COMMAND holoscan_install_test_helpers)
++    holoscan_install_test_helpers(TARGETS partition_environment_process_probe)
++endif()
+diff --git a/tests/runtime/CMakeLists.txt b/tests/runtime/CMakeLists.txt
+index 9b0d14b7a..b5e549172 100644
+--- a/tests/runtime/CMakeLists.txt
++++ b/tests/runtime/CMakeLists.txt
+@@ -325,6 +325,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+         liveness-polling
+         liveness-uncooperative
+     )
++    # The probe the ManagedSignals tests run, where a runner replaying them finds it.
++    if(COMMAND holoscan_install_test_helpers)
++        holoscan_install_test_helpers(TARGETS runtime_signal_process_probe)
++    endif()
++
+     foreach(scenario IN LISTS managed_signal_scenarios)
+         add_test(
+             NAME RUNTIME.RunSession.ManagedSignals.${scenario}
+diff --git a/tests/system/CMakeLists.txt b/tests/system/CMakeLists.txt
+index 27998abc4..32e471480 100644
+--- a/tests/system/CMakeLists.txt
++++ b/tests/system/CMakeLists.txt
+@@ -827,9 +827,21 @@ target_link_libraries(interprocess_runtime_child PRIVATE holoscan::core)
+ 
+ add_executable(interprocess_runtime_smoke interprocess_runtime_smoke.cpp)
+ target_link_libraries(interprocess_runtime_smoke PRIVATE holoscan::core)
++# An installed smoke test execs the installed child, which holoscan_install_test_helpers()
++# puts at its build-tree path under helpers/; the build-tree one is not there.
++if(HOLOSCAN_INSTALL_TESTS_DIR AND COMMAND holoscan_install_test_helpers)
++    file(RELATIVE_PATH _interprocess_runtime_child_dir
++        "${holoscan_BINARY_DIR}" "${CMAKE_CURRENT_BINARY_DIR}")
++    set(_interprocess_runtime_child_exe
++        "${CMAKE_INSTALL_PREFIX}/${HOLOSCAN_INSTALL_TESTS_DIR}/helpers/${_interprocess_runtime_child_dir}/interprocess_runtime_child")
++    unset(_interprocess_runtime_child_dir)
++else()
++    set(_interprocess_runtime_child_exe "$<TARGET_FILE:interprocess_runtime_child>")
++endif()
+ target_compile_definitions(interprocess_runtime_smoke PRIVATE
+-    HOLOSCAN_INTERPROCESS_RUNTIME_CHILD_EXE="$<TARGET_FILE:interprocess_runtime_child>"
++    HOLOSCAN_INTERPROCESS_RUNTIME_CHILD_EXE="${_interprocess_runtime_child_exe}"
+ )
++unset(_interprocess_runtime_child_exe)
+ add_dependencies(interprocess_runtime_smoke interprocess_runtime_child)
+ 
+ # REQ: CHAN-086
+@@ -1027,11 +1039,26 @@ add_dependencies(flatbuffer_schema_evolution_characterization
+     flatbuffer_schema_evolution_artifacts
+     flatbuffer_schema_evolution_v2_package)
+ target_compile_features(flatbuffer_schema_evolution_characterization PRIVATE cxx_std_20)
++# An installed characterization reads the installed schemas, which go to their
++# build-tree path under helpers/ beside the program; the build-tree ones are not there.
++set(schema_evolution_bfbs_dir "${schema_evolution_generated_dir}")
++if(HOLOSCAN_INSTALL_TESTS_DIR AND COMMAND holoscan_install_test_helpers)
++    file(RELATIVE_PATH _schema_evolution_relative_dir
++        "${holoscan_BINARY_DIR}" "${schema_evolution_generated_dir}")
++    install(FILES ${schema_evolution_bfbs_files}
++        COMPONENT holoscan-tests
++        DESTINATION "${HOLOSCAN_INSTALL_TESTS_DIR}/helpers/${_schema_evolution_relative_dir}"
++    )
++    set(schema_evolution_bfbs_dir
++        "${CMAKE_INSTALL_PREFIX}/${HOLOSCAN_INSTALL_TESTS_DIR}/helpers/${_schema_evolution_relative_dir}")
++    unset(_schema_evolution_relative_dir)
++endif()
+ target_compile_definitions(flatbuffer_schema_evolution_characterization
+     PRIVATE
+-        "EVOLUTION_V1_BFBS=\"${schema_evolution_generated_dir}/evolution_v1.bfbs\""
+-        "EVOLUTION_RENAMED_BFBS=\"${schema_evolution_generated_dir}/evolution_renamed.bfbs\""
+-        "EVOLUTION_REQUIRED_BFBS=\"${schema_evolution_generated_dir}/incompatible_required_field.bfbs\"")
++        "EVOLUTION_V1_BFBS=\"${schema_evolution_bfbs_dir}/evolution_v1.bfbs\""
++        "EVOLUTION_RENAMED_BFBS=\"${schema_evolution_bfbs_dir}/evolution_renamed.bfbs\""
++        "EVOLUTION_REQUIRED_BFBS=\"${schema_evolution_bfbs_dir}/incompatible_required_field.bfbs\"")
++unset(schema_evolution_bfbs_dir)
+ target_include_directories(flatbuffer_schema_evolution_characterization
+     PRIVATE
+         "${schema_evolution_generated_dir}"
+@@ -1437,3 +1464,24 @@ if(HOLOSCAN_BUILD_TESTING_LIBRARY)
+         TEST_PREFIX OPERATOR_TESTING_SCHEMA. WORKING_DIRECTORY ${holoscan_BINARY_DIR})
+     holoscan_install_test_targets(TARGETS operator_test_schema_test)
+ endif()
++
++# The programs this directory's ctest entries run, where a runner replaying them
++# finds them: every program built here except the suites, which go with the others.
++if(COMMAND holoscan_install_test_helpers)
++    get_property(_system_test_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
++    set(_system_test_programs)
++    foreach(_system_test_target IN LISTS _system_test_targets)
++        get_target_property(_system_test_type ${_system_test_target} TYPE)
++        get_target_property(_system_test_excluded ${_system_test_target} EXCLUDE_FROM_ALL)
++        if(_system_test_type STREQUAL "EXECUTABLE" AND NOT _system_test_excluded AND
++           NOT _system_test_target MATCHES "^(tensor_projection_test|operator_test_schema_test)$")
++            list(APPEND _system_test_programs ${_system_test_target})
++        endif()
++    endforeach()
++    holoscan_install_test_helpers(TARGETS ${_system_test_programs})
++    unset(_system_test_targets)
++    unset(_system_test_programs)
++    unset(_system_test_target)
++    unset(_system_test_type)
++    unset(_system_test_excluded)
++endif()

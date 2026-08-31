@@ -1,0 +1,34 @@
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Subject: [PATCH] tests: Give the HoloMQ retirement stress test two CUDA queues
+
+cuda_retirement_randomized_stress_test_device and _pinned hold one reader
+stream on cuStreamWaitValue32 and wait for the other before checking that the
+slot is retained by the gated reader alone, so they assume the two
+non-blocking streams run on separate hardware queues. With
+CUDA_DEVICE_MAX_CONNECTIONS unset, the Jetson AGX Thor driver behaves as if it
+were 1: both streams share a queue and the fast reader cannot finish while the
+other is gated. Upstream now detects that and reports the case skipped, which
+leaves the retention-by-one-reader path untested on Tegra. With 2, 4, 8 or 32
+connections the case runs and passes. Set 8, the documented default, for these
+tests only.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+diff --git a/tests/holomq/unit/CMakeLists.txt b/tests/holomq/unit/CMakeLists.txt
+index 95d2e0efd..02904a91f 100644
+--- a/tests/holomq/unit/CMakeLists.txt
++++ b/tests/holomq/unit/CMakeLists.txt
+@@ -188,8 +188,11 @@ if(NOT cuda_test_sources STREQUAL "")
+         add_test(NAME cuda_retirement_randomized_stress_test_${storage}
+             COMMAND $<TARGET_FILE:${CUDA_PROJECT_NAME}>
+                 "--gtest_filter=*CudaBufferFanoutTest.RandomizedReleaseAndClosingNeverReuseAnUnreadSlot/${parameter}")
++        # The gated reader stream must not share a hardware queue with the other
++        # reader, and Tegra's driver defaults to one queue.
+         set_tests_properties(cuda_retirement_randomized_stress_test_${storage} PROPERTIES
+-            LABELS "cuda;holomq;stress" TIMEOUT 45 SKIP_REGULAR_EXPRESSION "\\[  SKIPPED \\]")
++            LABELS "cuda;holomq;stress" TIMEOUT 45 SKIP_REGULAR_EXPRESSION "\\[  SKIPPED \\]"
++            ENVIRONMENT "CUDA_DEVICE_MAX_CONNECTIONS=8")
+     endforeach()
+ 
+     foreach(cuda_source IN LISTS cuda_test_sources)

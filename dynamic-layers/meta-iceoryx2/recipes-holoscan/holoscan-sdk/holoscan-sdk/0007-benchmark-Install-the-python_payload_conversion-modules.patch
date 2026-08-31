@@ -1,0 +1,47 @@
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Subject: [PATCH] benchmark: Install the python_payload_conversion modules
+
+BENCHMARK_PYTHON_PAYLOAD_CONVERSION imports the generated vector_record
+module, its codec extension and _pod_fixtures from the benchmark's build
+directory, and none of them is installed, so an installed benchmark tree
+cannot run it. Install them beside payload_conversion_benchmark.py in the
+holoscan-benchmarks component.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+diff --git a/benchmark/python_payload_conversion/CMakeLists.txt b/benchmark/python_payload_conversion/CMakeLists.txt
+index 234de4cfc..925e5d951 100644
+--- a/benchmark/python_payload_conversion/CMakeLists.txt
++++ b/benchmark/python_payload_conversion/CMakeLists.txt
+@@ -22,6 +22,30 @@ add_dependencies(python_payload_conversion_benchmark
+     holoscan-python python_vector_record_generated python_payload_pod_fixtures)
+ add_dependencies(holoscan-python-benchmark-targets python_payload_conversion_benchmark)
+ 
++# The benchmark imports the generated vector_record module, its codec and the
++# _pod_fixtures module from its own directory, so install them beside the
++# script for an installed tree to run it.
++set(_python_payload_conversion_install_dir
++    "${CMAKE_INSTALL_DATADIR}/benchmark/python_payload_conversion")
++get_target_property(_python_vector_record_module
++    python_vector_record_generated HOLOSCAN_FLATBUFFER_PYTHON_MODULE)
++get_target_property(_python_vector_record_stub
++    python_vector_record_generated HOLOSCAN_FLATBUFFER_PYTHON_STUB)
++get_target_property(_python_vector_record_codec
++    python_vector_record_generated HOLOSCAN_FLATBUFFER_PYTHON_CODEC_TARGET)
++install(FILES "${_python_vector_record_module}" "${_python_vector_record_stub}"
++    DESTINATION "${_python_payload_conversion_install_dir}"
++    COMPONENT holoscan-benchmarks
++)
++install(TARGETS "${_python_vector_record_codec}" python_payload_pod_fixtures
++    LIBRARY DESTINATION "${_python_payload_conversion_install_dir}"
++    COMPONENT holoscan-benchmarks
++)
++unset(_python_payload_conversion_install_dir)
++unset(_python_vector_record_codec)
++unset(_python_vector_record_module)
++unset(_python_vector_record_stub)
++
+ if(BUILD_TESTING)
+     add_test(NAME BENCHMARK_PYTHON_PAYLOAD_CONVERSION
+         COMMAND ${CMAKE_COMMAND} -E env

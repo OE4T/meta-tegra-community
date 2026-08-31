@@ -1,0 +1,54 @@
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Subject: [PATCH] cmake: Give cross-compiling consumers a host-runnable flatc
+
+The installed package config finds FlatBuffers for every consumer, and
+HoloscanSchemaTools runs whatever flatbuffers::flatc names. In a cross
+build that target comes from the target sysroot's FlatcTargets.cmake and
+names the target-architecture flatc, so holoscan_add_flatbuffer_schema()
+fails with an exec format error. Where a sysroot strips that export file,
+the target is missing and the function stops at its own FATAL_ERROR.
+
+When CMAKE_CROSSCOMPILING, look for a flatc on the build host before
+finding FlatBuffers and declare flatbuffers::flatc from it. The generated
+FlatcTargets.cmake returns early when all of its targets already exist,
+so the host binary is the one that stays. HOLOSCAN_FLATC_EXECUTABLE can
+be set to choose it explicitly.
+
+The search skips the package root and CMake prefix paths. By this point
+holoscan-full-config.cmake has prepended the Holoscan install prefix, the
+target sysroot's /usr, to CMAKE_PREFIX_PATH, and its bin/ holds the
+target flatc. What is left is PATH and the system paths. Under an SDK
+toolchain, which sets CMAKE_FIND_ROOT_PATH_MODE_PROGRAM to NEVER, that is
+the SDK's host bin directory. Under an OpenEmbedded recipe build
+(ONLY), it is the native sysroot. A target sysroot does not stage bin/.
+
+Builds that are not cross-compiling are unchanged.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+diff --git a/cmake/templates/holoscan-config.cmake.in b/cmake/templates/holoscan-config.cmake.in
+index 375de523e..adb4b276f 100644
+--- a/cmake/templates/holoscan-config.cmake.in
++++ b/cmake/templates/holoscan-config.cmake.in
+@@ -262,6 +262,20 @@ endif()
+ unset(_holoscan_caller_transport_root)
+ unset(_holoscan_caller_transport_root_defined)
+ set(holoscan_FIND_COMPONENTS "${_holoscan_requested_components}")
++# A cross-compiled FlatBuffers package exports flatbuffers::flatc as its own
++# target-architecture binary, which the build host cannot run. Declare a flatc
++# the host can run first: FlatBuffers' export file then sees its only target
++# already defined and leaves it alone. The CMake prefix paths are skipped
++# because they hold the target install prefix.
++if(CMAKE_CROSSCOMPILING AND NOT TARGET flatbuffers::flatc)
++  find_program(HOLOSCAN_FLATC_EXECUTABLE flatc
++    NO_PACKAGE_ROOT_PATH NO_CMAKE_PATH NO_CMAKE_ENVIRONMENT_PATH)
++  if(HOLOSCAN_FLATC_EXECUTABLE)
++    add_executable(flatbuffers::flatc IMPORTED)
++    set_target_properties(flatbuffers::flatc PROPERTIES
++      IMPORTED_LOCATION "${HOLOSCAN_FLATC_EXECUTABLE}")
++  endif()
++endif()
+ find_dependency(Flatbuffers "@Flatbuffers_VERSION@" EXACT CONFIG
+   HINTS "${_holoscan_frontdoor_install_prefix}/@HOLOSCAN_THIRD_PARTY_INSTALL_LIB_DIR@/cmake/flatbuffers")
+ 
