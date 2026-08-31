@@ -1,6 +1,6 @@
 SUMMARY = "NVIDIA cuDNN sample applications"
 HOMEPAGE = "https://developer.nvidia.com/cudnn"
-LICENSE = "LicenseRef-Proprietary"
+LICENSE = "Proprietary"
 LIC_FILES_CHKSUM = "file://usr/share/doc/libcudnn9-samples/copyright;md5=6309a40f44d0c8b8cd8950ef80691561"
 
 inherit l4t_deb_pkgfeed cmake cuda
