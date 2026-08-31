@@ -1,0 +1,247 @@
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Fri, 28 Aug 2026 00:00:00 +0000
+Subject: [PATCH] cmake: add system-library options for cmark-gfm and fast_float
+
+Adds SLANG_USE_SYSTEM_CMARK and SLANG_USE_SYSTEM_FAST_FLOAT so a distribution
+build can satisfy every external dependency from packages and reference no
+submodule at all. cmark and fast_float were the only two dependencies in
+external/CMakeLists.txt offering an override path but no system option.
+
+Also completes the existing system-library paths, which did not resolve every
+target or header Slang needs:
+
+  * source/slang-glslang links glslang's SPIR-V back end as plain `SPIRV`, but an
+    installed glslang exports only glslang::SPIRV.
+  * source/slang-glslang includes both "SPIRV/GlslangToSpv.h" and
+    "glslang/Public/ShaderLang.h". An installed glslang puts all its headers under
+    <prefix>/include/glslang while advertising only <prefix>/include, so the first
+    spelling does not resolve.
+  * source/slang-glslang links SPIRV-Tools-opt and SPIRV-Tools-link, which
+    SPIRV-Tools' per-library CMake packages provide separately.
+  * Distributions that build lz4 with its plain Makefile ship liblz4.pc but no
+    CMake package, so find_package(lz4 REQUIRED) fails outright there.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+
+---
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index c23537f4e..59ee83805 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -208,6 +208,16 @@ advanced_option(
+     "Build using system glslang library"
+     OFF
+ )
++advanced_option(
++    SLANG_USE_SYSTEM_CMARK
++    "Build using system cmark-gfm library"
++    OFF
++)
++advanced_option(
++    SLANG_USE_SYSTEM_FAST_FLOAT
++    "Build using system fast_float headers"
++    OFF
++)
+ if(WIN32)
+     set(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT ON)
+ else()
+@@ -554,9 +564,18 @@ if(${SLANG_USE_SYSTEM_MINIZ})
+ endif()
+ 
+ if(${SLANG_USE_SYSTEM_LZ4})
+-    find_package(lz4 REQUIRED)
+-    if(NOT TARGET lz4_static)
+-        add_library(lz4_static ALIAS LZ4::lz4)
++    # OpenEmbedded and several other distributions build lz4 with its plain
++    # Makefile, which installs liblz4.pc but no CMake package at all. Fall back
++    # to pkg-config so a system lz4 is usable in those environments too.
++    find_package(lz4 CONFIG QUIET)
++    if(lz4_FOUND)
++        if(NOT TARGET lz4_static)
++            add_library(lz4_static ALIAS LZ4::lz4)
++        endif()
++    else()
++        find_package(PkgConfig REQUIRED)
++        pkg_check_modules(LZ4 REQUIRED IMPORTED_TARGET GLOBAL liblz4)
++        add_library(lz4_static ALIAS PkgConfig::LZ4)
+     endif()
+ endif()
+ 
+@@ -566,6 +585,11 @@ endif()
+ 
+ if(${SLANG_USE_SYSTEM_SPIRV_TOOLS})
+     find_package(SPIRV-Tools REQUIRED)
++    # SPIRV-Tools installs a separate CMake package per library. source/slang-glslang
++    # links SPIRV-Tools-opt and SPIRV-Tools-link, and the SPIRV-Tools package alone
++    # does not define those imported targets.
++    find_package(SPIRV-Tools-opt REQUIRED)
++    find_package(SPIRV-Tools-link REQUIRED)
+ endif()
+ 
+ if(${SLANG_USE_SYSTEM_GLSLANG})
+@@ -573,6 +597,62 @@ if(${SLANG_USE_SYSTEM_GLSLANG})
+     if(NOT TARGET glslang)
+         add_library(glslang ALIAS glslang::glslang)
+     endif()
++    # source/slang-glslang links glslang's SPIR-V back end as plain `SPIRV`, which
++    # is the target name inside glslang's own build tree. An installed glslang
++    # exports only the namespaced glslang::SPIRV, so alias it back.
++    if(NOT TARGET SPIRV)
++        add_library(SPIRV ALIAS glslang::SPIRV)
++    endif()
++
++    # source/slang-glslang/slang-glslang.cpp includes glslang two different ways:
++    #
++    #     #include "SPIRV/GlslangToSpv.h"
++    #     #include "glslang/Public/ShaderLang.h"
++    #
++    # Both work when glslang is built from its submodule, because two directories
++    # end up on the include path: glslang's own source root, which is what
++    # "SPIRV/..." resolves against, and its parent, which is what "glslang/..."
++    # resolves against. An installed glslang instead puts every header under
++    # <prefix>/include/glslang and its imported targets advertise only
++    # <prefix>/include, so the second spelling still resolves while the first fails
++    # with "SPIRV/GlslangToSpv.h: No such file or directory". Adding the glslang
++    # subdirectory alongside the prefix restores the pair. Only one linked target
++    # has to carry it, since include directories accumulate over all of them.
++    get_target_property(
++        _slang_glslang_include_dirs
++        glslang::glslang
++        INTERFACE_INCLUDE_DIRECTORIES
++    )
++    foreach(_slang_glslang_dir IN LISTS _slang_glslang_include_dirs)
++        if(IS_DIRECTORY "${_slang_glslang_dir}/glslang")
++            set_property(
++                TARGET glslang::glslang
++                APPEND
++                PROPERTY
++                    INTERFACE_INCLUDE_DIRECTORIES
++                        "${_slang_glslang_dir}/glslang"
++            )
++        endif()
++    endforeach()
++endif()
++
++if(${SLANG_USE_SYSTEM_CMARK})
++    # The installed swiftlang/swift-cmark package exports its library under the
++    # same unnamespaced name (libcmark-gfm) that source/slang links against, so no
++    # alias is needed. Note that upstream installs cmark-gfm-config.cmake directly
++    # into ${CMAKE_INSTALL_LIBDIR}/cmake rather than a per-package subdirectory, so
++    # consumers normally have to pass -Dcmark-gfm_DIR=<libdir>/cmake.
++    find_package(cmark-gfm REQUIRED)
++endif()
++
++if(${SLANG_USE_SYSTEM_FAST_FLOAT})
++    find_package(FastFloat REQUIRED)
++    # The alias has to be created at this scope, not in external/: an ALIAS to a
++    # non-GLOBAL imported target is only visible in the directory that creates it
++    # and below, and source/compiler-core is not under external/.
++    if(NOT TARGET fast_float)
++        add_library(fast_float ALIAS FastFloat::fast_float)
++    endif()
+ endif()
+ 
+ if(SLANG_ENABLE_DXIL)
+diff --git a/external/CMakeLists.txt b/external/CMakeLists.txt
+index 2d854b218..f9f9ca71e 100644
+--- a/external/CMakeLists.txt
++++ b/external/CMakeLists.txt
+@@ -123,24 +123,26 @@ if(NOT ${SLANG_USE_SYSTEM_LZ4})
+ endif()
+ 
+ # cmark-gfm (CommonMark / GFM Markdown parser, swiftlang fork)
+-set(CMARK_LIB_FUZZER OFF)
+-set(CMARK_FUZZ_QUADRATIC OFF)
+-set(_prev_BUILD_TESTING ${BUILD_TESTING})
+-set(_prev_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+-set(BUILD_TESTING OFF)
+-set(BUILD_SHARED_LIBS OFF)
+-if(NOT SLANG_OVERRIDE_CMARK_PATH)
+-    add_subdirectory(cmark EXCLUDE_FROM_ALL ${system})
+-else()
+-    add_subdirectory(
+-        ${SLANG_OVERRIDE_CMARK_PATH}/cmark
+-        cmark
+-        EXCLUDE_FROM_ALL
+-        ${system}
+-    )
++if(NOT ${SLANG_USE_SYSTEM_CMARK})
++    set(CMARK_LIB_FUZZER OFF)
++    set(CMARK_FUZZ_QUADRATIC OFF)
++    set(_prev_BUILD_TESTING ${BUILD_TESTING})
++    set(_prev_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
++    set(BUILD_TESTING OFF)
++    set(BUILD_SHARED_LIBS OFF)
++    if(NOT SLANG_OVERRIDE_CMARK_PATH)
++        add_subdirectory(cmark EXCLUDE_FROM_ALL ${system})
++    else()
++        add_subdirectory(
++            ${SLANG_OVERRIDE_CMARK_PATH}/cmark
++            cmark
++            EXCLUDE_FROM_ALL
++            ${system}
++        )
++    endif()
++    set(BUILD_TESTING ${_prev_BUILD_TESTING})
++    set(BUILD_SHARED_LIBS ${_prev_BUILD_SHARED_LIBS})
+ endif()
+-set(BUILD_TESTING ${_prev_BUILD_TESTING})
+-set(BUILD_SHARED_LIBS ${_prev_BUILD_SHARED_LIBS})
+ 
+ # Vulkan headers
+ if(NOT TARGET Vulkan::Headers)
+@@ -184,30 +186,32 @@ target_include_directories(
+ 
+ # fast_float headers (header-only). Mark as a system include so the bundled
+ # (or override-supplied) headers don't trip Slang's extra warnings / -Werror.
+-add_library(fast_float INTERFACE)
+-if(NOT SLANG_OVERRIDE_FAST_FLOAT_PATH)
+-    set(_fast_float_include "${CMAKE_CURRENT_LIST_DIR}/fast_float/include")
+-else()
+-    set(_fast_float_include
+-        "${SLANG_OVERRIDE_FAST_FLOAT_PATH}/fast_float/include"
+-    )
+-    # The add_subdirectory-based overrides fail at configure time on a bad path
+-    # because CMake errors on a missing source directory. A header-only override
+-    # is just an include-dir string, so validate the user-supplied path here to
+-    # fail loudly at configure time rather than as an opaque "header not found"
+-    # compile error later.
+-    if(NOT EXISTS "${_fast_float_include}")
+-        message(
+-            FATAL_ERROR
+-            "SLANG_OVERRIDE_FAST_FLOAT_PATH is set to '${SLANG_OVERRIDE_FAST_FLOAT_PATH}' but '${_fast_float_include}' does not exist"
++if(NOT ${SLANG_USE_SYSTEM_FAST_FLOAT})
++    add_library(fast_float INTERFACE)
++    if(NOT SLANG_OVERRIDE_FAST_FLOAT_PATH)
++        set(_fast_float_include "${CMAKE_CURRENT_LIST_DIR}/fast_float/include")
++    else()
++        set(_fast_float_include
++            "${SLANG_OVERRIDE_FAST_FLOAT_PATH}/fast_float/include"
+         )
++        # The add_subdirectory-based overrides fail at configure time on a bad path
++        # because CMake errors on a missing source directory. A header-only override
++        # is just an include-dir string, so validate the user-supplied path here to
++        # fail loudly at configure time rather than as an opaque "header not found"
++        # compile error later.
++        if(NOT EXISTS "${_fast_float_include}")
++            message(
++                FATAL_ERROR
++                "SLANG_OVERRIDE_FAST_FLOAT_PATH is set to '${SLANG_OVERRIDE_FAST_FLOAT_PATH}' but '${_fast_float_include}' does not exist"
++            )
++        endif()
+     endif()
++    target_include_directories(
++        fast_float
++        ${system}
++        INTERFACE "${_fast_float_include}"
++    )
+ endif()
+-target_include_directories(
+-    fast_float
+-    ${system}
+-    INTERFACE "${_fast_float_include}"
+-)
+ 
+ # Slang and SPIRV-Tools share one mimalloc target. Resolve the checkout before either consumer is
+ # configured so slang-compiler can use mimalloc even when SPIRV-Tools is disabled or provided by
