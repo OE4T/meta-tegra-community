@@ -42,3 +42,20 @@ Holoscan SDK v5.0.0, to `iceoryx2`, `iceoryx2-c`, `iceoryx2-cxx` and
 
 The patches extend iceoryx2's C FFI structures, so every iceoryx2 consumer
 in a build that includes this layer sees the patched layout.
+
+## Holoscan SDK
+
+`recipes-holoscan` holds `holoscan-sdk` and the recipes that build against
+it. Holoscan SDK 5.0 links against iceoryx2 for its HoloMQ transport, so
+these recipes are only available when meta-iceoryx2 is in the build.
+
+Build the SDK with:
+```
+bitbake holoscan-sdk
+```
+
+When `ptest` is in `DISTRO_FEATURES`, its test suites are packaged in
+`holoscan-sdk-ptest`; run them on the target with:
+```
+ptest-runner holoscan-sdk
+```

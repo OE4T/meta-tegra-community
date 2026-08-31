@@ -1,0 +1,147 @@
+From baf8bf159fa5e7fe1b5c30955340ec356b07b592 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Sun, 18 Oct 2026 21:39:26 -0700
+Subject: [PATCH] fix(runtime): fall back when a causal successor defers
+
+The partition causal frontier fails the run with
+RUNTIME_OPERATOR_REPLAY_MISMATCH unless ingesting the successor's
+witness drains exactly one event. CUDAGraphOutputReadinessBinding
+legitimately drains nothing while its fixed output slot awaits
+downstream retirement, which races the next frame when the egress runs
+in another partition. The CUDA graph boundary matrix test hit this in
+2 to 5 percent of runs on Jetson AGX Orin.
+
+An empty drain consumes nothing, so ingest before consuming the
+receipt and, when nothing was drained, fall back to the ordinary
+READY-set path, whose bounded source wait rescans later. Errors and
+over-drains remain terminal. A test control forces one empty ingest to
+cover the deferral deterministically.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ src/runtime/run_session_readiness.cpp         | 13 +++++--
+ src/runtime/runtime_test_controls.hpp         | 22 ++++++++++++
+ ...est_runtime_inline_partition_execution.cpp | 35 +++++++++++++++++++
+ 3 files changed, 68 insertions(+), 2 deletions(-)
+
+diff --git a/src/runtime/run_session_readiness.cpp b/src/runtime/run_session_readiness.cpp
+index f5d6114dc..b930db853 100644
+--- a/src/runtime/run_session_readiness.cpp
++++ b/src/runtime/run_session_readiness.cpp
+@@ -1896,6 +1896,17 @@ void RunSessionState::append_readiness_poll_diagnostic(const GraphExec& exec, Re
+     static_cast<void>(cancel_ready_sources(state));
+     return CausalFrontierDisposition::kFailed;
+   }
++  const auto& control = plan_->executable_factories.test_direct_continuation_control;
++  const auto ingested =
++      control != nullptr && control->consume_causal_ingest_deferral()
++          ? expected<std::size_t, Error>{std::size_t{0U}}
++          : state.coordinator->ingest(*successor_binding, receipt.readiness_source, *source_credit);
++  if (ingested && *ingested == 0U) {
++    // A binding may hold its witness back, as a CUDA graph region does while its fixed output
++    // slot awaits downstream retirement. Nothing was drained, so leave the receipt intact for the
++    // ordinary READY-set path, whose bounded source wait rescans once the binding releases it.
++    return fallback();
++  }
+   // Consume the receipt before freeze_causal_next() because that operation assumes exclusive
+   // authority over the sole pending event. Ingress is destructive: any failure below is terminal,
+   // and cancel_ready_sources() retires coordinator credit rather than attempting an ordinary
+@@ -1903,8 +1914,6 @@ void RunSessionState::append_readiness_poll_diagnostic(const GraphExec& exec, Re
+   state.direct_chain.continuation_receipt.reset();
+   count_phase(RuntimePhaseCounter::kDirectContinuationReceiptsAccepted);
+   count_phase(RuntimePhaseCounter::kDirectContinuationPollElisions);
+-  const auto ingested =
+-      state.coordinator->ingest(*successor_binding, receipt.readiness_source, *source_credit);
+   if (!ingested || *ingested != 1U) {
+     append_diagnostic("RUNTIME_OPERATOR_REPLAY_MISMATCH",
+                       exec.operators()[successor_receiver].vertex,
+diff --git a/src/runtime/runtime_test_controls.hpp b/src/runtime/runtime_test_controls.hpp
+index 960d2d533..36143b4d4 100644
+--- a/src/runtime/runtime_test_controls.hpp
++++ b/src/runtime/runtime_test_controls.hpp
+@@ -388,6 +388,26 @@ class RuntimeDirectContinuationTestControl final {
+     return true;
+   }
+ 
++  void force_causal_ingest_deferral() {
++    const std::lock_guard lock(mutex_);
++    force_causal_ingest_deferral_ = true;
++    pause_after_receipt_ = false;
++  }
++
++  [[nodiscard]] bool consume_causal_ingest_deferral() {
++    const std::lock_guard lock(mutex_);
++    if (!force_causal_ingest_deferral_ || causal_ingest_deferral_consumed_) {
++      return false;
++    }
++    causal_ingest_deferral_consumed_ = true;
++    return true;
++  }
++
++  [[nodiscard]] bool causal_ingest_deferral_consumed() {
++    const std::lock_guard lock(mutex_);
++    return causal_ingest_deferral_consumed_;
++  }
++
+   void record_causal_freeze_failure_cleanup(const std::size_t pending_before_cancel,
+                                             const std::size_t outstanding_before_cancel,
+                                             const std::size_t pending_after_cancel,
+@@ -442,6 +462,8 @@ class RuntimeDirectContinuationTestControl final {
+   bool pause_after_receipt_{true};
+   bool force_causal_freeze_failure_{};
+   bool causal_freeze_failure_consumed_{};
++  bool force_causal_ingest_deferral_{};
++  bool causal_ingest_deferral_consumed_{};
+   CausalFreezeFailureObservation causal_freeze_failure_observation_{};
+   bool group_failure_published_{};
+   BoundaryFallbackObservation boundary_fallback_observation_;
+diff --git a/tests/runtime/test_runtime_inline_partition_execution.cpp b/tests/runtime/test_runtime_inline_partition_execution.cpp
+index 618c9170a..068166900 100644
+--- a/tests/runtime/test_runtime_inline_partition_execution.cpp
++++ b/tests/runtime/test_runtime_inline_partition_execution.cpp
+@@ -995,6 +995,41 @@ TEST(RuntimeInlinePartitionExecution,
+   EXPECT_EQ(count(detail::RuntimePhaseCounter::kActivationsCompleted), 1U);
+ }
+ 
++// A successor binding may hold a staged witness back, as a CUDA graph region does while its fixed
++// output slot awaits downstream retirement. The causal frontier has consumed nothing then, so it
++// must leave the receipt for the ordinary READY-set path instead of failing the run.
++TEST(RuntimeInlinePartitionExecution, CausalFrontierFallsBackWhenTheSuccessorDefersItsWitness) {
++  constexpr std::size_t kFrameCount = 3U;
++  InlinePartitionProbeState::reset();
++  // Key setup: make the first causal-frontier ingest drain nothing, as a deferring binding does.
++  ExecutionPlan plan = make_pod_chain_plan(QueuePolicy::kBlocking, false, kFrameCount, 1ns);
++  ASSERT_TRUE(plan.ok()) << plan.json();
++  const auto state = detail::ExecutionPlanAccess::retain(plan);
++  ASSERT_TRUE(state);
++  ASSERT_TRUE(state->inline_partition_execution.has_value()) << plan.json();
++  const auto control = std::make_shared<detail::RuntimeDirectContinuationTestControl>();
++  control->force_causal_ingest_deferral();
++  plan = detail::RuntimeTestPlanAccess::with_direct_continuation_test_control(plan, control);
++  ASSERT_TRUE(plan.ok()) << plan.json();
++
++  const InlinePartitionRunEvidence evidence = run_and_observe(plan, kFrameCount);
++
++  // Key assertion: the deferred witness reaches the sink through the ordinary path, and every
++  // frame completes without a diagnostic. Later frontiers may also fall back while that path
++  // holds pending events, so only the first fallback is fixed.
++  EXPECT_TRUE(control->causal_ingest_deferral_consumed());
++  ASSERT_TRUE(evidence.observed);
++  EXPECT_EQ(evidence.termination, RunTermination::kStopped);
++  EXPECT_EQ(evidence.diagnostic_count, 0U);
++  ASSERT_EQ(evidence.sink_values, (std::vector<std::uint32_t>{44U, 44U, 44U}));
++  const auto fallbacks =
++      phase_count(evidence, detail::RuntimePhaseCounter::kPartitionCausalFrontierFallbacks);
++  EXPECT_GE(fallbacks, 1U);
++  EXPECT_EQ(phase_count(evidence, detail::RuntimePhaseCounter::kPartitionCausalFrontierAccepted) +
++                fallbacks,
++            phase_count(evidence, detail::RuntimePhaseCounter::kPartitionCausalFrontierAttempts));
++}
++
+ INSTANTIATE_TEST_SUITE_P(QueuePolicies, InlinePodChainTest,
+                          testing::Values(QueuePolicy::kBlocking, QueuePolicy::kDropOldest),
+                          [](const testing::TestParamInfo<QueuePolicy>& info) {
+-- 
+2.43.0
+

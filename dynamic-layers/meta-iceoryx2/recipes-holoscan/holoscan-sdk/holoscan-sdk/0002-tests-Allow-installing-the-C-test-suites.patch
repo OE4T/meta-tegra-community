@@ -1,0 +1,504 @@
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Subject: [PATCH] tests: Allow installing the C++ test suites
+
+HOLOSCAN_BUILD_TESTS builds the test tree but no install component ships it,
+leaving a distribution to copy binaries out of the build tree along with their
+build-tree RPATH. Add HOLOSCAN_INSTALL_TESTS_DIR to opt into installing the
+self-contained suites, so CMake places them and rewrites their RPATH as it does
+for any other installed target.
+
+The suites are the gtest programs of tests/, of the holoviz, vision and
+inference modules, and of the holoviz operators. Where a directory also builds
+programs that are not suites, such as tests/system's smoke programs or
+tests/config's compile-only check, holoscan_install_test_targets() takes the
+suites by name, since a runner executes every program it installs as one.
+
+Some suites read files or exec programs by a compiled-in build-tree path, which
+an installed suite cannot reach and which a distribution's QA rejects. Install
+each beside the suite and compile in that path instead:
+- holoviz_test_text_renderer_compare's monospace TTF;
+- compile_test's golden plan artifacts, in compiler-testdata/;
+- the child programs the channel suites exec, in channel/.
+HOLOINFER_TEST reads its ONNX models relative to its working directory, so they
+go to modules/inference/tests/test_models under the suites' directory.
+
+The HoloMQ suites go to a holomq/ subdirectory. Their ctest entries split them
+by gtest filter and run two child programs standalone, so they are replayed
+entry by entry rather than run whole. holomq_cuda_unittests execs
+holomq_cuda_host_import_child by a compiled-in path, which for an installed
+suite has to be the installed child.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index fc2249af5..10726e268 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -56,6 +56,10 @@ if(HOLOSCAN_BUILD_EXAMPLES)
+     list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/examples/cmake")
+ endif()
+ 
++# Defines holoscan_install_test_targets(), which the test directories call. It has
++# to be included before they are added.
++include(HoloscanInstallTests)
++
+ # Append local cmake dependency path CMAKE_PREFIX_PATH
+ list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/deps")
+ 
+diff --git a/cmake/modules/HoloscanInstallTests.cmake b/cmake/modules/HoloscanInstallTests.cmake
+new file mode 100644
+index 000000000..05c881880
+--- /dev/null
++++ b/cmake/modules/HoloscanInstallTests.cmake
+@@ -0,0 +1,60 @@
++# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-License-Identifier: Apache-2.0
++#
++# HOLOSCAN_BUILD_TESTS builds the test tree but no install component ships it.
++# Setting HOLOSCAN_INSTALL_TESTS_DIR installs the self-contained suites instead,
++# letting CMake rewrite their RPATH as for any other installed target.
++#
++# STRING, not PATH: cmake absolutises a relative PATH cache value against the
++# build directory, while install() wants one relative to the prefix.
++set(HOLOSCAN_INSTALL_TESTS_DIR "" CACHE STRING
++    "Destination, relative to the install prefix, for the installed test suites")
++
++# Install every executable and shared library in the calling directory as component
++# holoscan-tests. Sweeping rather than naming targets picks up suites added later
++# and carries the plugins they dlopen beside themselves via $ORIGIN. SUBDIRECTORY
++# keeps a directory's programs apart, for suites that are not run whole but
++# through their ctest entries, or that ship helper programs. TARGETS installs only
++# the named targets, for a directory that also builds programs which are not
++# suites: a runner executes every program in the destination as one.
++function(holoscan_install_test_targets)
++    if(NOT HOLOSCAN_INSTALL_TESTS_DIR)
++        return()
++    endif()
++    cmake_parse_arguments(ARG "" "SUBDIRECTORY" "TARGETS" ${ARGN})
++    set(_holoscan_test_destination "${HOLOSCAN_INSTALL_TESTS_DIR}")
++    if(ARG_SUBDIRECTORY)
++        string(APPEND _holoscan_test_destination "/${ARG_SUBDIRECTORY}")
++    endif()
++
++    if(ARG_TARGETS)
++        set(_holoscan_test_targets ${ARG_TARGETS})
++    else()
++        get_property(_holoscan_test_targets
++            DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
++            PROPERTY BUILDSYSTEM_TARGETS
++        )
++    endif()
++
++    foreach(_holoscan_test_target IN LISTS _holoscan_test_targets)
++        get_target_property(_holoscan_test_target_type ${_holoscan_test_target} TYPE)
++        if(NOT (_holoscan_test_target_type STREQUAL "EXECUTABLE" OR
++                _holoscan_test_target_type STREQUAL "SHARED_LIBRARY"))
++            continue()
++        endif()
++
++        # Never built, so there is no binary to install: the expected_compile_fail_*
++        # fixtures are ill-formed on purpose.
++        get_target_property(_holoscan_test_target_excluded
++            ${_holoscan_test_target} EXCLUDE_FROM_ALL)
++        if(_holoscan_test_target_excluded)
++            continue()
++        endif()
++
++        install(TARGETS ${_holoscan_test_target}
++            COMPONENT holoscan-tests
++            RUNTIME DESTINATION "${_holoscan_test_destination}"
++            LIBRARY DESTINATION "${_holoscan_test_destination}"
++        )
++    endforeach()
++endfunction()
+diff --git a/modules/inference/tests/CMakeLists.txt b/modules/inference/tests/CMakeLists.txt
+index 104d139a1..c77c5bde8 100644
+--- a/modules/inference/tests/CMakeLists.txt
++++ b/modules/inference/tests/CMakeLists.txt
+@@ -134,3 +134,17 @@ holoscan_add_installed_consumer_test(
+         "-DHOLOSCAN_BUILD_EXAMPLES=${HOLOSCAN_BUILD_EXAMPLES}"
+         "-DHOLOSCAN_MODULE_PACKAGE_DIR=${CMAKE_INSTALL_LIBDIR}/cmake/${HOLOSCAN_PACKAGE_NAME}"
+ )
++
++# Ship these suites when the build opts into installing tests, with the models they
++# read from modules/inference/tests/test_models relative to their working
++# directory: install that tree beside them, where a runner starting them from the
++# suites' directory finds it.
++if(COMMAND holoscan_install_test_targets)
++    holoscan_install_test_targets()
++    if(HOLOSCAN_INSTALL_TESTS_DIR)
++        install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/test_models"
++            COMPONENT holoscan-tests
++            DESTINATION "${HOLOSCAN_INSTALL_TESTS_DIR}/modules/inference/tests"
++        )
++    endif()
++endif()
+diff --git a/modules/vision/tests/cpp/CMakeLists.txt b/modules/vision/tests/cpp/CMakeLists.txt
+index 425569941..a5c153441 100644
+--- a/modules/vision/tests/cpp/CMakeLists.txt
++++ b/modules/vision/tests/cpp/CMakeLists.txt
+@@ -86,3 +86,8 @@ holoscan_add_installed_consumer_test(
+ )
+ 
+ unset(_holoscan_vision_source_dir)
++
++# Ship these suites when the build opts into installing tests.
++if(COMMAND holoscan_install_test_targets)
++    holoscan_install_test_targets()
++endif()
+diff --git a/modules/visualization/operators/tests/system/CMakeLists.txt b/modules/visualization/operators/tests/system/CMakeLists.txt
+index 12f3a31e5..5dd89b243 100644
+--- a/modules/visualization/operators/tests/system/CMakeLists.txt
++++ b/modules/visualization/operators/tests/system/CMakeLists.txt
+@@ -36,3 +36,9 @@ holoviz_operator_add_system_test(holoviz_test_holoviz_op_contract test_holoviz_o
+ holoviz_operator_add_system_test(holoviz_test_holoviz_op_cuda_sink test_holoviz_op_cuda_sink.cpp)
+ target_link_libraries(holoviz_test_holoviz_op_cuda_sink
+     PRIVATE CUDA::cuda_driver holoscan::visualization::holoviz)
++
++# Ship these suites when the build opts into installing tests. A standalone
++# holoviz build does not include the SDK module that defines this.
++if(COMMAND holoscan_install_test_targets)
++    holoscan_install_test_targets()
++endif()
+diff --git a/modules/visualization/operators/tests/unit/CMakeLists.txt b/modules/visualization/operators/tests/unit/CMakeLists.txt
+index f43ec7eb0..108175014 100644
+--- a/modules/visualization/operators/tests/unit/CMakeLists.txt
++++ b/modules/visualization/operators/tests/unit/CMakeLists.txt
+@@ -117,3 +117,9 @@ if(NOT holoscan_visualization_IS_TOP_LEVEL)
+ endif()
+ 
+ unset(_holoviz_module_unit_dir)
++
++# Ship these suites when the build opts into installing tests. A standalone
++# holoviz build does not include the SDK module that defines this.
++if(COMMAND holoscan_install_test_targets)
++    holoscan_install_test_targets()
++endif()
+diff --git a/modules/visualization/tests/unit/CMakeLists.txt b/modules/visualization/tests/unit/CMakeLists.txt
+index ef7add476..63ae7928a 100644
+--- a/modules/visualization/tests/unit/CMakeLists.txt
++++ b/modules/visualization/tests/unit/CMakeLists.txt
+@@ -112,6 +112,18 @@ holoviz_add_unittest_target(holoviz_test_text_renderer_compare test_text_rendere
+ # file is absent (SDK-integrated builds may resolve imgui without misc/fonts).
+ get_property(_holoviz_imgui_source_dir GLOBAL PROPERTY HOLOVIZ_IMGUI_SOURCE_DIR)
+ file(TO_CMAKE_PATH "${_holoviz_imgui_source_dir}/misc/fonts/Cousine-Regular.ttf" _holoviz_test_mono_ttf)
++# A build path baked into a shipped binary fails QA, and the font would not be
++# readable there anyway. Install it beside the suite and bake in that path.
++if(HOLOSCAN_INSTALL_TESTS_DIR AND EXISTS "${_holoviz_test_mono_ttf}")
++    install(FILES "${_holoviz_test_mono_ttf}"
++        COMPONENT holoscan-tests
++        DESTINATION "${HOLOSCAN_INSTALL_TESTS_DIR}"
++    )
++    get_filename_component(_holoviz_test_mono_ttf_name "${_holoviz_test_mono_ttf}" NAME)
++    set(_holoviz_test_mono_ttf
++        "${CMAKE_INSTALL_PREFIX}/${HOLOSCAN_INSTALL_TESTS_DIR}/${_holoviz_test_mono_ttf_name}")
++    unset(_holoviz_test_mono_ttf_name)
++endif()
+ target_compile_definitions(holoviz_test_text_renderer_compare
+     PRIVATE HOLOVIZ_TEST_MONO_TTF="${_holoviz_test_mono_ttf}")
+ unset(_holoviz_imgui_source_dir)
+@@ -239,3 +251,9 @@ endif()
+ 
+ add_custom_target(holoscan_visualization_test DEPENDS ${_holoviz_unittest_targets})
+ unset(_holoviz_unittest_targets)
++
++# Ship these suites when the build opts into installing tests. A standalone
++# holoviz build does not include the SDK module that defines this.
++if(COMMAND holoscan_install_test_targets)
++    holoscan_install_test_targets()
++endif()
+diff --git a/tests/authoring/CMakeLists.txt b/tests/authoring/CMakeLists.txt
+index d1ff45c25..c72d1cb22 100644
+--- a/tests/authoring/CMakeLists.txt
++++ b/tests/authoring/CMakeLists.txt
+@@ -85,3 +85,6 @@ holoscan_add_authoring_compile_fail_test(
+     non_default_graph.cpp
+     "HOLOSCAN_REGISTER_GRAPH requires a default-constructible Graph or a Params aggregate"
+ )
++
++# Ship these suites when the build opts into installing tests.
++holoscan_install_test_targets()
+diff --git a/tests/channel/CMakeLists.txt b/tests/channel/CMakeLists.txt
+index a92cac002..8e67baaf6 100644
+--- a/tests/channel/CMakeLists.txt
++++ b/tests/channel/CMakeLists.txt
+@@ -30,6 +30,17 @@ function(holoscan_add_channel_expected_compile_fail_test
+         "${target_name}" "${diagnostic_fragment}")
+ endfunction()
+ 
++# The suites exec their child programs by path. An installed suite execs the
++# installed children, in channel/; the build-tree ones are not there.
++function(holoscan_channel_child_exe out_var target)
++    if(HOLOSCAN_INSTALL_TESTS_DIR)
++        set(${out_var}
++            "${CMAKE_INSTALL_PREFIX}/${HOLOSCAN_INSTALL_TESTS_DIR}/channel/${target}" PARENT_SCOPE)
++    else()
++        set(${out_var} "$<TARGET_FILE:${target}>" PARENT_SCOPE)
++    endif()
++endfunction()
++
+ add_library(channel_process_test_support STATIC
+     channel_test_support.cpp
+ )
+@@ -176,12 +187,18 @@ target_link_libraries(channel_event_wait_child
+         holoscan::core
+         holomq::holomq
+ )
++holoscan_channel_child_exe(_channel_interprocess_child channel_interprocess_child)
++holoscan_channel_child_exe(_channel_catalog_pod_child channel_catalog_pod_interprocess_child)
++holoscan_channel_child_exe(_channel_event_wait_child channel_event_wait_child)
+ target_compile_definitions(channel_test
+     PRIVATE
+-        HOLOSCAN_CHANNEL_INTERPROCESS_CHILD_EXE="$<TARGET_FILE:channel_interprocess_child>"
+-        HOLOSCAN_CHANNEL_CATALOG_POD_INTERPROCESS_CHILD_EXE="$<TARGET_FILE:channel_catalog_pod_interprocess_child>"
+-        HOLOSCAN_CHANNEL_EVENT_WAIT_CHILD_EXE="$<TARGET_FILE:channel_event_wait_child>"
++        HOLOSCAN_CHANNEL_INTERPROCESS_CHILD_EXE="${_channel_interprocess_child}"
++        HOLOSCAN_CHANNEL_CATALOG_POD_INTERPROCESS_CHILD_EXE="${_channel_catalog_pod_child}"
++        HOLOSCAN_CHANNEL_EVENT_WAIT_CHILD_EXE="${_channel_event_wait_child}"
+ )
++unset(_channel_interprocess_child)
++unset(_channel_catalog_pod_child)
++unset(_channel_event_wait_child)
+ add_dependencies(channel_test
+     channel_catalog_pod_interprocess_child
+     channel_event_wait_child
+@@ -258,10 +275,12 @@ target_link_libraries(channel_schema_interprocess_child
+         holoscan::sensor_io
+         holomq::holomq
+ )
++holoscan_channel_child_exe(_channel_schema_child channel_schema_interprocess_child)
+ target_compile_definitions(channel_schema_test
+     PRIVATE
+-        HOLOSCAN_CHANNEL_SCHEMA_INTERPROCESS_CHILD_EXE="$<TARGET_FILE:channel_schema_interprocess_child>"
++        HOLOSCAN_CHANNEL_SCHEMA_INTERPROCESS_CHILD_EXE="${_channel_schema_child}"
+ )
++unset(_channel_schema_child)
+ add_dependencies(channel_schema_test
+     channel_schema_interprocess_child
+ )
+@@ -300,14 +319,16 @@ target_link_libraries(channel_tensor_interprocess_child
+         holoscan::core
+         holomq::holomq
+ )
++holoscan_channel_child_exe(_channel_tensor_child channel_tensor_interprocess_child)
+ target_compile_definitions(channel_tensor_test
+     PRIVATE
+-        HOLOSCAN_CHANNEL_TENSOR_INTERPROCESS_CHILD_EXE="$<TARGET_FILE:channel_tensor_interprocess_child>"
++        HOLOSCAN_CHANNEL_TENSOR_INTERPROCESS_CHILD_EXE="${_channel_tensor_child}"
+ )
+ target_compile_definitions(channel_test
+     PRIVATE
+-        HOLOSCAN_CHANNEL_TENSOR_INTERPROCESS_CHILD_EXE="$<TARGET_FILE:channel_tensor_interprocess_child>"
++        HOLOSCAN_CHANNEL_TENSOR_INTERPROCESS_CHILD_EXE="${_channel_tensor_child}"
+ )
++unset(_channel_tensor_child)
+ add_dependencies(channel_tensor_test
+     channel_tensor_interprocess_child
+ )
+@@ -320,3 +341,15 @@ gtest_discover_tests(channel_tensor_test
+     TEST_PREFIX CHANNEL.
+     WORKING_DIRECTORY ${holoscan_BINARY_DIR}
+ )
++
++# Ship these suites, and the child programs they exec in channel/, when the build
++# opts into installing tests.
++holoscan_install_test_targets(TARGETS channel_test channel_schema_test channel_tensor_test)
++holoscan_install_test_targets(SUBDIRECTORY channel
++    TARGETS
++        channel_catalog_pod_interprocess_child
++        channel_event_wait_child
++        channel_interprocess_child
++        channel_schema_interprocess_child
++        channel_tensor_interprocess_child
++)
+diff --git a/tests/compiler/CMakeLists.txt b/tests/compiler/CMakeLists.txt
+index 5c6b982ca..1d2741730 100644
+--- a/tests/compiler/CMakeLists.txt
++++ b/tests/compiler/CMakeLists.txt
+@@ -110,6 +110,16 @@ configure_file(
+     "${compiler_artifact_golden_dir}/tensor_byte_span_derivation.v2.json"
+     COPYONLY
+ )
++# A build path baked into a shipped binary fails QA, and the goldens would not be
++# readable there anyway. Install them beside the suite and bake in that path.
++if(HOLOSCAN_INSTALL_TESTS_DIR)
++    install(DIRECTORY "${compiler_artifact_golden_dir}/"
++        COMPONENT holoscan-tests
++        DESTINATION "${HOLOSCAN_INSTALL_TESTS_DIR}/compiler-testdata"
++    )
++    set(compiler_artifact_golden_dir
++        "${CMAKE_INSTALL_PREFIX}/${HOLOSCAN_INSTALL_TESTS_DIR}/compiler-testdata")
++endif()
+ target_compile_definitions(compile_test
+     PRIVATE
+         HOLOSCAN_COMPILER_TEST_DATA_DIR="${compiler_artifact_golden_dir}"
+@@ -282,3 +292,6 @@ set_tests_properties(COMPILE_PURITY.no_forbidden_mutation_calls
+     PROPERTIES
+         LABELS "compile;purity;structural"
+ )
++
++# Ship this suite when the build opts into installing tests.
++holoscan_install_test_targets(TARGETS compile_test)
+diff --git a/tests/config/CMakeLists.txt b/tests/config/CMakeLists.txt
+index b6a527766..b88abdac8 100644
+--- a/tests/config/CMakeLists.txt
++++ b/tests/config/CMakeLists.txt
+@@ -106,3 +106,8 @@ holoscan_add_installed_consumer_test(
+ )
+ unset(_holoscan_tooling_component_modes_csv)
+ unset(_holoscan_tooling_component_modes)
++
++# Ship these suites when the build opts into installing tests. Not
++# config_no_exceptions_compile, which only checks that the codec compiles without
++# exceptions: no test runs it.
++holoscan_install_test_targets(TARGETS config_test config_io_test)
+diff --git a/tests/core/CMakeLists.txt b/tests/core/CMakeLists.txt
+index e2e1e9fcb..a116dcfa5 100644
+--- a/tests/core/CMakeLists.txt
++++ b/tests/core/CMakeLists.txt
+@@ -971,3 +971,6 @@ if(HOLOSCAN_BUILD_TESTING_LIBRARY)
+         WORKING_DIRECTORY ${holoscan_BINARY_DIR}
+     )
+ endif()
++
++# Ship these suites when the build opts into installing tests.
++holoscan_install_test_targets()
+diff --git a/tests/cuda_execution/CMakeLists.txt b/tests/cuda_execution/CMakeLists.txt
+index 2ac2bcdf8..383314532 100644
+--- a/tests/cuda_execution/CMakeLists.txt
++++ b/tests/cuda_execution/CMakeLists.txt
+@@ -45,3 +45,6 @@ gtest_discover_tests(cuda_execution_test
+     TEST_PREFIX CUDA_EXECUTION.
+     WORKING_DIRECTORY ${holoscan_BINARY_DIR}
+ )
++
++# Ship these suites when the build opts into installing tests.
++holoscan_install_test_targets()
+diff --git a/tests/holomq/unit/CMakeLists.txt b/tests/holomq/unit/CMakeLists.txt
+index 860226b59..95d2e0efd 100644
+--- a/tests/holomq/unit/CMakeLists.txt
++++ b/tests/holomq/unit/CMakeLists.txt
+@@ -153,8 +153,16 @@ if(NOT cuda_test_sources STREQUAL "")
+     target_include_directories(holomq_cuda_host_import_child PRIVATE
+         "${CMAKE_CURRENT_LIST_DIR}/../../../src/holomq")
+     target_link_libraries(holomq_cuda_host_import_child PRIVATE ${HOLOMQ_TEST_LIBRARY})
++    # An installed suite execs the installed child; the build-tree one is not there.
++    if(HOLOSCAN_INSTALL_TESTS_DIR)
++        set(_holomq_import_child_exe
++            "${CMAKE_INSTALL_PREFIX}/${HOLOSCAN_INSTALL_TESTS_DIR}/holomq/holomq_cuda_host_import_child")
++    else()
++        set(_holomq_import_child_exe "$<TARGET_FILE:holomq_cuda_host_import_child>")
++    endif()
+     target_compile_definitions(${CUDA_PROJECT_NAME} PRIVATE
+-        HOLOMQ_CUDA_HOST_IMPORT_CHILD_EXE="$<TARGET_FILE:holomq_cuda_host_import_child>")
++        HOLOMQ_CUDA_HOST_IMPORT_CHILD_EXE="${_holomq_import_child_exe}")
++    unset(_holomq_import_child_exe)
+     add_dependencies(${CUDA_PROJECT_NAME} holomq_cuda_host_import_child)
+ 
+     add_executable(holomq_retirement_worker_affinity_child retirement_worker_affinity_child.cpp)
+@@ -201,3 +209,9 @@ if(NOT cuda_test_sources STREQUAL "")
+ endif()
+ 
+ add_custom_target(holomq_all_unittests DEPENDS ${unittest_targets})
++
++# Ship these suites and their child programs when the build opts into installing
++# tests. They run through their ctest entries, which split them by gtest filter.
++if(COMMAND holoscan_install_test_targets)
++    holoscan_install_test_targets(SUBDIRECTORY holomq)
++endif()
+diff --git a/tests/memory/CMakeLists.txt b/tests/memory/CMakeLists.txt
+index a1695bee0..1e04aadde 100644
+--- a/tests/memory/CMakeLists.txt
++++ b/tests/memory/CMakeLists.txt
+@@ -40,3 +40,6 @@ gtest_discover_tests(memory_test
+     TEST_PREFIX MEMORY.
+     WORKING_DIRECTORY ${holoscan_BINARY_DIR}
+ )
++
++# Ship these suites when the build opts into installing tests.
++holoscan_install_test_targets()
+diff --git a/tests/params/CMakeLists.txt b/tests/params/CMakeLists.txt
+index ab6c33cfc..4455fc388 100644
+--- a/tests/params/CMakeLists.txt
++++ b/tests/params/CMakeLists.txt
+@@ -60,3 +60,6 @@ if(TARGET experimental_params_web_tuner)
+         WORKING_DIRECTORY ${holoscan_BINARY_DIR}
+     )
+ endif()
++
++# Ship these suites when the build opts into installing tests.
++holoscan_install_test_targets()
+diff --git a/tests/runtime/CMakeLists.txt b/tests/runtime/CMakeLists.txt
+index 359b484f5..9b0d14b7a 100644
+--- a/tests/runtime/CMakeLists.txt
++++ b/tests/runtime/CMakeLists.txt
+@@ -209,6 +209,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+         PROPERTIES LABELS "runtime;signals"
+         WORKING_DIRECTORY ${holoscan_BINARY_DIR}
+     )
++    holoscan_install_test_targets(TARGETS runtime_benchmark_signal_admission_test)
+ 
+     add_executable(runtime_signal_process_probe
+         runtime_signal_process_probe.cpp
+@@ -442,3 +443,7 @@ foreach(policy_environment IN ITEMS ON OFF)
+         WORKING_DIRECTORY ${holoscan_BINARY_DIR}
+     )
+ endforeach()
++
++# Ship these suites when the build opts into installing tests.
++holoscan_install_test_targets(
++    TARGETS runtime_test runtime_graph_phase_trace_test runtime_ready_policy_test)
+diff --git a/tests/sensor_io/CMakeLists.txt b/tests/sensor_io/CMakeLists.txt
+index 65ee0d3ca..5dc21a397 100644
+--- a/tests/sensor_io/CMakeLists.txt
++++ b/tests/sensor_io/CMakeLists.txt
+@@ -49,3 +49,6 @@ gtest_discover_tests(sensor_io_test
+     TEST_PREFIX SENSOR_IO.
+     WORKING_DIRECTORY ${holoscan_BINARY_DIR}
+ )
++
++# Ship these suites when the build opts into installing tests.
++holoscan_install_test_targets()
+diff --git a/tests/system/CMakeLists.txt b/tests/system/CMakeLists.txt
+index 7d626bada..27998abc4 100644
+--- a/tests/system/CMakeLists.txt
++++ b/tests/system/CMakeLists.txt
+@@ -1219,6 +1219,9 @@ target_link_libraries(tensor_projection_test PRIVATE
+ holoscan_configure_test_clang_tidy(tensor_projection_test)
+ include(GoogleTest)
+ gtest_discover_tests(tensor_projection_test DISCOVERY_MODE PRE_TEST TEST_PREFIX SYSTEM.)
++# Ship this suite when the build opts into installing tests; the rest of this
++# directory's programs are not suites.
++holoscan_install_test_targets(TARGETS tensor_projection_test)
+ 
+ # REQ: OPERATOR-036
+ # REQ: OPERATOR-037
+@@ -1432,4 +1435,5 @@ if(HOLOSCAN_BUILD_TESTING_LIBRARY)
+         holoscan::testing holoscan::sensor_io GTest::gtest_main)
+     gtest_discover_tests(operator_test_schema_test DISCOVERY_MODE PRE_TEST
+         TEST_PREFIX OPERATOR_TESTING_SCHEMA. WORKING_DIRECTORY ${holoscan_BINARY_DIR})
++    holoscan_install_test_targets(TARGETS operator_test_schema_test)
+ endif()
+diff --git a/tests/threading/CMakeLists.txt b/tests/threading/CMakeLists.txt
+index a8b340493..97715616f 100644
+--- a/tests/threading/CMakeLists.txt
++++ b/tests/threading/CMakeLists.txt
+@@ -42,3 +42,6 @@ gtest_discover_tests(threading_test
+     TEST_PREFIX THREADING.
+     WORKING_DIRECTORY ${holoscan_BINARY_DIR}
+ )
++
++# Ship these suites when the build opts into installing tests.
++holoscan_install_test_targets()
+diff --git a/tests/time/CMakeLists.txt b/tests/time/CMakeLists.txt
+index 769d1cdcc..9ad6c86d1 100644
+--- a/tests/time/CMakeLists.txt
++++ b/tests/time/CMakeLists.txt
+@@ -38,3 +38,6 @@ gtest_discover_tests(clock_registry_test
+     TEST_PREFIX CLOCK_REGISTRY.
+     WORKING_DIRECTORY ${holoscan_BINARY_DIR}
+ )
++
++# Ship these suites when the build opts into installing tests.
++holoscan_install_test_targets()

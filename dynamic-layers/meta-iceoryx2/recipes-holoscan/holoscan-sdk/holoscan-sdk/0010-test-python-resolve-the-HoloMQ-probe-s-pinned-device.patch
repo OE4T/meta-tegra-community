@@ -1,0 +1,66 @@
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Subject: [PATCH] test(python): resolve the HoloMQ probe's pinned device alias
+
+HoloMQTensorImportProbe fills an acquired slot with cudaMemset or
+cudaMemsetAsync on the slot's host address. A pinned host pool registers
+its payloads with CU_MEMHOSTREGISTER_DEVICEMAP, and a registered range
+has the same device address only on devices that report
+CU_DEVICE_ATTRIBUTE_CAN_USE_HOST_POINTER_FOR_REGISTERED_MEM. AGX Orin
+reports 0, so the fill fails with cudaErrorInvalidValue, which the probe
+reports as "HoloMQ probe slot is not available": both cases of
+test_numpy_asarray_waits_only_for_a_cuda_written_producer, which use a
+pinned pool, fail.
+
+Resolve the device alias with cuPointerGetAttribute, as "test(holomq):
+resolve pinned payload device aliases" does for the C++ HoloMQ CUDA import
+tests, falling back to the address itself when the query does not apply,
+so device pools are unchanged. Report a failed fill on its own, with the
+CUDA error, rather than as an unavailable slot.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+diff --git a/python/tests/core/operator_test_support.cpp b/python/tests/core/operator_test_support.cpp
+index b6bc0fb92..16c140452 100644
+--- a/python/tests/core/operator_test_support.cpp
++++ b/python/tests/core/operator_test_support.cpp
+@@ -53,6 +53,20 @@
+ 
+ namespace {
+ 
++// Pinned host payloads are registered with CU_MEMHOSTREGISTER_DEVICEMAP. Their device address
++// equals the host address only on devices that report
++// CU_DEVICE_ATTRIBUTE_CAN_USE_HOST_POINTER_FOR_REGISTERED_MEM, so resolve the device alias rather
++// than using the host address. Device allocations resolve to themselves.
++[[nodiscard]] void* device_address(void* pointer) noexcept {
++  const auto address = static_cast<CUdeviceptr>(reinterpret_cast<std::uintptr_t>(pointer));
++  CUdeviceptr device{};
++  if (cuPointerGetAttribute(&device, CU_POINTER_ATTRIBUTE_DEVICE_POINTER, address) !=
++      CUDA_SUCCESS) {
++    return pointer;
++  }
++  return reinterpret_cast<void*>(static_cast<std::uintptr_t>(device));
++}
++
+ // Manufacture a real imported HoloMQ lease for CuPy stream-exchange regressions.
+ class HoloMQTensorImportProbe {
+  public:
+@@ -93,10 +107,16 @@ class HoloMQTensorImportProbe {
+       throw std::runtime_error("HoloMQ probe is not initialized");
+     }
+     auto owner = pool_->acquire();
+-    if (!owner || (cuda_writer ? cudaMemsetAsync(owner->ptr(), 7, 64U, producer_stream_)
+-                               : cudaMemset(owner->ptr(), 7, 64U)) != cudaSuccess) {
++    if (!owner) {
+       throw std::runtime_error("HoloMQ probe slot is not available");
+     }
++    void* const slot = device_address(owner->ptr());
++    const cudaError_t filled = cuda_writer ? cudaMemsetAsync(slot, 7, 64U, producer_stream_)
++                                           : cudaMemset(slot, 7, 64U);
++    if (filled != cudaSuccess) {
++      throw std::runtime_error(std::string("HoloMQ probe slot fill failed: ") +
++                               cudaGetErrorString(filled));
++    }
+     auto handle = cuda_writer ? owner->export_handle(producer_stream_)
+                               : owner->export_handle_unsynchronized();
+     if (!handle) {
