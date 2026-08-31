@@ -1,0 +1,236 @@
+From 7b87af21e9c6174ca36dd20800c575349fac5397 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Thu, 1 Oct 2026 14:46:19 -0700
+Subject: [PATCH] tests: Allow installing the Python suites' helpers
+
+The Python ctests run helper programs, fixture libraries and generated
+schema packages by build-tree path, which HOLOSCAN_INSTALL_TESTS_DIR does
+not install. A distribution replaying them on a target would have to copy
+those binaries out of the build tree and rewrite their RPATH itself.
+
+Add holoscan_install_test_helpers() to install them as component
+holoscan-tests under helpers/, at the path the build tree gives them, so a
+runner can map each build-tree path onto its installed copy by prefix and
+CMake sets the install RPATH. They stay out of the suites' own directory,
+where a runner executes every program as a suite.
+
+Also install python_core_session_reaper_test with the other suites, and build
+holoscan_test_support, byte_schema_support and the constructor-handle provider
+with NOSTRIP, as the
+SDK's installed nanobind modules are, so they keep their symbols for a debug
+package.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+diff --git a/cmake/modules/HoloscanInstallTests.cmake b/cmake/modules/HoloscanInstallTests.cmake
+index 05c881880..6c6f6e6ce 100644
+--- a/cmake/modules/HoloscanInstallTests.cmake
++++ b/cmake/modules/HoloscanInstallTests.cmake
+@@ -58,3 +58,63 @@ function(holoscan_install_test_targets)
+         )
+     endforeach()
+ endfunction()
++
++# Install what the Python suites run by path rather than import: helper programs,
++# fixture libraries and generated schema packages. Each goes under helpers/,
++# at the path the build tree gives it relative to the top-level build directory,
++# so a runner can map any build-tree path onto the installed copy by prefix.
++# helpers/ keeps them out of the suites' own directory, where a runner treats
++# every program as a suite.
++#
++#   TARGETS  executables, shared libraries and Python extension modules
++#   SCHEMAS  holoscan_add_flatbuffer_schema(... PYTHON) targets: their generated
++#            module, its stub, and its codec extension
++function(holoscan_install_test_helpers)
++    if(NOT HOLOSCAN_INSTALL_TESTS_DIR)
++        return()
++    endif()
++    cmake_parse_arguments(_hith "" "" "TARGETS;SCHEMAS" ${ARGN})
++    set(_hith_root "${HOLOSCAN_INSTALL_TESTS_DIR}/helpers")
++
++    foreach(_hith_target IN LISTS _hith_TARGETS)
++        get_target_property(_hith_type ${_hith_target} TYPE)
++        if(_hith_type STREQUAL "EXECUTABLE")
++            get_target_property(_hith_dir ${_hith_target} RUNTIME_OUTPUT_DIRECTORY)
++        else()
++            get_target_property(_hith_dir ${_hith_target} LIBRARY_OUTPUT_DIRECTORY)
++        endif()
++        if(NOT _hith_dir)
++            get_target_property(_hith_dir ${_hith_target} BINARY_DIR)
++        endif()
++        file(RELATIVE_PATH _hith_relative "${holoscan_BINARY_DIR}" "${_hith_dir}")
++        install(TARGETS ${_hith_target}
++            COMPONENT holoscan-tests
++            RUNTIME DESTINATION "${_hith_root}/${_hith_relative}"
++            LIBRARY DESTINATION "${_hith_root}/${_hith_relative}"
++        )
++    endforeach()
++
++    foreach(_hith_schema IN LISTS _hith_SCHEMAS)
++        get_target_property(_hith_module ${_hith_schema} HOLOSCAN_FLATBUFFER_PYTHON_MODULE)
++        get_target_property(_hith_stub ${_hith_schema} HOLOSCAN_FLATBUFFER_PYTHON_STUB)
++        get_target_property(_hith_codec ${_hith_schema} HOLOSCAN_FLATBUFFER_PYTHON_CODEC_TARGET)
++        if(NOT _hith_module OR NOT _hith_codec)
++            message(FATAL_ERROR
++                "holoscan_install_test_helpers: ${_hith_schema} has no Python codec")
++        endif()
++        get_filename_component(_hith_dir "${_hith_module}" DIRECTORY)
++        file(RELATIVE_PATH _hith_relative "${holoscan_BINARY_DIR}" "${_hith_dir}")
++        set(_hith_files "${_hith_module}")
++        if(_hith_stub)
++            list(APPEND _hith_files "${_hith_stub}")
++        endif()
++        install(FILES ${_hith_files}
++            COMPONENT holoscan-tests
++            DESTINATION "${_hith_root}/${_hith_relative}"
++        )
++        install(TARGETS ${_hith_codec}
++            COMPONENT holoscan-tests
++            LIBRARY DESTINATION "${_hith_root}/${_hith_relative}"
++        )
++    endforeach()
++endfunction()
+diff --git a/examples/flatbuffer_schemas/descriptor_tensor_external_topic/cpp/CMakeLists.txt b/examples/flatbuffer_schemas/descriptor_tensor_external_topic/cpp/CMakeLists.txt
+index 818f6da36..7222910bf 100644
+--- a/examples/flatbuffer_schemas/descriptor_tensor_external_topic/cpp/CMakeLists.txt
++++ b/examples/flatbuffer_schemas/descriptor_tensor_external_topic/cpp/CMakeLists.txt
+@@ -64,6 +64,11 @@ if(BUILD_TESTING)
+         )
+ 
+         if(HOLOSCAN_BUILD_PYTHON_EXAMPLES)
++            # The Python client of EXAMPLE_PYTHON_DESCRIPTOR_TENSOR_EXTERNAL_TOPIC_TEST
++            # imports this generated schema package.
++            if(COMMAND holoscan_install_test_helpers)
++                holoscan_install_test_helpers(SCHEMAS descriptor_tensor_external_topic_generated)
++            endif()
+             get_target_property(
+                 _HOLOSCAN_DESCRIPTOR_TOPIC_PYTHON_DIR
+                 descriptor_tensor_external_topic_generated
+diff --git a/modules/inference/python/CMakeLists.txt b/modules/inference/python/CMakeLists.txt
+index edb66de63..78fc68954 100644
+--- a/modules/inference/python/CMakeLists.txt
++++ b/modules/inference/python/CMakeLists.txt
+@@ -74,6 +74,9 @@ if(HOLOSCAN_BUILD_TESTS AND BUILD_TESTING)
+     holoscan_configure_cxx20_target(holoscan_inference_python_plan PRIVATE)
+     target_link_libraries(holoscan_inference_python_plan PRIVATE holoscan::op_inference)
+     add_dependencies(holoscan-python holoscan_inference_python_plan)
++    if(COMMAND holoscan_install_test_helpers)
++        holoscan_install_test_helpers(TARGETS holoscan_inference_python_plan)
++    endif()
+ 
+     add_test(NAME python-inference.bindings
+         COMMAND "${Python3_EXECUTABLE}" -m pytest -q
+diff --git a/modules/vision/python/CMakeLists.txt b/modules/vision/python/CMakeLists.txt
+index 0d3096084..571821a9e 100644
+--- a/modules/vision/python/CMakeLists.txt
++++ b/modules/vision/python/CMakeLists.txt
+@@ -93,6 +93,9 @@ if(HOLOSCAN_BUILD_TESTS AND BUILD_TESTING)
+     holoscan_configure_cxx20_target(holoscan_vision_python_plan PRIVATE)
+     target_link_libraries(holoscan_vision_python_plan PRIVATE holoscan::vision)
+     add_dependencies(holoscan-python holoscan_vision_python_plan)
++    if(COMMAND holoscan_install_test_helpers)
++        holoscan_install_test_helpers(TARGETS holoscan_vision_python_plan)
++    endif()
+ 
+     add_test(NAME python-vision.bindings
+         COMMAND "${Python3_EXECUTABLE}" -m pytest -q
+diff --git a/modules/visualization/python/CMakeLists.txt b/modules/visualization/python/CMakeLists.txt
+index 5a62b236f..a3b4d5553 100644
+--- a/modules/visualization/python/CMakeLists.txt
++++ b/modules/visualization/python/CMakeLists.txt
+@@ -73,6 +73,9 @@ if(HOLOSCAN_BUILD_TESTS AND BUILD_TESTING)
+     target_link_libraries(holoscan_visualization_python_plan
+         PRIVATE holoscan::visualization::op_holoviz)
+     add_dependencies(holoscan-python holoscan_visualization_python_plan)
++    if(COMMAND holoscan_install_test_helpers)
++        holoscan_install_test_helpers(TARGETS holoscan_visualization_python_plan)
++    endif()
+ 
+     add_test(NAME python-visualization.bindings
+         COMMAND "${Python3_EXECUTABLE}" -m pytest -q
+diff --git a/python/tests/core/CMakeLists.txt b/python/tests/core/CMakeLists.txt
+index 35383d7a8..84e531463 100644
+--- a/python/tests/core/CMakeLists.txt
++++ b/python/tests/core/CMakeLists.txt
+@@ -49,14 +49,17 @@ endif()
+ find_package(Python 3.12 REQUIRED COMPONENTS Interpreter Development.SABIModule)
+ 
+ if(HOLOSCAN_PYTHON_NANOBIND_SPLIT_MODE_PROTOTYPE)
++    # NOSTRIP, as for the SDK's own modules: once installed, keep the symbols
++    # for the debug package rather than letting nanobind link with -Wl,-s.
+     nanobind_add_module(holoscan_python_test_support
+         BACKEND_MODULE nanobind_backend
+         STABLE_ABI_VERSION 3.12
++        NOSTRIP
+         operator_test_support.cpp
+         phase_counter_support.cpp
+     )
+ else()
+-    nanobind_add_module(holoscan_python_test_support STABLE_ABI
++    nanobind_add_module(holoscan_python_test_support STABLE_ABI NOSTRIP
+         operator_test_support.cpp
+         phase_counter_support.cpp)
+ endif()
+@@ -79,7 +82,7 @@ add_dependencies(
+ # A synthetic constructor-handle provider built like an independent package: its own nanobind
+ # domain, so it shares no binding-library type registry with Holoscan's extension.
+ nanobind_add_module(holoscan_python_constructor_handle_provider
+-    STABLE_ABI
++    STABLE_ABI NOSTRIP
+     NB_DOMAIN holoscan_test_constructor_handle_provider
+     constructor_handle_provider.cpp
+ )
+@@ -152,7 +155,7 @@ holoscan_add_flatbuffer_schema(
+     MAX_SERIALIZED_SIZE 2097152
+     PYTHON
+ )
+-nanobind_add_module(python_core_byte_schema_support STABLE_ABI byte_schema_support.cpp)
++nanobind_add_module(python_core_byte_schema_support STABLE_ABI NOSTRIP byte_schema_support.cpp)
+ target_link_libraries(python_core_byte_schema_support PRIVATE
+     holoscan::core python_core_byte_payload_generated)
+ set_target_properties(python_core_byte_schema_support PROPERTIES
+@@ -627,3 +630,43 @@ if(HOLOSCAN_BUILD_BENCHMARKS)
+         set_tests_properties(BENCHMARK_PYTHON_SCHEMA_BYTES PROPERTIES LABELS benchmark TIMEOUT 120)
+     endif()
+ endif()
++# Ship what these suites run by path when the build opts into installing tests.
++# python_core_session_reaper_test is a gtest suite of its own and goes with the
++# other suites; the rest are helpers the Python tests are pointed at.
++if(COMMAND holoscan_install_test_helpers)
++    holoscan_install_test_helpers(
++        TARGETS
++            holoscan_python_constructor_handle_provider
++            holoscan_python_test_support
++            python_core_byte_schema_support
++            python_core_config_plan
++            python_core_first_pipeline_plan
++            python_core_policy_plan
++            python_core_reusable_graph_plan
++            python_core_schema_payload_peer
++            python_core_sdk_descriptor_topic_fixture
++            python_core_temporal_plan
++            python_core_topic_peer
++            python_core_topic_plan
++        SCHEMAS
++            python_core_byte_channel_payload_generated
++            python_core_byte_payload_generated
++            python_core_byte_tensor_payload_generated
++            python_core_control_payload_generated
++            python_core_stereo_payload_generated
++            python_core_vector_payload_generated
++    )
++    if(TARGET python_core_descriptor_topic_fixture)
++        holoscan_install_test_helpers(
++            TARGETS
++                python_core_descriptor_topic_fixture
++                python_core_descriptor_topic_mismatch_peer
++        )
++    endif()
++endif()
++if(HOLOSCAN_INSTALL_TESTS_DIR)
++    install(TARGETS python_core_session_reaper_test
++        COMPONENT holoscan-tests
++        RUNTIME DESTINATION "${HOLOSCAN_INSTALL_TESTS_DIR}"
++    )
++endif()

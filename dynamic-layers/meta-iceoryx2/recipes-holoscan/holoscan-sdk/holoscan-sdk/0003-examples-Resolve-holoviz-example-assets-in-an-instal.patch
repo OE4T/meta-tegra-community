@@ -1,0 +1,84 @@
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Subject: [PATCH] examples: Resolve holoviz example assets in an installed tree
+
+holoviz_textured_quad and holoviz_cuda_interop_benchmark cannot find nv_logo.png
+once installed. parse_resource_path_args() defaults to <exedir>/<example>_assets,
+a directory only the POST_BUILD command creates, so it exists in the build tree
+alone, while install(FILES) places the image directly beside the binary:
+
+  Failed to load image .../holoviz_textured_quad_assets/nv_logo.png: can't fopen
+
+The flat install is deliberate, and matches how the rest of the SDK ships
+example data, so resolve the assets rather than move them: try the subdirectory,
+then the executable's own directory, taking the first that holds every required
+file. A build tree is unaffected, its POST_BUILD copy having populated the first
+candidate, which stays the one reported when neither is complete. This
+implements the search --help already describes, "the build-tree asset directory
+or the installed example directory", of which only the first was ever written.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+diff --git a/modules/visualization/examples/core/example_utils.hpp b/modules/visualization/examples/core/example_utils.hpp
+index 9c465d837..3e098cd09 100644
+--- a/modules/visualization/examples/core/example_utils.hpp
++++ b/modules/visualization/examples/core/example_utils.hpp
+@@ -48,6 +48,22 @@ inline std::filesystem::path current_executable_path(const char* argv0) {
+   return std::filesystem::path(argv0);
+ }
+ 
++/// The files every resource path has to provide. Shared by the default-path search and by
++/// the `--print-resource-path` check so the two cannot disagree about what a usable
++/// resource directory is.
++inline constexpr const char* kResourceFileNames[] = {"nv_logo.png"};
++
++/// True when \p dir provides every file in kResourceFileNames.
++inline bool has_resource_files(const std::filesystem::path& dir) {
++  for (const char* file_name : kResourceFileNames) {
++    std::error_code exists_error;
++    if (!std::filesystem::exists(dir / file_name, exists_error)) {
++      return false;
++    }
++  }
++  return true;
++}
++
+ /// Result of parse_resource_path_args(): either the resolved resource path, or the exit code
+ /// the program should return immediately (after `--help`, `--print-resource-path`, or a usage
+ /// error).
+@@ -58,7 +74,9 @@ struct ResourcePathArgs {
+ 
+ /// Parse the command line shared by the resource-path examples: one optional positional
+ /// resource path plus `--help`/`-h` and `--print-resource-path`. When no path is given,
+-/// default to the \p assets_dir_name directory next to the running executable.
++/// look for the assets in the \p assets_dir_name directory next to the running executable,
++/// and failing that beside the executable itself, which is where an installed example
++/// carries them.
+ inline ResourcePathArgs parse_resource_path_args(int argc, char** argv,
+                                                  const char* assets_dir_name) {
+   const auto print_usage = [&](std::ostream& out) {
+@@ -93,12 +111,22 @@ inline ResourcePathArgs parse_resource_path_args(int argc, char** argv,
+   }
+ 
+   if (res_path.empty()) {
+-    res_path = (current_executable_path(argv[0]).parent_path() / assets_dir_name).string();
++    // Two layouts carry the assets. A build tree copies them into a per-example
++    // subdirectory beside the binary, because the core examples all build into one
++    // shared output directory. An installed example has them
++    // directly beside the binary instead: its install destination is already
++    // per-example, so there is nothing for the subdirectory to keep apart. Prefer the
++    // subdirectory, and keep naming it when neither layout is complete, so a build
++    // tree that failed to populate it still reports the file it expected there.
++    const std::filesystem::path exe_dir = current_executable_path(argv[0]).parent_path();
++    const std::filesystem::path assets_dir = exe_dir / assets_dir_name;
++    const bool installed_layout = !has_resource_files(assets_dir) && has_resource_files(exe_dir);
++    res_path = (installed_layout ? exe_dir : assets_dir).string();
+   }
+ 
+   if (print_resource_path) {
+     const std::filesystem::path assets_path{res_path};
+-    for (const char* file_name : {"nv_logo.png"}) {
++    for (const char* file_name : kResourceFileNames) {
+       std::error_code exists_error;
+       if (!std::filesystem::exists(assets_path / file_name, exists_error)) {
+         std::cerr << "Missing " << (assets_path / file_name).string() << "\n";
