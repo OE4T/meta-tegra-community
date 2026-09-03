@@ -10,20 +10,28 @@ SECTION = "lib"
 
 inherit pkgconfig cmake features_check
 
-SRC_URI = "git://github.com/glfw/glfw.git;protocol=https;branch=master;tag=${PV}"
+SRC_URI = "git://github.com/glfw/glfw.git;protocol=https;nobranch=1;tag=${PV}"
 SRCREV = "7b6aead9fb88b3623e3b3725ebb42670cbe4c579"
 
-EXTRA_OECMAKE += "-DBUILD_SHARED_LIBS=ON -DGLFW_BUILD_DOCS=OFF"
-
-CFLAGS += "-fPIC"
-
-DEPENDS = "libpng zlib"
-REQUIRED_DISTRO_FEATURES = "opengl x11"
+REQUIRED_DISTRO_FEATURES = "opengl"
 ANY_OF_DISTRO_FEATURES = "wayland x11"
 
-PACKAGECONFIG ??= "x11 wayland"
+PACKAGECONFIG ??= "${@bb.utils.filter('DISTRO_FEATURES', 'wayland x11', d)}"
 
-PACKAGECONFIG[wayland] = "-DGLFW_BUILD_WAYLAND=ON,-DGLFW_BUILD_WAYLAND=OFF,wayland wayland-native wayland-protocols libxkbcommon"
-PACKAGECONFIG[x11] = ",,libxrandr libxinerama libxi libxcursor libglu"
+# GLFW dlopen()s its platform libraries, so no NEEDED entry pulls them in.
+PACKAGECONFIG[wayland] = "-DGLFW_BUILD_WAYLAND=ON,-DGLFW_BUILD_WAYLAND=OFF,wayland wayland-native libxkbcommon,wayland libxkbcommon"
+PACKAGECONFIG[x11] = "-DGLFW_BUILD_X11=ON,-DGLFW_BUILD_X11=OFF,libx11 libxrandr libxinerama libxi libxcursor libxext,libx11 libxrandr libxinerama libxi libxcursor libxext libxrender"
+
+EXTRA_OECMAKE += " \
+    -DBUILD_SHARED_LIBS=ON \
+    -DGLFW_BUILD_DOCS=OFF \
+    -DGLFW_BUILD_EXAMPLES=OFF \
+    -DGLFW_BUILD_TESTS=OFF \
+"
+
+RCONFLICTS:${PN} = "glfw"
+RCONFLICTS:${PN}-dev = "glfw-dev"
 
 COMPATIBLE_HOST:libc-musl = "null"
+
+CVE_PRODUCT = "glfw"
