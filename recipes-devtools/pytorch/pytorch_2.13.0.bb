@@ -199,9 +199,9 @@ do_install:append() {
     install -m 0755 ${B}/_C${PYEXTSUFFIX} \
         ${D}${PYTHON_SITEPACKAGES_DIR}/torch/_C${PYEXTSUFFIX}
 
-    # CMake installs a plain _C.so to ${prefix}/ (the wheel root); the correctly
-    # ABI-tagged copy is already above. Drop the stray to satisfy installed-vs-shipped.
-    rm -f ${D}${prefix}/_C.so
+    # CMake installs its own _C to ${prefix}/ (the wheel root), tagged with the
+    # build host's SOABI; the target-tagged copy is already above. Drop the stray.
+    rm -f ${D}${prefix}/_C*.so
 }
 
 PACKAGES =+ "${@bb.utils.contains('PACKAGECONFIG', 'python', 'python3-torch-dev python3-torch', '', d)}"
@@ -245,6 +245,7 @@ FILES:${PN}-staticdev += "${libdir}/mimalloc-2.3"
 # library and generated headers. This is harmless and can be ignored.
 INSANE_SKIP:${PN} += "buildpaths"
 INSANE_SKIP:${PN}-dev += "buildpaths"
+INSANE_SKIP:${PN}-src += "buildpaths"
 # torch/__init__.py explicitly loads libtorch_global_deps.so via ctypes.CDLL with
 # RTLD_GLOBAL before importing _C. PyTorch uses unversioned sonames so the symlink
 # in torch/lib/ necessarily ends in .so, which triggers the dev-so check.
