@@ -1,0 +1,53 @@
+Subject: [PATCH] cmake: limit optional dependencies and use shared libcrypto
+
+The layers do not use valijson or jsoncpp. Find those packages only
+when building the tools that need them. Link the JSON layer to the
+shared libcrypto supplied by the target distribution; it uses no
+libssl symbols.
+
+Upstream-Status: Pending
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -62,10 +62,6 @@
+ 
+ find_package(VulkanUtilityLibraries REQUIRED CONFIG)
+ 
+-find_package(valijson REQUIRED CONFIG)
+-
+-find_package(jsoncpp REQUIRED CONFIG)
+-
+ if (CMAKE_SYSTEM_NAME STREQUAL "Windows" OR
+     CMAKE_SYSTEM_NAME STREQUAL "Linux" OR
+     CMAKE_SYSTEM_NAME MATCHES "BSD")
+@@ -115,6 +111,8 @@
+ endif()
+ 
+ if(BUILD_VIA)
++    find_package(valijson REQUIRED CONFIG)
++    find_package(jsoncpp REQUIRED CONFIG)
+     add_subdirectory(via)
+ endif()
+ 
+@@ -127,6 +125,7 @@
+ endif()
+ 
+ if(BUILD_LAYERMGR)
++    find_package(valijson REQUIRED CONFIG)
+     add_subdirectory(vkconfig_core)
+     add_subdirectory(vkconfig)
+ endif()
+diff --git a/layersvt/CMakeLists.txt b/layersvt/CMakeLists.txt
+--- a/layersvt/CMakeLists.txt
++++ b/layersvt/CMakeLists.txt
+@@ -176,9 +176,7 @@
+     run_vulkantools_vk_xml_generate(json_gen_generator.py json_gen.cpp)
+     add_vk_layer(json_gen json_gen.cpp vk_layer_table.cpp vk_layer_table.h VkLayer_json_gen.def VkLayer_json_gen.json.in ../scripts/json_gen_generator.py)
+ 
+-    set(OPENSSL_USE_STATIC_LIBS TRUE)
+     find_package(OpenSSL REQUIRED)
+-    target_link_libraries(VkLayer_json_gen OpenSSL::SSL)
+     target_link_libraries(VkLayer_json_gen OpenSSL::Crypto)
+ endif ()
+ 

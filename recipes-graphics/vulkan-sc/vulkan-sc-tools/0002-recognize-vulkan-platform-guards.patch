@@ -1,0 +1,18 @@
+Subject: [PATCH] scripts: recognize current Vulkan platform guards
+
+Vulkan-Headers now defines Open Harmony OS and UBM platform extensions.
+Use their registry protection macros when generating the JSON layer.
+
+Upstream-Status: Pending
+
+--- a/scripts/common_codegen.py
++++ b/scripts/common_codegen.py
+@@ -64,6 +64,8 @@
+     'provisional' : 'VK_ENABLE_BETA_EXTENSIONS',
+     'directfb' : 'VK_USE_PLATFORM_DIRECTFB_EXT',
+     'screen' : 'VK_USE_PLATFORM_SCREEN_QNX',
++    'ohos' : 'VK_USE_PLATFORM_OHOS',
++    'ubm' : 'VK_USE_PLATFORM_UBM_SEC',
+ }
+ 
+ #
