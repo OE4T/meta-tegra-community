@@ -5,8 +5,6 @@ SECTION = "devel/python"
 LICENSE = "AGPL-3.0-only"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=8763b57f0092c337eb12c354870a324a"
 
-# PEP 625 sdist uses underscores: jetson_stats-7.2.1.tar.gz
-PYPI_PACKAGE = "jetson_stats"
 SRC_URI[sha256sum] = "90f74f817a2327d001fc0e9e2a348b78b048b718567a4236b3207a6b756f4d0f"
 
 SRC_URI += "\
