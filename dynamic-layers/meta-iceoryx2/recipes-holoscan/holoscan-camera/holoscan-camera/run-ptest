@@ -1,0 +1,126 @@
+#!/bin/sh
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+# SPDX-License-Identifier: MIT
+#
+# Run the holoscan-camera test payload: the operator gtest suites installed
+# beside this script, then upstream's --validate checks of the sample
+# applications, which compile each graph without opening a camera.
+#
+# No camera is needed. The SIPL hardware suite skips each case unless
+# SIPL_CAMERA_CONFIG names a camera (SIPL_JSON_CONFIG, SIPL_CAMERA_INDEX and
+# SIPL_CUDA_DEVICE refine it), and is passed through from the environment.
+
+cd "$(dirname "$(readlink -f "$0")")" || exit 1
+
+rc=0
+log=$(mktemp) || exit 1
+results=$(mktemp) || exit 1
+trap 'rm -f "$log" "$results"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+gtest_timeout=600
+# A test that ignores SIGTERM gets SIGKILL this many seconds later (exit 137).
+kill_after=30
+
+# One result per gtest case; anchoring on the "(N ms)" suffix skips gtest's
+# trailing failure summary. Exits nonzero if any case failed.
+gtest_report() {
+    awk -v suite="$1" '
+        function case_name() { name = $4; sub(/,$/, "", name); return suite ":" name }
+
+        /^\[ *OK *\] .* \([0-9]+ ms\)$/      { print "PASS: " case_name(); next }
+        /^\[ *FAILED *\] .* \([0-9]+ ms\)$/  { print "FAIL: " case_name(); failed++; next }
+        /^\[ *SKIPPED *\] .* \([0-9]+ ms\)$/ { print "SKIP: " case_name(); next }
+        END { exit (failed > 0 ? 1 : 0) }
+    ' "$2"
+}
+
+for suite in *; do
+    [ -f "$suite" ] && [ -x "$suite" ] || continue
+    [ "$suite" = run-ptest ] && continue
+
+    timeout -k "$kill_after" "$gtest_timeout" "./$suite" >"$log" 2>&1
+    status=$?
+
+    reported_failure=0
+    gtest_report "$suite" "$log" >"$results" || reported_failure=1
+    cat "$results"
+
+    # 77 means every selected case skipped.
+    [ $status -eq 77 ] && continue
+
+    if [ $status -eq 124 ] || [ $status -eq 137 ]; then
+        echo "FAIL: $suite (timed out after ${gtest_timeout}s)"
+    elif [ ! -s "$results" ]; then
+        if [ $status -eq 0 ]; then
+            echo "PASS: $suite"
+        else
+            echo "FAIL: $suite (exited $status)"
+        fi
+    elif [ $status -ne 0 ] && [ $reported_failure -eq 0 ]; then
+        echo "FAIL: $suite (exited $status without reporting a failing case)"
+    fi
+
+    if [ $status -ne 0 ]; then
+        rc=1
+        sed 's/^/  | /' "$log"
+    fi
+done
+
+# Upstream's add_test() entries for the applications, judged as ctest does: a
+# PASS_REGULAR_EXPRESSION decides on its own, otherwise the exit status.
+validate() {
+    name=$1
+    pass_re=$2
+    binary=@BINDIR@/$3
+    shift 3
+    if [ ! -e "$binary" ]; then
+        echo "SKIP: $name ($binary is not installed)"
+        return
+    fi
+
+    timeout -k "$kill_after" 120 "$binary" --validate "$@" >"$log" 2>&1
+    status=$?
+
+    # As in ctest, a timeout fails even when the output matched.
+    if [ $status -eq 124 ] || [ $status -eq 137 ]; then
+        verdict=FAIL
+    elif [ -n "$pass_re" ]; then
+        grep -Eq -- "$pass_re" "$log" && verdict=PASS || verdict=FAIL
+    else
+        [ $status -eq 0 ] && verdict=PASS || verdict=FAIL
+    fi
+    echo "$verdict: $name"
+    if [ $verdict = FAIL ]; then
+        rc=1
+        sed 's/^/  | /' "$log"
+    fi
+}
+
+for placement in host pinned device; do
+    expected=$placement
+    [ $placement = device ] && expected=device:0
+    validate "holoscan_camera_v4l2_validate_$placement" \
+        "graph validation complete \(memory=$expected\)" \
+        holoscan_camera_v4l2 --memory-kind $placement
+done
+
+for format in nv12 i420; do
+    validate "argus_validate_$format" "" holoscan_camera_argus --memory host --format $format
+done
+validate argus_validate_device "" holoscan_camera_argus --memory device
+
+validate sipl_player_validate_isp "graph validation complete \(isp, tiled\)" sipl_player
+validate sipl_player_validate_raw "graph validation complete \(raw, tiled\)" sipl_player --raw
+validate sipl_player_validate_separate "graph validation complete \(isp, separate\)" \
+    sipl_player --separate
+validate sipl_player_validate_raw_separate "graph validation complete \(raw, separate\)" \
+    sipl_player --raw --separate
+validate sipl_player_validate_headless "graph validation complete \(isp, tiled, headless\)" \
+    sipl_player --headless
+validate sipl_player_validate_raw_separate_headless \
+    "graph validation complete \(raw, separate, headless\)" \
+    sipl_player --raw --separate --headless
+
+exit $rc
