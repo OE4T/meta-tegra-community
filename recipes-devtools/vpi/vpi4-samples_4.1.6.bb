@@ -1,7 +1,7 @@
 SUMMARY = "NVIDIA VPI command-line sample applications"
 HOMEPAGE = "https://developer.nvidia.com/embedded/vpi"
 LICENSE = "BSD-3-Clause AND LicenseRef-Proprietary"
-LIC_FILES_CHKSUM = "file://01-convolve_2d/main.cpp;endline=27;md5=ad6efe6d8b43b8bceef6d97c7b79193f \
+LIC_FILES_CHKSUM = "file://01-convolve_2d/main.cpp;endline=27;md5=ac7975b528d3b5d7eb2f4ddcb629e547 \
                     file://assets/LICENSE;md5=6b5f633fc3acaabf21035790a05b1c71"
 
 COMPATIBLE_MACHINE = "(tegra)"
@@ -9,7 +9,7 @@ COMPATIBLE_MACHINE = "(tegra)"
 inherit l4t_deb_pkgfeed cuda cmake
 
 SRC_COMMON_DEBS = "vpi4-samples_${PV}_arm64.deb;subdir=vpi4-samples"
-SRC_URI[sha256sum] = "7267c7819e74153c70ad505ba6e66b0590f7756f7cffc45ee3b98c636138b58c"
+SRC_URI[sha256sum] = "230f18fc33cf5f135e23a83640952b9ad4e77e4e97554da10c95bd0b8a201eb4"
 
 SRC_URI += "file://CMakeLists.txt;subdir=vpi4-samples/opt/nvidia/vpi4/samples"
 
