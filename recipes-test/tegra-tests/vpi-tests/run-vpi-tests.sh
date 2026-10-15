@@ -111,10 +111,6 @@ run_optflow_lk() {
 }
 
 run_optflow_dense() {
-    if [ "${TEGRACHIPID}" != "0x23" ]; then
-        echo "Skipping 13_optflow_dense (unsupported chip: ${TEGRACHIPID})"
-        return $SKIPCODE
-    fi
     if [ ! -x "$SAMPLEROOT/bin/vpi_sample_13_optflow_dense" ]; then
         echo "Skipping 13_optflow_dense"
         return $SKIPCODE
