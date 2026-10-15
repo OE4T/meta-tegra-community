@@ -1,0 +1,166 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Thu, 15 Oct 2026 09:39:31 -0700
+Subject: [PATCH] Updates for OE cross builds
+
+A distribution installs to its own prefix and cross-compiles against a
+sysroot that already holds the BSP, which the standalone package build does
+not expect.
+
+The CMake package configuration is only installed with PKG_holoscan_camera,
+which also forces the prefix to /usr and a multiarch libdir.
+HOLOSCAN_CAMERA_INSTALL_PACKAGE_CONFIG installs the same configuration, in
+the layout a nested build uses, without either.
+
+HOLOSCAN_CAMERA_INSTALL_TESTS_DIR installs the operator gtest suites as
+component holoscan-camera-tests, excluded from a plain install. Going through
+install(TARGETS) lets CMake drop their build-tree RPATHs.
+
+A missing libnvsipl, libnvsipl_query, libnvscibuf or libnvscisync is a
+FATAL_ERROR when cross compiling instead of a WARNING, since the operator
+would otherwise link without them and fail only at run time.
+
+The SIPL header directories are exported only when they exist and are not a
+compiler default directory: with the headers in the sysroot's /usr/include,
+the export handed every consumer this build's sysroot path.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ CMakeLists.txt                                | 18 +++++++++++++
+ .../argus_capture_op/tests/CMakeLists.txt     |  1 +
+ operators/sipl_capture_op/CMakeLists.txt      | 25 ++++++++++++++-----
+ .../sipl_capture_op/tests/CMakeLists.txt      |  2 ++
+ .../v4l2_capture_op/tests/CMakeLists.txt      |  2 ++
+ pkg/holoscan-camera/CMakeLists.txt            |  2 +-
+ 6 files changed, 43 insertions(+), 7 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 2e1c928..04fd3a0 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -49,6 +49,19 @@ option(HOLOSCAN_CAMERA_BUILD_DEB
+     "Configure the holoscan-camera Debian package (CPack) even when this module is built nested in another project"
+     OFF)
+ option(BUILD_SHARED_LIBS "Build Holoscan Camera libraries as shared libraries" ON)
++option(HOLOSCAN_CAMERA_INSTALL_PACKAGE_CONFIG
++    "Install the find_package(holoscan-camera) configuration without PKG_holoscan_camera"
++    OFF)
++# STRING, not PATH: CMake would make a relative PATH absolute against the build directory.
++set(HOLOSCAN_CAMERA_INSTALL_TESTS_DIR "" CACHE STRING
++    "Install the operator test suites here, relative to the prefix, as component holoscan-camera-tests")
++function(holoscan_camera_install_tests)
++    if(HOLOSCAN_CAMERA_INSTALL_TESTS_DIR)
++        install(TARGETS ${ARGN}
++            RUNTIME DESTINATION "${HOLOSCAN_CAMERA_INSTALL_TESTS_DIR}"
++            COMPONENT holoscan-camera-tests EXCLUDE_FROM_ALL)
++    endif()
++endfunction()
+ 
+ # Apache-2.0 section 4 requires every redistribution to carry the license and notice.
+ # A parent project's GNUInstallDirs DOCDIR names the parent (e.g. share/doc/holoscan);
+@@ -191,6 +204,11 @@ if(HOLOSCAN_CAMERA_BUILD_PYTHON)
+     add_subdirectory(python)
+ endif()
+ 
++# A distribution installs to its own prefix, which PKG_holoscan_camera would force to /usr.
++if(HOLOSCAN_CAMERA_INSTALL_PACKAGE_CONFIG AND NOT PKG_holoscan_camera)
++    add_subdirectory(pkg/holoscan-camera)
++endif()
++
+ if(HOLOSCAN_CAMERA_BUILD_TESTING AND PKG_holoscan_camera)
+     add_subdirectory(tests)
+ endif()
+diff --git a/operators/argus_capture_op/tests/CMakeLists.txt b/operators/argus_capture_op/tests/CMakeLists.txt
+index d54409d..a3590f1 100644
+--- a/operators/argus_capture_op/tests/CMakeLists.txt
++++ b/operators/argus_capture_op/tests/CMakeLists.txt
+@@ -11,3 +11,4 @@ if(HOLOSCAN_CAMERA_RUN_ARGUS_TESTS)
+     gtest_discover_tests(test_argus_capture_op DISCOVERY_MODE PRE_TEST
+         PROPERTIES LABELS "unit;argus" TIMEOUT 15)
+ endif()
++holoscan_camera_install_tests(test_argus_capture_op)
+diff --git a/operators/sipl_capture_op/CMakeLists.txt b/operators/sipl_capture_op/CMakeLists.txt
+index d800e6e..fe5b1b4 100644
+--- a/operators/sipl_capture_op/CMakeLists.txt
++++ b/operators/sipl_capture_op/CMakeLists.txt
+@@ -68,8 +68,16 @@ find_library(NVSIPL_LIB nvsipl
+ find_library(NVSIPL_QUERY_LIB nvsipl_query
+     HINTS /usr/lib/aarch64-linux-gnu/nvidia /usr/lib/aarch64-linux-gnu)
+ 
++# A cross build stages the BSP in its sysroot, so a missing library is an error there rather
++# than a library that would silently be left out of the link.
++if(CMAKE_CROSSCOMPILING)
++    set(_sipl_missing_lib_severity FATAL_ERROR)
++else()
++    set(_sipl_missing_lib_severity WARNING)
++endif()
++
+ if(NOT NVSIPL_LIB OR NOT NVSIPL_QUERY_LIB)
+-    message(WARNING
++    message(${_sipl_missing_lib_severity}
+         "libnvsipl.so / libnvsipl_query.so not found — "
+         "building with --allow-shlib-undefined. "
+         "Mount the L4T BSP at /usr/lib/aarch64-linux-gnu/nvidia for runtime.")
+@@ -87,10 +95,15 @@ if(DEFINED NVSIPL_API_MAJOR_VERSION)
+ endif()
+ # PUBLIC: sipl_capture_service.hpp is a public header that directly includes SIPL/NvSci
+ # headers, so every consumer needs these paths on its include search list.
+-target_include_directories(sipl_capture_op PUBLIC
+-    ${NVSIPL_INCLUDE_DIR}
+-    ${NVSIPL_INCLUDE_DIR}/nvsci
+-    ${NVSIPL_INCLUDE_DIR}/nvmedia)
++# Headers in a compiler default directory need no search path, and exporting one would hand
++# consumers this build's sysroot path.
++foreach(_sipl_include_dir IN ITEMS
++        "${NVSIPL_INCLUDE_DIR}" "${NVSIPL_INCLUDE_DIR}/nvsci" "${NVSIPL_INCLUDE_DIR}/nvmedia")
++    if(IS_DIRECTORY "${_sipl_include_dir}" AND
++       NOT _sipl_include_dir IN_LIST CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES)
++        target_include_directories(sipl_capture_op PUBLIC "${_sipl_include_dir}")
++    endif()
++endforeach()
+ 
+ # The R38.5 and R39.2 SIPL archives both place query headers here.
+ if(EXISTS "${NVSIPL_INCLUDE_DIR}/query/include/NvSIPLCameraQuery.hpp")
+@@ -104,7 +117,7 @@ find_library(NVSCISYNC_LIB nvscisync
+     HINTS /usr/lib/aarch64-linux-gnu/nvidia /usr/lib/aarch64-linux-gnu)
+ 
+ if(NOT NVSCIBUF_LIB OR NOT NVSCISYNC_LIB)
+-    message(WARNING
++    message(${_sipl_missing_lib_severity}
+         "libnvscibuf.so / libnvscisync.so not found — "
+         "building with --allow-shlib-undefined.")
+ endif()
+diff --git a/operators/sipl_capture_op/tests/CMakeLists.txt b/operators/sipl_capture_op/tests/CMakeLists.txt
+index 8103c1a..50e9d2b 100644
+--- a/operators/sipl_capture_op/tests/CMakeLists.txt
++++ b/operators/sipl_capture_op/tests/CMakeLists.txt
+@@ -82,3 +82,5 @@ set_target_properties(sipl_capture_op_hardware_test PROPERTIES
+ gtest_discover_tests(sipl_capture_op_hardware_test
+     PROPERTIES LABELS "hardware"
+     DISCOVERY_MODE PRE_TEST)
++
++holoscan_camera_install_tests(sipl_capture_op_test sipl_capture_op_hardware_test)
+diff --git a/operators/v4l2_capture_op/tests/CMakeLists.txt b/operators/v4l2_capture_op/tests/CMakeLists.txt
+index 3c8c8a8..f8dd905 100644
+--- a/operators/v4l2_capture_op/tests/CMakeLists.txt
++++ b/operators/v4l2_capture_op/tests/CMakeLists.txt
+@@ -25,3 +25,5 @@ include(GoogleTest)
+ gtest_discover_tests(test_v4l2_capture_op
+     DISCOVERY_MODE PRE_TEST
+     PROPERTIES LABELS "unit")
++
++holoscan_camera_install_tests(test_v4l2_capture_op)
+diff --git a/pkg/holoscan-camera/CMakeLists.txt b/pkg/holoscan-camera/CMakeLists.txt
+index 5dc86ce..f53a8e2 100644
+--- a/pkg/holoscan-camera/CMakeLists.txt
++++ b/pkg/holoscan-camera/CMakeLists.txt
+@@ -6,7 +6,7 @@
+ # build uses HoloHub's Debian packaging helper; a nested build can opt into it
+ # with HOLOSCAN_CAMERA_BUILD_DEB, otherwise it installs the CMake package
+ # directly into the SDK module layout without including CPack.
+-if(PROJECT_IS_TOP_LEVEL OR HOLOSCAN_CAMERA_BUILD_DEB)
++if(PKG_holoscan_camera AND (PROJECT_IS_TOP_LEVEL OR HOLOSCAN_CAMERA_BUILD_DEB))
+     include(holohub_configure_deb)
+ 
+     holohub_configure_deb(
