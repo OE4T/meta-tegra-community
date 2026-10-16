@@ -1,0 +1,8 @@
+[Match]
+Name=mgbe0_0
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+Address=192.168.0.101/24
