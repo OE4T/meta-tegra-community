@@ -85,7 +85,7 @@ make_trt_engine() {
     bounded 300 /usr/src/tensorrt/bin/trtexec \
         --onnx="$SAMPLEMODELS/resnet10/resnet10_dynamic_batch.onnx" \
         --minShapes=data:1x3x368x640 --optShapes=data:2x3x368x640 \
-        --maxShapes=data:4x3x368x640 --fp16 \
+        --maxShapes=data:4x3x368x640 \
         --saveEngine=resnet10.engine --skipInference || return $?
     [ -s resnet10.engine ]
 }
@@ -324,7 +324,13 @@ test_video_osd() {
     bounded 120 video_convert input.yuv 1920 1080 YUV420 input.rgba 1920 1080 RGBA || return $?
     check_size input.rgba0 8294400 || return $?
     for mode in 0 1; do
-        bounded 120 video_osd input.rgba0 1920 1080 RGBA "osd-$mode-" RGBA -m "$mode" || return $?
+        # GPU OSD uses CUDA-pinned buffers, which the VIC transform
+        # rejects on tegra234, so pair it with the GPU transform there.
+        local xform=
+        if [ "$mode" -eq 1 ] && grep -qz '^nvidia,tegra234$' /proc/device-tree/compatible; then
+            xform="-f 1"
+        fi
+        bounded 120 video_osd input.rgba0 1920 1080 RGBA "osd-$mode-" RGBA -m "$mode" $xform || return $?
         check_size "osd-$mode-0" 8294400 || return $?
         if cmp -s input.rgba0 "osd-$mode-0"; then
             echo "Error: OSD mode $mode did not modify the image"
