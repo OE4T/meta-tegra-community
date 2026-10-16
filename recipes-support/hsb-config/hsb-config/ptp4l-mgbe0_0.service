@@ -1,0 +1,10 @@
+[Unit]
+Description=Send PTP SYNC messages to mgbe0_0
+After=phc2sys-mgbe0_0.service
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/ptp4l -i mgbe0_0 -f /etc/linuxptp/hsb-ptp.conf
+
+[Install]
+WantedBy=multi-user.target
