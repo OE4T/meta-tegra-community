@@ -1,0 +1,15 @@
+[Unit]
+Description=Copy system time to mgbe0_0
+Wants=network-online.target
+After=network-online.target
+After=systemd-networkd.service
+
+[Service]
+Type=simple
+ExecStartPre=/bin/sh -c 'until [ "$(cat /sys/class/net/mgbe0_0/operstate)" = "up" ]; do sleep 1; done'
+ExecStart=/usr/sbin/phc2sys -c mgbe0_0 -s CLOCK_REALTIME -O 0 -S 0.0001
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
