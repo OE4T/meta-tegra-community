@@ -12,4 +12,10 @@ SRCREV = "9c7f14c3acaec412f02cfefd067cd3802cb7ea85"
 
 inherit setuptools3
 
-RDEPENDS:${PN} = "python3"
+RDEPENDS:${PN} = " \
+    python3 \
+    python3-brotli \
+    python3-certifi \
+    python3-gevent \
+    python3-six \
+"
