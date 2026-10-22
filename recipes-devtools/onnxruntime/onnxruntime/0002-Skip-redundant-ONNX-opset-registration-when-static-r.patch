@@ -30,10 +30,10 @@ system ONNX built with static registration enabled]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
 diff --git a/onnxruntime/core/session/environment.cc b/onnxruntime/core/session/environment.cc
-index 523ff8eaf13..9b6eefcd3e8 100644
+index 0a32c14..bab344b 100644
 --- a/onnxruntime/core/session/environment.cc
 +++ b/onnxruntime/core/session/environment.cc
-@@ -303,15 +303,27 @@ Status Environment::Initialize(std::unique_ptr<logging::LoggingManager> logging_
+@@ -320,15 +320,27 @@ Status Environment::Initialize(std::unique_ptr<logging::LoggingManager> logging_
  #ifdef USE_DML
        dml::RegisterDmlSchemas();
  #endif
