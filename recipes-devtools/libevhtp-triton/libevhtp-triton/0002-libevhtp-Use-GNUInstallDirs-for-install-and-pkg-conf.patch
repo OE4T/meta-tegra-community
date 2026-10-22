@@ -1,0 +1,101 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 5 Oct 2026 14:58:55 -0700
+Subject: [PATCH 2/2] libevhtp: Use GNUInstallDirs for install and pkg-config
+ paths
+
+The library, the CMake package files and evhtp.pc are installed to a
+hard-coded lib directory, so builds for multilib or lib64 layouts put
+them in the wrong place. evhtp.pc is also generated from
+LIB_INSTALL_DIR and INCLUDE_INSTALL_DIR, which nothing in this project
+sets, so unless the caller passes them it gets an empty libdir and
+includedir=/evhtp, and its Libs.private lists library names and CMake
+target names such as Threads::Threads, which pkg-config cannot use.
+
+Install to the GNUInstallDirs directories and generate evhtp.pc from
+them. Express libevent, OpenSSL and Oniguruma as Requires.private
+modules, and add the thread library flags to Libs.private.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ CMakeLists.txt | 27 +++++++++++++++++++++------
+ evhtp.pc.in    |  8 ++++----
+ 2 files changed, 25 insertions(+), 10 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 427387c..1b6ef19 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -243,8 +243,9 @@ add_subdirectory(examples)
+ #   * <prefix>/lib/cmake/<PROJECT-NAME>
+ #   * <prefix>/lib/
+ #   * <prefix>/include/
+-set(config_install_dir "lib/cmake/${PROJECT_NAME}")
+-set(include_install_dir "include")
++include(GNUInstallDirs)
++set(config_install_dir "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
++set(include_install_dir "${CMAKE_INSTALL_INCLUDEDIR}")
+ 
+ set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
+ 
+@@ -281,9 +282,9 @@ configure_package_config_file(
+ install(
+     TARGETS evhtp
+     EXPORT "${TARGETS_EXPORT_NAME}"
+-    LIBRARY DESTINATION "lib"
+-    ARCHIVE DESTINATION "lib"
+-    RUNTIME DESTINATION "bin"
++    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
++    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
++    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+     INCLUDES DESTINATION "${include_install_dir}"
+ )
+ 
+@@ -324,11 +325,25 @@ install(
+     DESTINATION "${config_install_dir}"
+ )
+ 
++# pkg-config modules of the private dependencies, and flags for those
++# that have none.
++set(PC_REQUIRES_PRIVATE "libevent")
++set(PC_LIBS_PRIVATE "")
++if(OPENSSL_FOUND AND NOT EVHTP_DISABLE_SSL)
++    string(APPEND PC_REQUIRES_PRIVATE " openssl")
++endif()
++if(ONIGURUMA_FOUND AND NOT EVHTP_DISABLE_REGEX)
++    string(APPEND PC_REQUIRES_PRIVATE " oniguruma")
++endif()
++if(TARGET Threads::Threads AND NOT EVHTP_DISABLE_EVTHR)
++    string(APPEND PC_LIBS_PRIVATE " ${CMAKE_THREAD_LIBS_INIT}")
++endif()
++
+ configure_file(
+     ${CMAKE_CURRENT_SOURCE_DIR}/evhtp.pc.in
+     ${CMAKE_CURRENT_BINARY_DIR}/evhtp.pc @ONLY)
+ install(FILES       "${CMAKE_CURRENT_BINARY_DIR}/evhtp.pc"
+-        DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/pkgconfig")
++        DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+ 
+ message("")
+ message(STATUS "${BoldBlue}EVHTP_VERSION${ColourReset}            : ${BoldGreen} ${PROJECT_VERSION}${ColourReset}")
+diff --git a/evhtp.pc.in b/evhtp.pc.in
+index a7b351f..5b7cc6a 100644
+--- a/evhtp.pc.in
++++ b/evhtp.pc.in
+@@ -1,11 +1,11 @@
+ prefix=@CMAKE_INSTALL_PREFIX@
+-libdir=@LIB_INSTALL_DIR@
+-includedir=@INCLUDE_INSTALL_DIR@/evhtp
++libdir=@CMAKE_INSTALL_FULL_LIBDIR@
++includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@/evhtp
+ 
+ Name: libevhtp
+ Description: A more flexible replacement for libevent's httpd API
+ Version: @PROJECT_VERSION@
++Requires.private: @PC_REQUIRES_PRIVATE@
+ Libs: -L${libdir} -levhtp
+-Libs.private: @LIBEVHTP_EXTERNAL_LIBS@
++Libs.private: @PC_LIBS_PRIVATE@
+ Cflags: -I${includedir}
+-
