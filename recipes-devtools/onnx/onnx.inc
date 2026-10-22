@@ -3,11 +3,6 @@ HOMEPAGE = "https://github.com/onnx/onnx"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57"
 
-# Shared by the onnx and onnx-ort recipes. Patches live in the onnx/ subdir,
-# which is only on the default file search path for the BPN "onnx" recipe; add
-# it explicitly so the onnx-ort recipe can find the same patches.
-FILESEXTRAPATHS:prepend := "${THISDIR}/onnx:"
-
 SRC_URI = " \
     git://github.com/onnx/onnx.git;protocol=https;branch=rel-${PV};tag=v${PV} \
     file://0001-Updates-for-OE-cross-builds.patch \
