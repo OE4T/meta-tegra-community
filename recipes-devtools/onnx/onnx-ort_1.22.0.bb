@@ -1,5 +1,8 @@
 require onnx.inc
 
+SRC_URI = "git://github.com/onnx/onnx.git;protocol=https;branch=rel-${PV};tag=v${PV}"
+SRCREV = "2bb50465112feca9003e1ed654d77f01ff1415ca"
+
 SUMMARY = "ONNX built as a private static library for onnxruntime (isolated schema registry)"
 
 inherit cmake
