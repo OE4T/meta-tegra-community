@@ -7,19 +7,20 @@ SRC_URI = " \
     git://github.com/microsoft/onnxruntime.git;protocol=https;nobranch=1;tag=v${PV} \
     git://github.com/NVIDIA/cudnn-frontend.git;protocol=https;nobranch=1;name=cudnn_frontend;destsuffix=${BPN}-${PV}/_deps/cudnn_frontend-src \
 "
-SRCREV = "058787ceead760166e3c50a0a4cba8a833a6f53f"
-SRCREV_cudnn_frontend = "666996fe3960f27170d1527e5579ba24c8d3380a"
+SRCREV = "d9d3b2fc25558db20900cb71865ffeb2348a3385"
+SRCREV_cudnn_frontend = "c4a97621eca52fa0c3a1862a411a16be580b25c6"
 
 SRCREV_FORMAT = "onnxruntime_cudnn_frontend"
 
 SRC_URI += " \
     file://0001-Use-external-library-dependencies.patch \
     file://0002-Skip-redundant-ONNX-opset-registration-when-static-r.patch \
+    file://0003-eigen_common_wrapper.h-Ignore-GCC-s-C-20-implicit-th.patch \
 "
 
 COMPATIBLE_MACHINE = "(cuda)"
 
-inherit cmake cuda setuptools3
+inherit cmake cuda python_setuptools_build_meta
 
 B = "${S}"
 
@@ -65,7 +66,6 @@ EXTRA_OECMAKE = " \
     -DFETCHCONTENT_TRY_FIND_PACKAGE_MODE=ALWAYS \
     -Donnxruntime_USE_PREINSTALLED_EIGEN=OFF \
     -DCMAKE_SKIP_RPATH=ON \
-    -DCMAKE_CXX_STANDARD=17 \
     ${@bb.utils.contains('PACKAGECONFIG', 'python', '-Donnxruntime_ENABLE_PYTHON=ON', '', d)} \
     -DCMAKE_CUDA_COMPILER_FORCED=TRUE \
 "
@@ -85,7 +85,7 @@ OECMAKE_CXX_FLAGS:append = "${@' -Wno-error=sfinae-incomplete' if ((d.getVar('GC
 OECMAKE_SOURCEPATH = "${S}/cmake"
 
 PACKAGECONFIG ?= "python"
-PACKAGECONFIG[python] = ",,python3-numpy-native,python3-coloredlogs python3-flatbuffers python3-numpy python3-protobuf python3-sympy"
+PACKAGECONFIG[python] = ",,python3-numpy-native python3-wheel-native,python3-coloredlogs python3-flatbuffers python3-numpy python3-protobuf python3-sympy"
 
 do_configure() {
     cmake_do_configure
@@ -94,14 +94,14 @@ do_configure() {
 do_compile() {
     cmake_do_compile
     if "${@bb.utils.contains('PACKAGECONFIG', 'python', 'true', 'false', d)}"; then
-        setuptools3_do_compile
+        python_pep517_do_compile
     fi
 }
 
 do_install() {
     cmake_do_install
     if "${@bb.utils.contains('PACKAGECONFIG', 'python', 'true', 'false', d)}"; then
-        setuptools3_do_install
+        python_pep517_do_install
     fi
 }
 
