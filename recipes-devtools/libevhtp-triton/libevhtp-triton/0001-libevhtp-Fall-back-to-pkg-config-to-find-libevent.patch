@@ -1,0 +1,47 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Mon, 5 Oct 2026 11:42:22 -0700
+Subject: [PATCH 1/2] libevhtp: Fall back to pkg-config to find libevent
+
+find_package(Libevent) only succeeds when libevent was built with CMake,
+because only that build installs LibeventConfig.cmake. libevent built
+with autotools, as most distributions do, only provides libevent.pc, so
+the configure step fails.
+
+Use pkg-config when the CMake package is not found. In that case
+Libevent is not added to the dependencies of the installed
+libevhtpConfig.cmake: the libraries are referenced by name, and the
+include directories reported by pkg-config are only used for the build,
+so no build-host paths end up in the exported targets.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ CMakeLists.txt | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a3f8e23..427387c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -59,10 +59,17 @@ set(LIBEVHTP_SOURCE_FILES
+     log.c
+     triton_timestamp.cc)
+ 
+-find_package(Libevent REQUIRED)
++find_package(Libevent QUIET)
++if(Libevent_FOUND)
++    list(APPEND package_deps Libevent)
++    list(APPEND LIBEVHTP_EXTERNAL_INCLUDES ${LIBEVENT_INCLUDE_DIRS})
++else()
++    # libevent built with autotools installs no CMake package.
++    find_package(PkgConfig REQUIRED)
++    pkg_check_modules(LIBEVENT REQUIRED libevent)
++    list(APPEND LIBEVHTP_EXTERNAL_INCLUDES $<BUILD_INTERFACE:${LIBEVENT_INCLUDE_DIRS}>)
++endif()
+ list(APPEND LIBEVHTP_EXTERNAL_LIBS ${LIBEVENT_LIBRARIES})
+-list(APPEND LIBEVHTP_EXTERNAL_INCLUDES ${LIBEVENT_INCLUDE_DIRS})
+-list(APPEND package_deps Libevent)
+ 
+ set(evhtp_dir_headers
+   "include/evhtp/evhtp.h"
