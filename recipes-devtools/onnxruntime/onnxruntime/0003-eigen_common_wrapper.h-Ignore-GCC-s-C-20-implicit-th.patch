@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Wed, 21 Oct 2026 15:22:15 -0700
+Subject: [PATCH] eigen_common_wrapper.h: Ignore GCC's C++20 implicit this
+ capture deprecation
+
+ONNX Runtime builds as C++20. Eigen releases up to 3.4.x capture 'this'
+implicitly through '[=]' in the unsupported Tensor module, which GCC
+diagnoses under -Wdeprecated:
+
+  unsupported/Eigen/CXX11/src/Tensor/TensorDeviceThreadPool.h:210:19:
+  error: implicit capture of 'this' via '[=]' is deprecated in C++20
+  [-Werror=deprecated]
+
+The wrapper already ignores the clang equivalent
+(-Wdeprecated-this-capture), which GCC does not have. Ignore
+-Wdeprecated for GCC around the Eigen include as well, so that building
+against an installed Eigen 3.4.x works with -Werror.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ include/onnxruntime/core/common/eigen_common_wrapper.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/include/onnxruntime/core/common/eigen_common_wrapper.h b/include/onnxruntime/core/common/eigen_common_wrapper.h
+index 19efa7b..13dccdf 100644
+--- a/include/onnxruntime/core/common/eigen_common_wrapper.h
++++ b/include/onnxruntime/core/common/eigen_common_wrapper.h
+@@ -55,6 +55,14 @@
+ #pragma GCC diagnostic ignored "-Wdeprecated-this-capture"
+ #endif
+ 
++// GCC reports the same deprecation under -Wdeprecated when building as C++20
++// against an Eigen release that predates the fix (e.g. 3.4.x):
++// unsupported/Eigen/CXX11/src/Tensor/TensorDeviceThreadPool.h:210:19:
++// error: implicit capture of 'this' via '[=]' is deprecated in C++20 [-Werror=deprecated]
++#if !defined(__clang__)
++#pragma GCC diagnostic ignored "-Wdeprecated"
++#endif
++
+ #elif defined(_MSC_VER)
+ // build\windows\debug\external\eigen3\unsupported\eigen\cxx11\src/Tensor/Tensor.h(76):
+ // warning C4554: '&': check operator precedence for possible error; use parentheses to clarify precedence
