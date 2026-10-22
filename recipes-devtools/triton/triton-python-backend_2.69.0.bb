@@ -6,6 +6,7 @@ SRC_URI = "\
     git://github.com/triton-inference-server/python_backend.git;protocol=https;branch=r26.05 \
     file://0001-fix-cmake-build.patch \
     file://0002-utils-Serialize-UUID-generation.patch \
+    file://0003-Fix-segfault-during-shutdown.patch \
 "
 
 SRCREV = "47f9e030ea1ef6d33f7069ab129747fe756ace70"
