@@ -1,4 +1,4 @@
-From 43b0d0f0ba3225b5c58371cbb5958718fb29a3d4 Mon Sep 17 00:00:00 2001
+From f65c90d7b551187c17149f06a5a3998309ff6134 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
 Date: Wed, 11 Jun 2025 12:07:22 +0100
 Subject: [PATCH] Build fixups
@@ -6,11 +6,11 @@ Subject: [PATCH] Build fixups
 Upstream-Status: Inappropriate [OE-Specific]
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt | 55 +++++++++++++-------------------------------------
- 1 file changed, 14 insertions(+), 41 deletions(-)
+ CMakeLists.txt | 61 +++++++++++++++++---------------------------------
+ 1 file changed, 21 insertions(+), 40 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 3e450fd..29261f7 100644
+index bf374cd..b26ee8c 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -140,7 +140,8 @@ endif()
@@ -67,14 +67,28 @@ index 3e450fd..29261f7 100644
  # CUDA
  #
  if(${TRITON_ENABLE_GPU})
--  find_package(CUDAToolkit REQUIRED)
 +  enable_language(CUDA)
-+  find_package(CUDA REQUIRED)
-+  include_directories(${CUDA_INCLUDE_DIRS})
+   find_package(CUDAToolkit REQUIRED)
++  include_directories(${CUDAToolkit_INCLUDE_DIRS})
  endif() # TRITON_ENABLE_GPU
  
  #
-@@ -281,7 +254,7 @@ set_target_properties(
+@@ -246,6 +219,14 @@ if(${TRITON_ENABLE_GPU})
+     PRIVATE TRITON_ENABLE_GPU=1
+   )
+ endif() # TRITON_ENABLE_GPU
++# triton-backend-utils is linked by name rather than through its exported
++# target, so its TRITON_ENABLE_STATS usage requirement is repeated here.
++if(${TRITON_ENABLE_STATS})
++  target_compile_definitions(
++    triton-onnxruntime-backend
++    PRIVATE TRITON_ENABLE_STATS=1
++  )
++endif() # TRITON_ENABLE_STATS
+ if(${TRITON_ENABLE_ONNXRUNTIME_TENSORRT})
+   target_compile_definitions(
+     triton-onnxruntime-backend
+@@ -281,7 +262,7 @@ set_target_properties(
      INSTALL_RPATH_USE_LINK_PATH FALSE
      INSTALL_RPATH "$\{ORIGIN\}"
      LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_onnxruntime.ldscript
@@ -83,7 +97,7 @@ index 3e450fd..29261f7 100644
  )
  endif()
  
-@@ -295,19 +268,19 @@ ENDFOREACH(p)
+@@ -295,19 +276,19 @@ ENDFOREACH(p)
  target_link_libraries(
    triton-onnxruntime-backend
    PRIVATE
@@ -93,7 +107,7 @@ index 3e450fd..29261f7 100644
 -    triton-backend-utils    # from repo-backend
 +    triton-backend-utils               # from repo-backend
 +    triton-backend-cuda-utils          # from repo-backend
-+    triton-core                        # from repo-core
++    tritonserver                       # from repo-core
 +    triton-common-async-work-queue     # from repo-common
      ${TRITON_ONNXRUNTIME_LDFLAGS}
 -    ${ONNXRUNTIME_LIBRARY}
@@ -109,7 +123,7 @@ index 3e450fd..29261f7 100644
    )
  endif() # TRITON_ENABLE_GPU
  
-@@ -410,8 +383,8 @@ install(
+@@ -410,8 +391,8 @@ install(
      triton-onnxruntime-backend
    EXPORT
      triton-onnxruntime-backend-targets
@@ -121,5 +135,5 @@ index 3e450fd..29261f7 100644
  
  # For Jetson, we build the onnxruntime backend once and re-use
 -- 
-2.34.1
+2.43.0
 

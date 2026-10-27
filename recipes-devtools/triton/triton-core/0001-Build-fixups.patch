@@ -1,4 +1,4 @@
-From e09a0b75ffb251087898e23977607b5d39795683 Mon Sep 17 00:00:00 2001
+From fa658fcdbde2ed8e36f3f8c6a0330f5298ddc1b9 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
 Date: Mon, 30 Jun 2025 21:24:57 +0100
 Subject: [PATCH] Build fixups
@@ -7,28 +7,20 @@ Upstream-Status: Inappropriate [OE-Specific]
 Signed-off-by: Roger Knecht <roger@norberthealth.com>
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt                     | 49 ++--------------------
+ CMakeLists.txt                     | 48 ++----------------------------
  python/CMakeLists.txt              |  2 +-
  python/build_wheel.py              |  2 +-
- python/setup.py                    | 67 ++++++++++++++++++++++++++++--
- python/tritonserver/CMakeLists.txt | 12 ++----
- src/CMakeLists.txt                 | 36 ++++------------
- src/model_config_utils.cc          |  4 +-
- 7 files changed, 82 insertions(+), 90 deletions(-)
+ python/setup.py                    |  4 +--
+ python/tritonserver/CMakeLists.txt | 14 +++------
+ src/CMakeLists.txt                 | 37 +++++++----------------
+ src/model_config_utils.cc          |  4 +--
+ 7 files changed, 23 insertions(+), 88 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 5453a41..d8cc4d1 100644
+index a9e9be9a..0e806939 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -120,6 +120,7 @@ add_library(
-   triton-core-serverstub SHARED
-   ${CMAKE_CURRENT_SOURCE_DIR}/src/tritonserver_stub.cc
- )
-+set_target_properties(triton-core-serverstub PROPERTIES LIBRARY_OUTPUT_NAME triton-core-serverstub)
- 
- add_library(
-   TritonCore::triton-core-serverstub ALIAS triton-core-serverstub
-@@ -139,7 +140,7 @@ else()
+@@ -139,7 +139,7 @@ else()
    target_compile_options(
      triton-core-serverstub
      PRIVATE
@@ -37,7 +29,7 @@ index 5453a41..d8cc4d1 100644
    )
  endif()
  
-@@ -183,12 +184,6 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
+@@ -183,12 +183,6 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
  
    # Repo tags
    set(TRITON_REPO_ORGANIZATION "https://github.com/triton-inference-server" CACHE STRING "Git repository to pull from")
@@ -50,7 +42,7 @@ index 5453a41..d8cc4d1 100644
  
    if(TRITON_ENABLE_METRICS AND NOT TRITON_ENABLE_STATS)
      message(FATAL_ERROR "TRITON_ENABLE_METRICS=ON requires TRITON_ENABLE_STATS=ON")
-@@ -210,14 +205,6 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
+@@ -210,14 +204,6 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
      message(FATAL_ERROR "TRITON_ENABLE_METRICS_GPU=ON requires TRITON_ENABLE_GPU=ON")
    endif()
  
@@ -65,7 +57,7 @@ index 5453a41..d8cc4d1 100644
    # Some libs are installed to ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/{LIB}/lib64 instead
    # of ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/{LIB}/lib on Centos
    set (LIB_DIR "lib")
-@@ -300,38 +287,9 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
+@@ -301,38 +287,9 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
      SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src"
      BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/triton-core"
      CMAKE_CACHE_ARGS
@@ -104,7 +96,7 @@ index 5453a41..d8cc4d1 100644
        -DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH}
        -DCNMEM_PATH:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/cnmem
        -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION}
-@@ -355,7 +313,8 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
+@@ -356,7 +313,8 @@ if(NOT TRITON_CORE_HEADERS_ONLY)
        -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
        -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}
        -DTRITON_VERSION:STRING=${TRITON_VERSION}
@@ -115,7 +107,7 @@ index 5453a41..d8cc4d1 100644
  endif() # NOT TRITON_CORE_HEADERS_ONLY
  
 diff --git a/python/CMakeLists.txt b/python/CMakeLists.txt
-index df7f1bd..30df59e 100644
+index 2f2d5a1a..2cf11bfe 100644
 --- a/python/CMakeLists.txt
 +++ b/python/CMakeLists.txt
 @@ -45,7 +45,7 @@ set(wheel_stamp_file "stamp.whl")
@@ -128,113 +120,42 @@ index df7f1bd..30df59e 100644
      "${CMAKE_CURRENT_SOURCE_DIR}/build_wheel.py"
      --dest-dir "${CMAKE_CURRENT_BINARY_DIR}/generic"
 diff --git a/python/build_wheel.py b/python/build_wheel.py
-index 2888cfe..f44a1da 100755
+index 91f98e9b..f7d3183b 100755
 --- a/python/build_wheel.py
 +++ b/python/build_wheel.py
-@@ -112,7 +112,7 @@ if __name__ == "__main__":
+@@ -275,7 +275,7 @@ if __name__ == "__main__":
  
      os.chdir(FLAGS.whl_dir)
      print("=== Building wheel")
 -    args = ["python3", "-m", "build"]
 +    args = ["python3", "setup.py", "bdist_wheel"]
- 
-     wenv = os.environ.copy()
-     wenv["VERSION"] = FLAGS.triton_version
+     # PEP 427 "build tag": an optional segment between version and
+     # python-tag that lets two wheels of the same version coexist
+     # (e.g. reruns of the same CI pipeline). Sources, first non-empty
 diff --git a/python/setup.py b/python/setup.py
-index 9b9b291..c7dbb8a 100755
+index db324e80..b04524c5 100755
 --- a/python/setup.py
 +++ b/python/setup.py
-@@ -25,10 +25,10 @@
- # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+@@ -28,7 +28,7 @@
  
--
-+import os
  import subprocess
  
--from setuptools import setup
-+from setuptools import find_packages, setup
+-from setuptools import Distribution, setup
++from setuptools import Distribution, find_packages, setup
  from setuptools.command.build_py import build_py
  
  
-@@ -37,11 +37,70 @@ class BuildPyCommand(build_py):
-         build_py.run(self)
-         # Generate stub files:
-         package_name = self.distribution.metadata.name
-+        stubgen_cmd = os.environ.get('STUBGEN_CLI')
-         subprocess.run(
--            ["stubgen", "-p", f"{package_name}._c", "-o", f"{self.build_lib}"],
-+            [stubgen_cmd, "-p", f"{package_name}._c", "-o", f"{self.build_lib}"],
-             check=True,
-         )
+@@ -64,4 +64,4 @@ class BinaryDistribution(Distribution):
  
  
  if __name__ == "__main__":
--    setup(cmdclass={"build_py": BuildPyCommand})
-+    if "VERSION" not in os.environ:
-+        raise Exception("envvar VERSION must be specified")
-+
-+    VERSION = os.environ["VERSION"]
-+
-+    data_files = [
-+        ("", ["LICENSE.txt"]),
-+    ]
-+
-+    # Type checking marker file indicating support for type checkers.
-+    # https://peps.python.org/pep-0561/
-+    # Type hints for c extension generated by mypy
-+    platform_package_data = [
-+        os.environ["TRITON_PYBIND"],
-+        "py.typed",
-+        "_c/__init__.pyi",
-+        "_c/triton_bindings.pyi",
-+    ]
-+
-+    gpu_extras = ["cupy-cuda12x"]
-+    test_extras = ["pytest"]
-+    all_extras = gpu_extras + test_extras
-+
-+    setup(
-+        name="tritonserver",
-+        version=VERSION,
-+        author="NVIDIA Inc.",
-+        author_email="sw-dl-triton@nvidia.com",
-+        description="Triton Inference Server In-Process Python API",
-+        license="BSD",
-+        url="https://developer.nvidia.com/nvidia-triton-inference-server",
-+        classifiers=[
-+            "Development Status :: 5 - Production/Stable",
-+            "Intended Audience :: Developers",
-+            "Intended Audience :: Science/Research",
-+            "Intended Audience :: Information Technology",
-+            "Topic :: Scientific/Engineering",
-+            "Topic :: Scientific/Engineering :: Image Recognition",
-+            "Topic :: Scientific/Engineering :: Artificial Intelligence",
-+            "Topic :: Software Development :: Libraries",
-+            "Topic :: Utilities",
-+            "License :: OSI Approved :: BSD License",
-+            "Programming Language :: Python :: 3",
-+            "Programming Language :: Python :: 3.10",
-+            "Programming Language :: Python :: 3.12",
-+            "Environment :: Console",
-+            "Natural Language :: English",
-+            "Operating System :: OS Independent",
-+        ],
-+        packages=find_packages(),
-+        package_data={
-+            "": platform_package_data,
-+        },
-+        zip_safe=False,
-+        ccmdclass={"build_py": BuildPyCommand},
-+        data_files=data_files,
-+        install_requires=["numpy<2"],
-+        extras_require={"GPU": gpu_extras, "test": test_extras, "all": all_extras},
-+    )
+-    setup(distclass=BinaryDistribution, cmdclass={"build_py": BuildPyCommand})
++    setup(distclass=BinaryDistribution, packages=find_packages())
 diff --git a/python/tritonserver/CMakeLists.txt b/python/tritonserver/CMakeLists.txt
-index d2480bc..4efd85a 100644
+index cc491d0a..1281f39a 100644
 --- a/python/tritonserver/CMakeLists.txt
 +++ b/python/tritonserver/CMakeLists.txt
-@@ -37,15 +37,9 @@ file(COPY _c/__init__.py DESTINATION ./_c/.)
+@@ -37,21 +37,15 @@ file(COPY _c/__init__.py DESTINATION ./_c/.)
  file(GLOB PYTHON_MODULE_FILES ./_api/*.py)
  file(COPY ${PYTHON_MODULE_FILES} DESTINATION ./_api/.)
  
@@ -253,11 +174,18 @@ index d2480bc..4efd85a 100644
  set(
    PYTHON_BINDING_SRCS
    _c/tritonserver_pybind.cc
+ )
+ 
+-pybind11_add_module(python-bindings SHARED ${PYTHON_BINDING_SRCS})
++pybind11_add_module(python-bindings SHARED NO_EXTRAS ${PYTHON_BINDING_SRCS})
+ target_link_libraries(
+   python-bindings
+   PRIVATE
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index eb911fb..bbe5b66 100644
+index 39f2cad4..0978f984 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -32,30 +32,16 @@ if(NOT CMAKE_BUILD_TYPE)
+@@ -32,29 +32,17 @@ if(NOT CMAKE_BUILD_TYPE)
    set(CMAKE_BUILD_TYPE Release)
  endif()
  
@@ -283,32 +211,26 @@ index eb911fb..bbe5b66 100644
  # CUDA
  #
  if(${TRITON_ENABLE_GPU})
--  find_package(CUDAToolkit REQUIRED)
 +  enable_language(CUDA)
-   find_package(CUDA REQUIRED)
-+  include_directories(${CUDA_INCLUDE_DIRS})
-+  link_directories(${CUDA_LIBRARIES})
-   message(STATUS "Using CUDA ${CUDA_VERSION}")
+   find_package(CUDAToolkit REQUIRED)
++  include_directories(${CUDAToolkit_INCLUDE_DIRS})
++  link_directories(${CUDAToolkit_LIBRARY_DIR})
++  message(STATUS "Using CUDA ${CUDAToolkit_VERSION}")
  endif() # TRITON_ENABLE_GPU
  
-@@ -71,7 +57,7 @@ message(STATUS "Using Boost ${Boost_VERSION}")
+ #
+@@ -70,8 +58,9 @@ message(STATUS "Using Boost ${Boost_VERSION}")
  # Protobuf
  #
  set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
 -find_package(Protobuf CONFIG REQUIRED)
 +find_package(Protobuf REQUIRED)
  message(STATUS "Using protobuf ${Protobuf_VERSION}")
++find_package(TritonCommon CONFIG REQUIRED)
  
  #
-@@ -238,6 +224,7 @@ add_library(
-   triton-core SHARED
-   ${SERVER_SRCS} ${SERVER_HDRS}
- )
-+set_target_properties(triton-core PROPERTIES LIBRARY_OUTPUT_NAME triton-core)
- 
- add_library(
-   TritonCore::triton-core ALIAS triton-core
-@@ -257,7 +244,7 @@ else()
+ # Prometheus
+@@ -259,7 +248,7 @@ else()
    target_compile_options(
      triton-core
      PRIVATE
@@ -317,11 +239,12 @@ index eb911fb..bbe5b66 100644
    )
    set_target_properties(
      triton-core
-@@ -452,13 +439,11 @@ find_package(re2 REQUIRED)
+@@ -455,13 +444,12 @@ find_package(re2 REQUIRED)
  target_link_libraries(
    triton-core
    PRIVATE
 -    proto-library                    # from repo-common
++    TritonCommon::triton-common-proto
      triton-common-async-work-queue   # from repo-common
      triton-common-thread-pool        # from repo-common
      triton-common-error              # from repo-common
@@ -331,7 +254,7 @@ index eb911fb..bbe5b66 100644
      triton-common-table-printer      # from repo-common
      protobuf::libprotobuf
      re2::re2
-@@ -505,12 +490,12 @@ if(${TRITON_ENABLE_AZURE_STORAGE})
+@@ -509,12 +497,12 @@ if(${TRITON_ENABLE_AZURE_STORAGE})
  endif() # TRITON_ENABLE_AZURE_STORAGE
  
  if(${TRITON_ENABLE_GPU})
@@ -346,7 +269,7 @@ index eb911fb..bbe5b66 100644
    )
  endif() # TRITON_ENABLE_GPU
  
-@@ -529,8 +514,3 @@ install(
+@@ -534,8 +522,3 @@ install(
    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
  )
@@ -356,10 +279,10 @@ index eb911fb..bbe5b66 100644
 -  add_subdirectory(test test)
 -endif() # NOT WIN32
 diff --git a/src/model_config_utils.cc b/src/model_config_utils.cc
-index a182fe3..19cfb5d 100644
+index 465ec008..721f970f 100644
 --- a/src/model_config_utils.cc
 +++ b/src/model_config_utils.cc
-@@ -1936,7 +1936,7 @@ CollectInt64Fields(
+@@ -1967,7 +1967,7 @@ CollectInt64Fields(
    const google::protobuf::Reflection* refl = message->GetReflection();
    for (int i = 0; i < desc->field_count(); ++i) {
      const google::protobuf::FieldDescriptor* field = desc->field(i);
@@ -368,7 +291,7 @@ index a182fe3..19cfb5d 100644
      switch (field->type()) {
        case google::protobuf::FieldDescriptor::TYPE_MESSAGE: {
          if (field->is_repeated()) {
-@@ -2161,7 +2161,7 @@ ModelConfigToJson(
+@@ -2192,7 +2192,7 @@ ModelConfigToJson(
    std::string config_json_str;
    ::google::protobuf::util::JsonPrintOptions options;
    options.preserve_proto_field_names = true;
@@ -378,5 +301,5 @@ index a182fe3..19cfb5d 100644
        config, &config_json_str, options);
  
 -- 
-2.34.1
+2.43.0
 
