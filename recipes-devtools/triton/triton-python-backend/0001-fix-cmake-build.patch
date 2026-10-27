@@ -1,4 +1,4 @@
-From 26de9e8d2fcd78400e889ae7aba86be3cb1d628b Mon Sep 17 00:00:00 2001
+From e254eff28ef06b5fa21becd16be50b48e921004b Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
 Date: Fri, 13 Jun 2025 18:08:57 +0100
 Subject: [PATCH] fix cmake build
@@ -7,24 +7,24 @@ Upstream-Status: Inappropriate [OE-Specific]
 Signed-off-by: Khem Raj <raj.khem@gmail.com>
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt  | 146 +++---------------------------------------------
+ CMakeLists.txt  | 140 ++++++++++--------------------------------------
  src/pb_memory.h |   2 +
- 2 files changed, 10 insertions(+), 138 deletions(-)
+ 2 files changed, 30 insertions(+), 112 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 0aaa95a..a572826 100644
+index f5c5b29..c3d3997 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -26,7 +26,7 @@
  
- cmake_minimum_required(VERSION 3.17)
+ cmake_minimum_required(VERSION 3.31.8)
  
 -project(tritonpythonbackend LANGUAGES C CXX)
 +project(triton-python-backend LANGUAGES C CXX)
  
  # Use C++17 standard as Triton's minimum required.
  set(TRITON_MIN_CXX_STANDARD 17 CACHE STRING "The minimum C++ standard which features are requested to build this target.")
-@@ -56,89 +56,13 @@ if(NOT CMAKE_BUILD_TYPE)
+@@ -56,91 +56,13 @@ if(NOT CMAKE_BUILD_TYPE)
    set(CMAKE_BUILD_TYPE Release)
  endif()
  
@@ -94,10 +94,12 @@ index 0aaa95a..a572826 100644
 -#
 -# Boost
 -#
+-set(TRITON_BOOST_URL "https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz" CACHE STRING "Boost source code URL")
+-
 -ExternalProject_Add(
 -  boostorg
--  URL https://archives.boost.io/release/1.79.0/source/boost_1_79_0.tar.gz
--  URL_HASH SHA256=273f1be93238a068aba4f9735a4a2b003019af067b9c183ed227780b8f36062c
+-  URL ${TRITON_BOOST_URL}
+-  URL_HASH SHA256=4b2136f98bdd1f5857f1c3dea9ac2018effe65286cf251534b6ae20cc45e1847
 -  PREFIX "boost-src"
 -  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E copy_directory
 -                    <SOURCE_DIR>/boost/ ${CMAKE_BINARY_DIR}/boost
@@ -110,43 +112,42 @@ index 0aaa95a..a572826 100644
  # CUDA
  #
  if(${TRITON_ENABLE_GPU})
--  find_package(CUDAToolkit REQUIRED)
 +  enable_language(CUDA)
-+  find_package(CUDA REQUIRED)
-+  include_directories(${CUDA_INCLUDE_DIRS})
+   find_package(CUDAToolkit REQUIRED)
++  include_directories(${CUDAToolkit_INCLUDE_DIRS})
    message(STATUS "Using CUDA ${CUDA_VERSION}")
    set(CUDA_NVCC_FLAGS -std=c++${TRITON_MIN_CXX_STANDARD})
  elseif()
-@@ -250,16 +174,6 @@ list(APPEND
-   ${COMMON_SRCS}
+@@ -157,6 +79,9 @@ if(NOT WIN32)
+   find_package(Threads REQUIRED)
+ endif()
+ 
++find_package(pybind11 CONFIG REQUIRED)
++find_package(TritonCommon CONFIG REQUIRED)
++
+ include_directories(${CMAKE_BINARY_DIR})
+ configure_file(src/libtriton_python.ldscript libtriton_python.ldscript COPYONLY)
+ 
+@@ -259,9 +184,6 @@ add_executable(
+   ${PYTHON_BACKEND_STUB_SRCS}
  )
  
--add_executable(
--  triton-python-backend-stub
--  ${PYTHON_BACKEND_STUB_SRCS}
--)
--
 -add_dependencies(triton-python-backend boostorg)
 -add_dependencies(triton-python-backend-stub boostorg)
 -
--set_property(TARGET triton-python-backend-stub PROPERTY OUTPUT_NAME triton_python_backend_stub)
--
+ set_property(TARGET triton-python-backend-stub PROPERTY OUTPUT_NAME triton_python_backend_stub)
+ 
  add_library(
-   TritonPythonBackend::triton-python-backend ALIAS triton-python-backend
- )
-@@ -272,32 +186,6 @@ target_compile_options(
+@@ -280,28 +202,11 @@ target_compile_features(triton-python-backend-stub PRIVATE cxx_std_${TRITON_MIN_
+ target_compile_options(
+   triton-python-backend-stub PRIVATE
+   $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
+-    -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -Werror>
++    -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -Wno-type-limits>
    $<$<CXX_COMPILER_ID:MSVC>:/Wall /D_WIN32_WINNT=0x0A00 /EHsc /Zc:preprocessor>
  )
+ target_compile_definitions(triton-python-backend-stub PRIVATE TRITON_PB_STUB)
  
--target_compile_features(triton-python-backend-stub PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
--target_compile_options(
--  triton-python-backend-stub PRIVATE
--  $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
--    -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -Werror>
--  $<$<CXX_COMPILER_ID:MSVC>:/Wall /D_WIN32_WINNT=0x0A00 /EHsc /Zc:preprocessor>
--)
--target_compile_definitions(triton-python-backend-stub PRIVATE TRITON_PB_STUB)
--
 -# RHEL assets are not released in a container environment nor do the current
 -# Python lib versions in the manylinux base container match those currently
 -# available for RHEL8 package managers. Therefore, we package the correct
@@ -167,7 +168,7 @@ index 0aaa95a..a572826 100644
  # For WIN32 do not link Threads and DL_LIBS
  if(WIN32)
    target_link_libraries(
-@@ -324,27 +212,14 @@ else()
+@@ -328,12 +233,13 @@ else()
    target_link_libraries(
      triton-python-backend
      PRIVATE
@@ -175,28 +176,47 @@ index 0aaa95a..a572826 100644
        Threads::Threads
        triton-backend-utils          # from repo-backend
 +      triton-backend-cuda-utils     # from repo-backend
++      TritonCommon::triton-common-async-work-queue
        ${CMAKE_DL_LIBS}              # dlopen and dlclose
        -lrt                          # shared memory
 -      triton-core-serverstub        # from repo-core
++      tritonserver                  # from repo-core
        ZLIB::ZLIB
        -larchive
    )
--
--  target_link_libraries(
--    triton-python-backend-stub
--    PRIVATE
+@@ -341,9 +247,9 @@ else()
+   target_link_libraries(
+     triton-python-backend-stub
+     PRIVATE
 -    dlpack
--    Threads::Threads
--    triton-backend-utils           # from repo-backend
--    ${CMAKE_DL_LIBS}               # dlopen and dlclose
--    pybind11::embed
--    -lrt                           # shared memory
--    -larchive                      # libarchive
--  )
+     Threads::Threads
+     triton-backend-utils           # from repo-backend
++    TritonCommon::triton-common-async-work-queue
+     ${CMAKE_DL_LIBS}               # dlopen and dlclose
+     pybind11::embed
+     -lrt                           # shared memory
+@@ -351,6 +257,20 @@ else()
+   )
  endif()
  
++# triton-backend-utils is linked by name rather than through its exported
++# target, so its usage requirements have to be repeated here.
++if(${TRITON_ENABLE_GPU})
++  foreach(_target triton-python-backend triton-python-backend-stub)
++    target_compile_definitions(${_target} PRIVATE TRITON_ENABLE_GPU=1)
++    target_link_libraries(${_target} PRIVATE CUDA::cudart)
++  endforeach()
++endif() # TRITON_ENABLE_GPU
++if(${TRITON_ENABLE_STATS})
++  foreach(_target triton-python-backend triton-python-backend-stub)
++    target_compile_definitions(${_target} PRIVATE TRITON_ENABLE_STATS=1)
++  endforeach()
++endif() # TRITON_ENABLE_STATS
++
  if(WIN32)
-@@ -363,8 +238,6 @@ else()
+   set_target_properties(
+     triton-python-backend PROPERTIES
+@@ -367,8 +287,6 @@ else()
    )
  endif()
  
@@ -205,11 +225,8 @@ index 0aaa95a..a572826 100644
  #
  # Install
  #
-@@ -374,12 +247,10 @@ set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/TritonPythonBackend)
- install(
-   TARGETS
-     triton-python-backend
--    triton-python-backend-stub
+@@ -381,9 +299,8 @@ install(
+     triton-python-backend-stub
    EXPORT
      triton-python-backend-targets
 -  LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/python
@@ -220,7 +237,7 @@ index 0aaa95a..a572826 100644
  )
  
  install(
-@@ -396,8 +267,7 @@ install(
+@@ -400,8 +317,7 @@ install(
  install(
    FILES
      src/resources/triton_python_backend_utils.py
@@ -244,5 +261,5 @@ index ad79dae..fec8edc 100644
  #include "shm_manager.h"
  #include "triton/backend/backend_common.h"
 -- 
-2.34.1
+2.43.0
 

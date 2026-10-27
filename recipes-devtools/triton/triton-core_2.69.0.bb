@@ -4,11 +4,11 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=5ad619ba25208ce8a327356e0111bb23"
 SECTION = "libs"
 
 SRC_URI = "\
-    git://github.com/triton-inference-server/core.git;protocol=https;branch=r25.05 \
+    git://github.com/triton-inference-server/core.git;protocol=https;branch=r26.05 \
     file://0001-Build-fixups.patch \
 "
 
-SRCREV = "109c69f9715fd95cd6d5fde74e1a6b354a025616"
+SRCREV = "e6fcb0c78e072672beab614384fd4f763c302134"
 
 DEPENDS = "\
     boost \
@@ -32,7 +32,11 @@ EXTRA_OECMAKE = '\
 
 SETUPTOOLS_SETUP_PATH = "${B}/python"
 
-PACKAGECONFIG ??= "logging gpu"
+# setuptools3 replaces the cmake cleandirs; stale ExternalProject stamps
+# in ${B} would otherwise skip rebuilding the sub-projects.
+do_configure[cleandirs] += "${B}"
+
+PACKAGECONFIG ??= "logging stats gpu"
 PACKAGECONFIG[logging] = "-DTRITON_ENABLE_LOGGING=ON,-DTRITON_ENABLE_LOGGING=OFF"
 PACKAGECONFIG[stats] = "-DTRITON_ENABLE_STATS=ON,-DTRITON_ENABLE_STATS=OFF"
 PACKAGECONFIG[tracing] = "-DTRITON_ENABLE_TRACING=ON,-DTRITON_ENABLE_TRACING=OFF"
@@ -61,8 +65,7 @@ do_compile() {
 
 do_install:append() {
     install -d ${D}${libdir}
-    install -m 0644 ${B}/triton-core/libtriton-core.so ${D}${libdir}
-    install -m 0644 ${B}/libtriton-core-serverstub.so ${D}${libdir}
+    install -m 0644 ${B}/triton-core/libtritonserver.so ${D}${libdir}
 
     install -d ${D}${includedir}/triton/core
     install -m 0644 ${S}/include/triton/core/tritonbackend.h ${D}${includedir}/triton/core/
@@ -78,5 +81,3 @@ SOLIBS = ".so"
 FILES_SOLIBSDEV = ""
 
 FILES:${PN}-dev += ""
-
-INSANE_SKIP:${PN} += "already-stripped"

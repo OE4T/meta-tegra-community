@@ -1,0 +1,55 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Wed, 21 Oct 2026 12:00:00 -0700
+Subject: [PATCH] utils: Serialize UUID generation
+
+GenerateUUID() shares one static boost::uuids::random_generator
+between all callers without a lock. Since Boost 1.86 the generator is
+a ChaCha20/12 PRNG that hands out words from an internal block buffer,
+and Boost documents its classes as only as thread-safe as an int.
+
+Triton loads models on several threads (four by default). When two
+Python models are loaded at the same time, their stub launchers can
+read the same words and get the same UUID, and then the same shared
+memory region name. One launcher then fails to create the region with
+"File exists" and removes it in its error path. The other launcher's
+stub then fails to open the region with "No such file or directory",
+so both models fail to load.
+
+Guard the generator with a mutex.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ src/pb_utils.cc | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/src/pb_utils.cc b/src/pb_utils.cc
+index 79b45ec..6f6bd83 100644
+--- a/src/pb_utils.cc
++++ b/src/pb_utils.cc
+@@ -29,6 +29,7 @@
+ #include <sys/stat.h>
+ 
+ #include <fstream>
++#include <mutex>
+ 
+ #ifdef _WIN32
+ #include <windows.h>
+@@ -351,8 +352,15 @@ IsExecutableFile(const std::string& filepath)
+ std::string
+ GenerateUUID()
+ {
++  // The generator keeps internal state and is not thread-safe, and models
++  // are loaded concurrently.
++  static std::mutex generator_mutex;
+   static boost::uuids::random_generator generator;
+-  boost::uuids::uuid uuid = generator();
++  boost::uuids::uuid uuid;
++  {
++    std::lock_guard<std::mutex> lock(generator_mutex);
++    uuid = generator();
++  }
+   return boost::uuids::to_string(uuid);
+ }
+ 

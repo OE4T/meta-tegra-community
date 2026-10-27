@@ -1,0 +1,57 @@
+From cbe8250f7687b9c5e13636444083632e85b7cfa7 Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Wed, 21 Oct 2026 14:40:15 -0700
+Subject: [PATCH] protobuf: Support cross-compiling against protobuf and gRPC
+ packages
+
+When protobuf and gRPC are built for a cross-compilation target, their
+CMake packages do not provide the protobuf::protoc and
+gRPC::grpc_cpp_plugin executable targets: protoc is not exported for
+the target, and gRPCConfig.cmake skips the plugin targets when
+CMAKE_CROSSCOMPILING is set. The code generation steps then fail.
+
+Define the two targets from the host executables when the packages do
+not provide them. protoc comes from Protobuf_PROTOC_EXECUTABLE, which
+find_package(Protobuf) already requires in module-compatible mode, and
+grpc_cpp_plugin is looked up with find_program(), so it can be set with
+-DGRPC_CPP_PLUGIN_EXECUTABLE=<path>.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ protobuf/CMakeLists.txt | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/protobuf/CMakeLists.txt b/protobuf/CMakeLists.txt
+index 3b70113..80387af 100644
+--- a/protobuf/CMakeLists.txt
++++ b/protobuf/CMakeLists.txt
+@@ -37,6 +37,25 @@ if(${TRITON_COMMON_ENABLE_GRPC})
+   include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
+ endif()
+ 
++# Packages built for a cross-compilation target do not export the host
++# code generators as targets, so fall back to the host executables.
++if(NOT TARGET protobuf::protoc)
++  add_executable(protobuf::protoc IMPORTED)
++  set_target_properties(
++    protobuf::protoc
++    PROPERTIES IMPORTED_LOCATION ${Protobuf_PROTOC_EXECUTABLE}
++  )
++endif()
++
++if(${TRITON_COMMON_ENABLE_GRPC} AND NOT TARGET gRPC::grpc_cpp_plugin)
++  find_program(GRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin REQUIRED)
++  add_executable(gRPC::grpc_cpp_plugin IMPORTED)
++  set_target_properties(
++    gRPC::grpc_cpp_plugin
++    PROPERTIES IMPORTED_LOCATION ${GRPC_CPP_PLUGIN_EXECUTABLE}
++  )
++endif()
++
+ #
+ # Protobuf
+ #
+-- 
+2.43.0
+
