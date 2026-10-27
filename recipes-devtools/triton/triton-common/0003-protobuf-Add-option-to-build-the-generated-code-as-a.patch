@@ -1,0 +1,163 @@
+From 2fb31784356098c28b37deebb5e00ac936dc2ccc Mon Sep 17 00:00:00 2001
+From: Ilies CHERGUI <ichergui@nvidia.com>
+Date: Wed, 21 Oct 2026 14:40:59 -0700
+Subject: [PATCH] protobuf: Add option to build the generated code as a shared
+ library
+
+The generated protobuf code registers its descriptors in the descriptor
+pool of the protobuf library when it is loaded. With protobuf linked
+statically, as in the Triton builds, every component has its own pool,
+so libtritonserver.so and the tritonserver executable can each embed
+proto-library. With a shared protobuf library the pool belongs to the
+whole process, and the second registration aborts it:
+
+  descriptor_database.cc: File already exists in database:
+  model_config.proto
+
+Add TRITON_COMMON_ENABLE_SHARED_PROTO, OFF by default. When it is ON,
+the generated protobuf code, and the generated gRPC code when gRPC is
+enabled, is built once as the shared library triton-common-proto, which
+is installed and exported as TritonCommon::triton-common-proto together
+with the .proto files. The library is versioned with TRITON_VERSION
+when it is set, because its ABI follows the .proto files of the
+release. When the option is OFF, triton-common-proto is an alias of
+proto-library, so in-tree consumers can link triton-common-proto in
+both cases. triton-common-model-config links triton-common-proto, so
+with the option ON it no longer embeds a second copy of the generated
+code.
+
+Upstream-Status: Pending
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ CMakeLists.txt                    | 13 ++++++-
+ cmake/TritonCommonConfig.cmake.in |  4 ++
+ protobuf/CMakeLists.txt           | 63 +++++++++++++++++++++++++++++++
+ 3 files changed, 79 insertions(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 340d1d2..208a7c2 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -42,6 +42,7 @@ set(TRITON_MIN_CXX_STANDARD 17 CACHE STRING "The minimum C++ standard whose feat
+ option(TRITON_COMMON_ENABLE_PROTOBUF "Build protobuf artifacts" OFF)
+ option(TRITON_COMMON_ENABLE_PROTOBUF_PYTHON "Build protobuf artifacts for python" ON)
+ option(TRITON_COMMON_ENABLE_GRPC "Build grpc artifacts" OFF)
++option(TRITON_COMMON_ENABLE_SHARED_PROTO "Build the generated protobuf and grpc code as one shared library" OFF)
+ option(TRITON_COMMON_ENABLE_JSON "Build json-related libs" ON)
+ 
+ if(TRITON_COMMON_ENABLE_JSON)
+@@ -150,7 +151,7 @@ if(${TRITON_COMMON_ENABLE_PROTOBUF} OR ${TRITON_COMMON_ENABLE_GRPC})
+     PRIVATE
+       common-compile-settings
+       protobuf::libprotobuf
+-      proto-library
++      triton-common-proto
+   )
+ 
+   set_target_properties(
+@@ -208,6 +209,16 @@ if(${TRITON_COMMON_ENABLE_GRPC} OR ${TRITON_COMMON_ENABLE_PROTOBUF})
+   )
+ endif()
+ 
++if(${TRITON_COMMON_ENABLE_PROTOBUF} AND TRITON_COMMON_ENABLE_SHARED_PROTO)
++  install(
++    TARGETS
++      triton-common-proto
++    EXPORT
++      triton-common-targets
++    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
++  )
++endif()
++
+ if(${TRITON_COMMON_ENABLE_GRPC})
+   install(
+     TARGETS
+diff --git a/cmake/TritonCommonConfig.cmake.in b/cmake/TritonCommonConfig.cmake.in
+index 7f4d28a..1991016 100644
+--- a/cmake/TritonCommonConfig.cmake.in
++++ b/cmake/TritonCommonConfig.cmake.in
+@@ -33,6 +33,10 @@ list(APPEND CMAKE_MODULE_PATH ${TRITONCOMMON_CMAKE_DIR})
+ include(CMakeFindDependencyMacro)
+ find_dependency(Threads)
+ 
++if(@TRITON_COMMON_ENABLE_SHARED_PROTO@ AND NOT TARGET protobuf::libprotobuf)
++  find_dependency(Protobuf CONFIG)
++endif()
++
+ if(NOT TARGET TritonCommon::triton-common-json)
+   include("${TRITONCOMMON_CMAKE_DIR}/TritonCommonTargets.cmake")
+ endif()
+diff --git a/protobuf/CMakeLists.txt b/protobuf/CMakeLists.txt
+index 80387af..840726b 100644
+--- a/protobuf/CMakeLists.txt
++++ b/protobuf/CMakeLists.txt
+@@ -229,3 +229,66 @@ if(${TRITON_COMMON_ENABLE_GRPC})
+     OPTIONAL
+   )
+ endif()
++
++#
++# Generated code as one shared library
++#
++# The generated code registers its descriptors in the descriptor pool of
++# the protobuf library. With a shared protobuf library that pool is
++# shared by the whole process, so the generated code must be linked
++# into only one library of the process, or protobuf aborts at load time
++# with "File already exists in database".
++#
++if(${TRITON_COMMON_ENABLE_PROTOBUF})
++  if(TRITON_COMMON_ENABLE_SHARED_PROTO)
++    add_library(
++      triton-common-proto SHARED
++      $<TARGET_OBJECTS:proto-library>
++    )
++
++    target_include_directories(
++      triton-common-proto
++      PUBLIC
++        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
++        $<INSTALL_INTERFACE:include>
++    )
++
++    target_link_libraries(
++      triton-common-proto
++      PUBLIC
++        protobuf::libprotobuf
++    )
++
++    if(${TRITON_COMMON_ENABLE_GRPC})
++      target_sources(
++        triton-common-proto
++        PRIVATE
++          $<TARGET_OBJECTS:grpc-service-library>
++          $<TARGET_OBJECTS:grpc-health-library>
++      )
++
++      target_link_libraries(
++        triton-common-proto
++        PRIVATE
++          gRPC::grpc++
++      )
++    endif()
++
++    if(TRITON_VERSION)
++      set_target_properties(
++        triton-common-proto
++        PROPERTIES
++          VERSION ${TRITON_VERSION}
++          SOVERSION ${TRITON_VERSION}
++      )
++    endif()
++
++    install(
++      FILES
++        ${proto-srcs}
++      DESTINATION include
++    )
++  else()
++    add_library(triton-common-proto ALIAS proto-library)
++  endif()
++endif()
+-- 
+2.43.0
+

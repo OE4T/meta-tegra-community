@@ -1,4 +1,4 @@
-From 034eb283754752bc59c5cb39e1241359e3aa37da Mon Sep 17 00:00:00 2001
+From f9b8d5a0bc707852607ab58c9711822e7ac77a90 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
 Date: Mon, 9 Jun 2025 11:18:57 +0100
 Subject: [PATCH] Build fixups
@@ -7,14 +7,15 @@ Upstream-Status: Inappropriate [OE-Specific]
 Signed-off-by: Roger Knecht <roger@norberthealth.com>
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt                 | 39 +++++----------
- src/c++/CMakeLists.txt         | 35 +++++++-------
- src/c++/library/CMakeLists.txt | 86 ++++++++--------------------------
- src/python/CMakeLists.txt      | 18 ++-----
- 4 files changed, 51 insertions(+), 127 deletions(-)
+ CMakeLists.txt                                | 40 +++-----
+ src/c++/CMakeLists.txt                        | 34 +++----
+ src/c++/library/CMakeLists.txt                | 98 ++++---------------
+ .../library/cmake/TritonClientConfig.cmake.in |  8 ++
+ src/python/CMakeLists.txt                     | 56 ++++++-----
+ 5 files changed, 87 insertions(+), 149 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 6a5c65d..2da8a38 100644
+index c1d09f79..170afd1f 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -67,16 +67,7 @@ endif()
@@ -65,7 +66,7 @@ index 6a5c65d..2da8a38 100644
        -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION}
        -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
        -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
-@@ -160,14 +145,16 @@ if(TRITON_ENABLE_CC_HTTP OR TRITON_ENABLE_CC_GRPC)
+@@ -160,14 +145,17 @@ if(TRITON_ENABLE_CC_HTTP OR TRITON_ENABLE_CC_GRPC)
        -DLIB_DIR:STRING=${LIB_DIR}
        -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
        -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}
@@ -73,6 +74,7 @@ index 6a5c65d..2da8a38 100644
 +      -DCUDA_TOOLKIT_ROOT_DIR:PATH=${CUDA_TOOLKIT_ROOT_DIR}
 +    INSTALL_COMMAND ""
    )
++  install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/cc-clients/cmake_install.cmake)
  endif() # TRITON_ENABLE_CC_HTTP OR TRITON_ENABLE_CC_GRPC
  
  if(TRITON_ENABLE_PYTHON_HTTP OR TRITON_ENABLE_PYTHON_GRPC)
@@ -85,7 +87,7 @@ index 6a5c65d..2da8a38 100644
    endif() # TRITON_ENABLE_PYTHON_GRPC
  
    ExternalProject_Add(python-clients
-@@ -178,11 +165,6 @@ if(TRITON_ENABLE_PYTHON_HTTP OR TRITON_ENABLE_PYTHON_GRPC)
+@@ -178,11 +166,6 @@ if(TRITON_ENABLE_PYTHON_HTTP OR TRITON_ENABLE_PYTHON_GRPC)
        ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
        ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
        ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
@@ -97,7 +99,7 @@ index 6a5c65d..2da8a38 100644
        -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION}
        -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
        -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
-@@ -195,7 +177,8 @@ if(TRITON_ENABLE_PYTHON_HTTP OR TRITON_ENABLE_PYTHON_GRPC)
+@@ -195,7 +178,8 @@ if(TRITON_ENABLE_PYTHON_HTTP OR TRITON_ENABLE_PYTHON_GRPC)
        -DTRITON_ENABLE_GPU:BOOL=${TRITON_ENABLE_GPU}
        -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
        -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}
@@ -108,10 +110,10 @@ index 6a5c65d..2da8a38 100644
  endif() # TRITON_ENABLE_PYTHON_HTTP OR TRITON_ENABLE_PYTHON_GRPC
  
 diff --git a/src/c++/CMakeLists.txt b/src/c++/CMakeLists.txt
-index 71c4338..b2d8873 100644
+index dcd87c10..f5f5e580 100644
 --- a/src/c++/CMakeLists.txt
 +++ b/src/c++/CMakeLists.txt
-@@ -56,19 +56,7 @@ endif()
+@@ -57,19 +57,7 @@ endif()
  #
  # Dependencies
  #
@@ -131,7 +133,7 @@ index 71c4338..b2d8873 100644
  
  if(TRITON_ENABLE_CC_GRPC)
    set(TRITON_COMMON_ENABLE_PROTOBUF ON)
-@@ -80,9 +68,8 @@ if(NOT TRITON_ENABLE_CC_HTTP AND NOT TRITON_ENABLE_EXAMPLES)
+@@ -81,9 +69,8 @@ if(NOT TRITON_ENABLE_CC_HTTP AND NOT TRITON_ENABLE_EXAMPLES)
  endif()
  
  if(TRITON_ENABLE_TESTS)
@@ -142,20 +144,19 @@ index 71c4338..b2d8873 100644
  
  if(TRITON_ENABLE_TESTS)
    include_directories(
-@@ -94,7 +81,11 @@ endif() # TRITON_ENABLE_TESTS
+@@ -95,7 +82,11 @@ endif() # TRITON_ENABLE_TESTS
  # CUDA
  #
  if(TRITON_ENABLE_GPU)
--  find_package(CUDAToolkit REQUIRED)
 +  enable_language(CUDA)
-+  find_package(CUDA REQUIRED)
-+  include_directories(${CUDA_INCLUDE_DIRS})
-+  link_directories(${CUDA_LIBRARIES})
-+  message(STATUS "Using CUDA ${CUDA_VERSION}")
+   find_package(CUDAToolkit REQUIRED)
++  include_directories(${CUDAToolkit_INCLUDE_DIRS})
++  link_directories(${CUDAToolkit_LIBRARY_DIR})
++  message(STATUS "Using CUDA ${CUDAToolkit_VERSION}")
  endif() # TRITON_ENABLE_GPU
  
  #
-@@ -110,18 +101,24 @@ endif() # TRITON_ENABLE_CC_HTTP
+@@ -111,18 +102,25 @@ endif() # TRITON_ENABLE_CC_HTTP
  #
  if(TRITON_ENABLE_CC_GRPC)
    set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
@@ -181,11 +182,12 @@ index 71c4338..b2d8873 100644
 +  find_package(gRPC REQUIRED)
    message(STATUS "Using gRPC ${gRPC_VERSION}")
 -  include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
++  find_package(TritonCommon CONFIG REQUIRED)
  endif() # TRITON_ENABLE_CC_GRPC
  
  if(TRITON_ENABLE_CC_HTTP OR TRITON_ENABLE_CC_GRPC)
 diff --git a/src/c++/library/CMakeLists.txt b/src/c++/library/CMakeLists.txt
-index 6a80afc..d5d0b87 100644
+index a8d0dd9c..edfda398 100644
 --- a/src/c++/library/CMakeLists.txt
 +++ b/src/c++/library/CMakeLists.txt
 @@ -97,7 +97,7 @@ if(TRITON_ENABLE_CC_HTTP OR TRITON_ENABLE_EXAMPLES)
@@ -206,7 +208,42 @@ index 6a80afc..d5d0b87 100644
      )
    endforeach()
  
-@@ -245,7 +245,7 @@ if(TRITON_ENABLE_CC_GRPC)
+@@ -199,17 +199,11 @@ if(TRITON_ENABLE_CC_GRPC)
+       grpc-client-library EXCLUDE_FROM_ALL OBJECT
+       ${REQUEST_SRCS} ${REQUEST_HDRS}
+   )
+-  add_dependencies(
+-      grpc-client-library
+-      grpc-service-library proto-library
+-  )
+ 
+   # libgrpcclient_static.a
+   add_library(
+       grpcclient_static STATIC
+       $<TARGET_OBJECTS:grpc-client-library>
+-      $<TARGET_OBJECTS:grpc-service-library>
+-      $<TARGET_OBJECTS:proto-library>
+   )
+   add_library(
+       TritonClient::grpcclient_static ALIAS grpcclient_static
+@@ -225,6 +219,7 @@ if(TRITON_ENABLE_CC_GRPC)
+       grpcclient_static
+       PRIVATE gRPC::grpc++
+       PRIVATE gRPC::grpc
++      PUBLIC TritonCommon::triton-common-proto
+       PUBLIC protobuf::libprotobuf
+       PUBLIC Threads::Threads
+   )
+@@ -232,8 +227,6 @@ if(TRITON_ENABLE_CC_GRPC)
+   # libgrpcclient.so
+   add_library(
+       grpcclient SHARED
+-      $<TARGET_OBJECTS:grpc-service-library>
+-      $<TARGET_OBJECTS:proto-library>
+       $<TARGET_OBJECTS:grpc-client-library>
+   )
+   add_library(
+@@ -245,7 +238,7 @@ if(TRITON_ENABLE_CC_GRPC)
         grpcclient
         PROPERTIES
           LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libgrpcclient.ldscript
@@ -215,7 +252,15 @@ index 6a80afc..d5d0b87 100644
       )
    endif() # NOT WIN32 AND NOT TRITON_KEEP_TYPEINFO
  
-@@ -277,13 +277,16 @@ if(TRITON_ENABLE_CC_GRPC)
+@@ -253,6 +246,7 @@ if(TRITON_ENABLE_CC_GRPC)
+       grpcclient
+       PRIVATE gRPC::grpc++
+       PRIVATE gRPC::grpc
++      PUBLIC TritonCommon::triton-common-proto
+       PUBLIC protobuf::libprotobuf
+       PUBLIC Threads::Threads
+   )
+@@ -277,13 +271,16 @@ if(TRITON_ENABLE_CC_GRPC)
        PUBLIC
          $<INSTALL_INTERFACE:include>
          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -227,19 +272,20 @@ index 6a80afc..d5d0b87 100644
  
      if(TRITON_ENABLE_GPU)
 +      enable_language(CUDA)
-+      find_package(CUDA REQUIRED)
-+      include_directories(${CUDA_INCLUDE_DIRS})
-+      link_directories(${CUDA_LIBRARIES})
-+      message(STATUS "Using CUDA ${CUDA_VERSION}")
++      find_package(CUDAToolkit REQUIRED)
++      include_directories(${CUDAToolkit_INCLUDE_DIRS})
++      link_directories(${CUDAToolkit_LIBRARY_DIR})
++      message(STATUS "Using CUDA ${CUDAToolkit_VERSION}")
        target_compile_definitions(
          ${_client_target}
            PUBLIC TRITON_ENABLE_GPU=1
-@@ -292,63 +295,14 @@ if(TRITON_ENABLE_CC_GRPC)
+@@ -291,64 +288,14 @@ if(TRITON_ENABLE_CC_GRPC)
+     endif() # TRITON_ENABLE_GPU
  
      if(TRITON_ENABLE_GPU)
-       target_include_directories(${_client_target}
+-      target_include_directories(${_client_target}
 -                                 PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
-+                                 PUBLIC ${CUDA_INCLUDE_DIRS})
++      target_link_libraries(${_client_target} PUBLIC CUDA::toolkit)
      endif() # TRITON_ENABLE_GPU
    endforeach()
  
@@ -300,7 +346,7 @@ index 6a80afc..d5d0b87 100644
    )
  endif() # TRITON_ENABLE_CC_GRPC
  
-@@ -384,11 +338,6 @@ if(TRITON_ENABLE_CC_HTTP)
+@@ -384,11 +331,6 @@ if(TRITON_ENABLE_CC_HTTP)
      )
    endif() # NOT WIN32
  
@@ -312,7 +358,7 @@ index 6a80afc..d5d0b87 100644
  
    # libhttpclient_static.a
    add_library(
-@@ -401,7 +350,6 @@ if(TRITON_ENABLE_CC_HTTP)
+@@ -401,7 +343,6 @@ if(TRITON_ENABLE_CC_HTTP)
  
    target_link_libraries(
        httpclient_static
@@ -320,7 +366,7 @@ index 6a80afc..d5d0b87 100644
        PUBLIC CURL::libcurl
        PUBLIC Threads::Threads
    )
-@@ -427,13 +375,12 @@ if(TRITON_ENABLE_CC_HTTP)
+@@ -427,13 +368,12 @@ if(TRITON_ENABLE_CC_HTTP)
         httpclient
         PROPERTIES
           LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libhttpclient.ldscript
@@ -335,28 +381,29 @@ index 6a80afc..d5d0b87 100644
        PUBLIC CURL::libcurl
        PUBLIC Threads::Threads
    )
-@@ -468,6 +415,11 @@ if(TRITON_ENABLE_CC_HTTP)
+@@ -468,6 +408,11 @@ if(TRITON_ENABLE_CC_HTTP)
          PRIVATE CURL_STATICLIB=1
      )
      if(TRITON_ENABLE_GPU)
 +      enable_language(CUDA)
-+      find_package(CUDA REQUIRED)
-+      include_directories(${CUDA_INCLUDE_DIRS})
-+      link_directories(${CUDA_LIBRARIES})
-+      message(STATUS "Using CUDA ${CUDA_VERSION}")
++      find_package(CUDAToolkit REQUIRED)
++      include_directories(${CUDAToolkit_INCLUDE_DIRS})
++      link_directories(${CUDAToolkit_LIBRARY_DIR})
++      message(STATUS "Using CUDA ${CUDAToolkit_VERSION}")
        target_compile_definitions(
          ${_client_target}
            PUBLIC TRITON_ENABLE_GPU=1
-@@ -476,7 +428,7 @@ if(TRITON_ENABLE_CC_HTTP)
+@@ -475,8 +420,7 @@ if(TRITON_ENABLE_CC_HTTP)
+     endif() # TRITON_ENABLE_GPU
  
      if(TRITON_ENABLE_GPU)
-       target_include_directories(${_client_target}
+-      target_include_directories(${_client_target}
 -                                 PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
-+                                 PUBLIC ${CUDA_INCLUDE_DIRS})
++      target_link_libraries(${_client_target} PUBLIC CUDA::toolkit)
      endif() # TRITON_ENABLE_GPU
  
      if(${TRITON_ENABLE_ZLIB})
-@@ -490,7 +442,7 @@ if(TRITON_ENABLE_CC_HTTP)
+@@ -490,7 +434,7 @@ if(TRITON_ENABLE_CC_HTTP)
    install(
        FILES
        ${CMAKE_CURRENT_SOURCE_DIR}/http_client.h
@@ -365,7 +412,7 @@ index 6a80afc..d5d0b87 100644
    )
  endif() # TRITON_ENABLE_CC_HTTP
  
-@@ -500,7 +452,7 @@ if(TRITON_ENABLE_CC_HTTP OR TRITON_ENABLE_CC_GRPC)
+@@ -500,7 +444,7 @@ if(TRITON_ENABLE_CC_HTTP OR TRITON_ENABLE_CC_GRPC)
        ${CMAKE_CURRENT_SOURCE_DIR}/common.h
        ${CMAKE_CURRENT_SOURCE_DIR}/ipc.h
        ${CMAKE_CURRENT_SOURCE_DIR}/cencode.h
@@ -374,8 +421,27 @@ index 6a80afc..d5d0b87 100644
    )
  
    include(GNUInstallDirs)
+diff --git a/src/c++/library/cmake/TritonClientConfig.cmake.in b/src/c++/library/cmake/TritonClientConfig.cmake.in
+index b2529f16..d794aa39 100644
+--- a/src/c++/library/cmake/TritonClientConfig.cmake.in
++++ b/src/c++/library/cmake/TritonClientConfig.cmake.in
+@@ -32,6 +32,14 @@ get_filename_component(
+ 
+ list(APPEND CMAKE_MODULE_PATH ${TRITONCLIENT_CMAKE_DIR})
+ 
++if(@TRITON_ENABLE_GPU@)
++  find_dependency(CUDAToolkit)
++endif()
++
++if(@TRITON_ENABLE_CC_GRPC@ AND NOT TARGET TritonCommon::triton-common-proto)
++  find_dependency(TritonCommon)
++endif()
++
+ if(NOT TARGET TritonClient::triton-client)
+   include("${TRITONCLIENT_CMAKE_DIR}/TritonClientTargets.cmake")
+ endif()
 diff --git a/src/python/CMakeLists.txt b/src/python/CMakeLists.txt
-index 67975dd..848e456 100644
+index 42ca2c42..2ddc69b4 100644
 --- a/src/python/CMakeLists.txt
 +++ b/src/python/CMakeLists.txt
 @@ -40,8 +40,6 @@ option(TRITON_ENABLE_GPU "Enable GPU support in libraries" OFF)
@@ -387,7 +453,7 @@ index 67975dd..848e456 100644
  if(NOT CMAKE_BUILD_TYPE)
    set(CMAKE_BUILD_TYPE Release)
  endif()
-@@ -49,27 +47,21 @@ endif()
+@@ -49,46 +47,52 @@ endif()
  #
  # Dependencies
  #
@@ -411,15 +477,59 @@ index 67975dd..848e456 100644
  # CUDA
  #
  if(${TRITON_ENABLE_GPU})
--  find_package(CUDAToolkit REQUIRED)
 +  enable_language(CUDA)
-+  find_package(CUDA REQUIRED)
-+  include_directories(${CUDA_INCLUDE_DIRS})
-+  link_directories(${CUDA_LIBRARIES})
-+  message(STATUS "Using CUDA ${CUDA_VERSION}")
+   find_package(CUDAToolkit REQUIRED)
++  include_directories(${CUDAToolkit_INCLUDE_DIRS})
++  link_directories(${CUDAToolkit_LIBRARY_DIR})
++  message(STATUS "Using CUDA ${CUDAToolkit_VERSION}")
  endif() # TRITON_ENABLE_GPU
  
  #
+-# Protobuf
+-#
+-if(TRITON_ENABLE_PYTHON_GRPC)
+-  set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
+-  find_package(Protobuf CONFIG REQUIRED)
+-  message(STATUS "Using protobuf ${Protobuf_VERSION}")
+-  include_directories(${Protobuf_INCLUDE_DIRS})
+-endif() # TRITON_ENABLE_PYTHON_GRPC
+-
+-#
+-# GRPC
++# Python code generated from the .proto files installed by triton-common
+ #
+ if(TRITON_ENABLE_PYTHON_GRPC)
+-  find_package(gRPC CONFIG REQUIRED)
+-  message(STATUS "Using gRPC ${gRPC_VERSION}")
+-  include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
++  find_path(TRITON_COMMON_PROTO_DIR grpc_service.proto REQUIRED)
++  set(_proto_py_dir ${CMAKE_BINARY_DIR}/_deps/repo-common-build/protobuf)
++  set(
++    _proto_py
++    ${_proto_py_dir}/model_config_pb2.py
++    ${_proto_py_dir}/grpc_service_pb2.py
++    ${_proto_py_dir}/grpc_service_pb2_grpc.py
++  )
++  add_custom_command(
++    OUTPUT ${_proto_py}
++    COMMAND ${CMAKE_COMMAND} -E make_directory ${_proto_py_dir}
++    COMMAND python3
++    ARGS
++      -m grpc_tools.protoc
++      -I ${TRITON_COMMON_PROTO_DIR}
++      --python_out ${_proto_py_dir}
++      --grpc_python_out ${_proto_py_dir}
++      model_config.proto grpc_service.proto
++    DEPENDS
++      ${TRITON_COMMON_PROTO_DIR}/model_config.proto
++      ${TRITON_COMMON_PROTO_DIR}/grpc_service.proto
++  )
++  add_custom_target(proto-py-library DEPENDS ${_proto_py})
++  add_custom_target(grpc-service-py-library)
++  add_dependencies(grpc-service-py-library proto-py-library)
+ endif() # TRITON_ENABLE_PYTHON_GRPC
+ 
+ if(TRITON_ENABLE_PYTHON_HTTP OR TRITON_ENABLE_PYTHON_GRPC)
 -- 
-2.34.1
+2.43.0
 
