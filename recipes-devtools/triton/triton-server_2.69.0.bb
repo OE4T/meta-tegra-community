@@ -1,13 +1,14 @@
 DESCRIPTION = "The Triton Inference Server provides an optimized cloud and edge inferencing solution."
 LICENSE = "BSD-3-Clause"
-LIC_FILES_CHKSUM = "file://LICENSE;md5=cbffd7f72014cdf056bc4e6f176b0c6b"
+LIC_FILES_CHKSUM = "file://LICENSE;md5=e43a52b968e74208392c1640410c030f"
 
 SRC_URI = "\
-    git://github.com/triton-inference-server/server.git;protocol=https;branch=r25.05;lfs=0 \
+    git://github.com/triton-inference-server/server.git;protocol=https;branch=r26.05;lfs=0 \
     file://0001-Build-fixups.patch \
+    file://0002-build-deps-Align-protobuf-and-related-dependencies-w.patch \
 "
 
-SRCREV = "af417a8ae7457c17ebb44ecda204367f00d11ced"
+SRCREV = "34ca83e780bff7829b33d922fa9d16a0628e050c"
 
 DEPENDS += "\
     triton-core \
@@ -19,7 +20,7 @@ DEPENDS += "\
 
 COMPATIBLE_MACHINE = "(cuda)"
 
-inherit pkgconfig cmake setuptools3 cuda
+inherit pkgconfig cmake setuptools3 cuda python3targetconfig
 
 B = "${S}"
 
@@ -31,9 +32,9 @@ EXTRA_OECMAKE:append = ' \
     -DTRITON_VERSION="${PV}" \
 '
 
-SETUPTOOLS_SETUP_PATH = "${B}/src/python"
+SETUPTOOLS_SETUP_PATH = "${B}/triton-server/python/generic/wheel"
 
-PACKAGECONFIG ??= "logging http gpu tensorrt"
+PACKAGECONFIG ??= "logging stats http grpc gpu tensorrt"
 PACKAGECONFIG[logging] = "-DTRITON_ENABLE_LOGGING=ON,-DTRITON_ENABLE_LOGGING=OFF"
 PACKAGECONFIG[stats] = "-DTRITON_ENABLE_STATS=ON,-DTRITON_ENABLE_STATS=OFF"
 PACKAGECONFIG[tracing] = "-DTRITON_ENABLE_TRACING=ON,-DTRITON_ENABLE_TRACING=OFF"
@@ -41,8 +42,8 @@ PACKAGECONFIG[nvtx] = "-DTRITON_ENABLE_NVTX=ON,-DTRITON_ENABLE_NVTX=OFF"
 PACKAGECONFIG[gpu] = "-DTRITON_ENABLE_GPU=ON,-DTRITON_ENABLE_GPU=OFF"
 PACKAGECONFIG[mali_gpu] = "-DTRITON_ENABLE_MALI_GPU=ON,-DTRITON_ENABLE_MALI_GPU=OFF"
 PACKAGECONFIG[ensemble] = "-DTRITON_ENABLE_ENSEMBLE=ON,-DTRITON_ENABLE_ENSEMBLE=OFF"
-PACKAGECONFIG[http] = "-DTRITON_ENABLE_HTTP=ON,-DTRITON_ENABLE_HTTP=OFF,libevent libevhtp libb64"
-PACKAGECONFIG[grpc] = "-DTRITON_ENABLE_GRPC=ON,-DTRITON_ENABLE_GRPC=OFF"
+PACKAGECONFIG[http] = "-DTRITON_ENABLE_HTTP=ON,-DTRITON_ENABLE_HTTP=OFF,libevent libevhtp-triton libb64"
+PACKAGECONFIG[grpc] = "-DTRITON_ENABLE_GRPC=ON,-DTRITON_ENABLE_GRPC=OFF,grpc protobuf"
 PACKAGECONFIG[sagemaker] = "-DTRITON_ENABLE_SAGEMAKER=ON,-DTRITON_ENABLE_SAGEMAKER=OFF"
 PACKAGECONFIG[vertex_ai] = "-DTRITON_ENABLE_VERTEX_AI=ON,-DTRITON_ENABLE_VERTEX_AI=OFF"
 PACKAGECONFIG[metrics] = "-DTRITON_ENABLE_METRICS=ON,-DTRITON_ENABLE_METRICS=OFF"
@@ -60,9 +61,8 @@ do_configure() {
 
 do_compile() {
     cmake_do_compile
-    install -m 0644 ${B}/LICENSE ${B}/src/python/LICENSE.txt
     export VERSION="${PV}"
-    export TRITON_PYBIND="${B}/src/python/tritonfrontend"
+    export TRITON_PYBIND="tritonfrontend_bindings.*.so"
     setuptools3_do_compile
 }
 

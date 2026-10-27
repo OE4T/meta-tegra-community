@@ -1,4 +1,4 @@
-From bec5cc158bd6b105a8d7bbf63bd1f8edff20b160 Mon Sep 17 00:00:00 2001
+From b40d1df1384fa3f6f867042ddfbca1eb406978fb Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
 Date: Tue, 10 Jun 2025 17:56:02 +0100
 Subject: [PATCH] Build fixups
@@ -7,11 +7,11 @@ Upstream-Status: Inappropriate [OE-Specific]
 Signed-off-by: Roger Knecht <roger@norberthealth.com>
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt | 58 +++++++++++++++-----------------------------------
- 1 file changed, 17 insertions(+), 41 deletions(-)
+ CMakeLists.txt | 52 +++++++++++++++++---------------------------------
+ 1 file changed, 17 insertions(+), 35 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 682b3fd..a76bcac 100644
+index 3df1be1..0f2f062 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -40,17 +40,12 @@ option(TRITON_ENABLE_NVTX "Include nvtx markers collection in backend." OFF)
@@ -33,7 +33,7 @@ index 682b3fd..a76bcac 100644
  
  
  if(LINUX)
-@@ -64,51 +59,28 @@ if(LINUX)
+@@ -64,36 +59,13 @@ if(LINUX)
    endif(${DISTRO_ID_LIKE} MATCHES "rhel|centos")
  endif(LINUX)
  
@@ -66,34 +66,26 @@ index 682b3fd..a76bcac 100644
  # CUDA
  #
  if(${TRITON_ENABLE_GPU})
--  find_package(CUDAToolkit REQUIRED)
--  message(STATUS "Using CUDA ${CUDAToolkit_VERSION}")
 +  enable_language(CUDA)
-+  find_package(CUDA REQUIRED)
-+  include_directories(${CUDA_INCLUDE_DIRS})
-+  message(STATUS "Using CUDA ${CUDA_VERSION}")
+   find_package(CUDAToolkit REQUIRED)
++  include_directories(${CUDAToolkit_INCLUDE_DIRS})
+   message(STATUS "Using CUDA ${CUDAToolkit_VERSION}")
    if (WIN32)
      set(CUDA_NVCC_FLAGS -std=c++17)
-   else ()
-     set(CUDA_NVCC_FLAGS -std=c++11)
-   endif ()
+@@ -118,6 +90,12 @@ if(${TRITON_ENABLE_NVTX})
+   add_definitions(-DTRITON_ENABLE_NVTX=1)
+ endif() # TRITON_ENABLE_NVTX
  
--  if(NOT DEFINED CUDAToolkit_VERSION)
--    message( FATAL_ERROR "Unable to determine CUDAToolkit_VERSION, CMake will exit." )
-+  if(NOT DEFINED CUDA_VERSION)
-+    message( FATAL_ERROR "Unable to determine CUDA_VERSION, CMake will exit." )
-   endif()
- 
--  if(CUDAToolkit_VERSION VERSION_GREATER "10.1" OR CUDAToolkit_VERSION VERSION_EQUAL "10.1")
-+  if(CUDA_VERSION VERSION_GREATER "10.1" OR CUDA_VERSION VERSION_EQUAL "10.1")
-     add_definitions(-DTRITON_ENABLE_CUDA_GRAPH=1)
-   else()
--    message(WARNING "CUDA ${CUDAToolkit_VERSION} does not support CUDA graphs.")
-+    message(WARNING "CUDA ${CUDA_VERSION} does not support CUDA graphs.")
-   endif()
- else()
-   message( FATAL_ERROR "TensorRT backend requires TRITON_ENABLE_GPU=1, CMake will exit." )
-@@ -213,9 +185,13 @@ find_library(NVINFER_PLUGIN_LIBRARY NAMES nvinfer_plugin nvinfer_plugin_10)
++# triton-backend-utils is linked by name rather than through its exported
++# target, so its TRITON_ENABLE_STATS usage requirement is repeated here.
++if(${TRITON_ENABLE_STATS})
++  add_definitions(-DTRITON_ENABLE_STATS=1)
++endif() # TRITON_ENABLE_STATS
++
+ add_library(
+   triton-tensorrt-backend SHARED
+   src/tensorrt.cc
+@@ -213,9 +191,13 @@ find_library(NVINFER_PLUGIN_LIBRARY NAMES nvinfer_plugin nvinfer_plugin_10)
  target_link_libraries(
    triton-tensorrt-backend
    PRIVATE
@@ -106,11 +98,11 @@ index 682b3fd..a76bcac 100644
 +    triton-common-table-printer
 +    triton-backend-utils         # from repo-backend
 +    triton-backend-cuda-utils    # from repo-backend
-+    triton-core                  # from repo-core
++    tritonserver                 # from repo-core
      -lpthread
      ${NVINFER_LIBRARY}
      ${NVINFER_PLUGIN_LIBRARY}
-@@ -229,7 +205,7 @@ target_link_libraries(
+@@ -229,7 +211,7 @@ target_link_libraries(
  target_link_libraries(
      triton-tensorrt-backend
      PRIVATE
@@ -120,5 +112,5 @@ index 682b3fd..a76bcac 100644
  
  
 -- 
-2.34.1
+2.43.0
 

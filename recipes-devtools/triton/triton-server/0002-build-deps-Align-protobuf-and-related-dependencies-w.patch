@@ -1,0 +1,44 @@
+From a4ca466e07ab9fe58115c029845bb0e2213e04f4 Mon Sep 17 00:00:00 2001
+From: Misha Chornyi <99709299+mc-nv@users.noreply.github.com>
+Date: Wed, 22 Jul 2026 19:34:14 -0700
+Subject: [PATCH] build(deps): Align protobuf and related dependencies with the
+ gRPC v1.81.1 bump (#8888)
+
+[Backport of the src/grpc/grpc_server.cc hunk only: protobuf 22 removed
+google::protobuf::stringpiece_internal::StringPiece, so grpc_server.cc
+does not build against the protobuf 33 of meta-oe. The other hunks
+target the third_party superbuild, the Dockerfiles and the QA tests.]
+
+Upstream-Status: Backport [https://github.com/triton-inference-server/server/commit/5b27afcb3270c0218762ec8b2afe06869ed0c5bc]
+Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
+---
+ src/grpc/grpc_server.cc | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/src/grpc/grpc_server.cc b/src/grpc/grpc_server.cc
+index 10da64776..46f34be03 100644
+--- a/src/grpc/grpc_server.cc
++++ b/src/grpc/grpc_server.cc
+@@ -866,10 +866,15 @@ CommonHandler::RegisterModelConfig()
+         err = TRITONSERVER_MessageSerializeToJson(
+             model_config_message, &buffer, &byte_size);
+         if (err == nullptr) {
+-          ::google::protobuf::util::JsonStringToMessage(
+-              ::google::protobuf::stringpiece_internal::StringPiece(
+-                  buffer, (int)byte_size),
+-              response->mutable_config());
++          const auto parse_status =
++              ::google::protobuf::util::JsonStringToMessage(
++                  absl::string_view(buffer, byte_size),
++                  response->mutable_config());
++          if (!parse_status.ok()) {
++            err = TRITONSERVER_ErrorNew(
++                TRITONSERVER_ERROR_INTERNAL,
++                std::string(parse_status.message()).c_str());
++          }
+         }
+         TRITONSERVER_MessageDelete(model_config_message);
+       }
+-- 
+2.43.0
+
