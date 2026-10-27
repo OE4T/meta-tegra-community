@@ -1,4 +1,4 @@
-From 872bbe2f647750442bd56a355b343f8d9c157e24 Mon Sep 17 00:00:00 2001
+From 5bf665a4a60a933bf7d8a9fca9ebb675ec4ae6af Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
 Date: Fri, 13 Jun 2025 17:24:13 +0100
 Subject: [PATCH] Build fixups
@@ -8,14 +8,14 @@ Signed-off-by: Roger Knecht <roger@norberthealth.com>
 Signed-off-by: Matt Madison <matt@madison.systems>
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt | 49 +++++++++++++++++--------------------------------
- 1 file changed, 17 insertions(+), 32 deletions(-)
+ CMakeLists.txt | 45 ++++++++++++++-------------------------------
+ 1 file changed, 14 insertions(+), 31 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index f5c3356..718a8b4 100644
+index 4f6f827..90e619e 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -55,32 +55,16 @@ if(TRITON_ENABLE_MEMORY_TRACKER AND NOT TRITON_ENABLE_GPU)
+@@ -55,30 +55,14 @@ if(TRITON_ENABLE_MEMORY_TRACKER AND NOT TRITON_ENABLE_GPU)
    set(TRITON_ENABLE_MEMORY_TRACKER OFF CACHE BOOL "Device memory tracker disabled" FORCE)
  endif()
  
@@ -42,18 +42,14 @@ index f5c3356..718a8b4 100644
  # CUDA
  #
  if(${TRITON_ENABLE_GPU})
--  find_package(CUDAToolkit REQUIRED)
 +  enable_language(CUDA)
-+  find_package(CUDA REQUIRED)
-+  include_directories(${CUDA_INCLUDE_DIRS})
-+  link_directories(${CUDA_LIBRARIES})
+   find_package(CUDAToolkit REQUIRED)
++  include_directories(${CUDAToolkit_INCLUDE_DIRS})
++  link_directories(${CUDAToolkit_LIBRARY_DIR})
    set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
--  message(STATUS "Using CUDA ${CUDAToolkit_VERSION}")
-+  message(STATUS "Using CUDA ${CUDA_VERSION}")
+   message(STATUS "Using CUDA ${CUDAToolkit_VERSION}")
  
-   if(CUDAToolkit_VERSION VERSION_GREATER "10.1" OR CUDAToolkit_VERSION VERSION_EQUAL "10.1")
-     add_definitions(-DTRITON_ENABLE_CUDA_GRAPH=1)
-@@ -115,17 +99,16 @@ add_library(
+@@ -115,18 +99,15 @@ add_library(
  
  if(${TRITON_ENABLE_GPU})
    add_library(
@@ -63,8 +59,9 @@ index f5c3356..718a8b4 100644
    )
  
    enable_language(CUDA)
+-  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/define.cuda_architectures.cmake)
 -  set_target_properties(kernel_library_new PROPERTIES LANGUAGE CUDA)
--  set_target_properties(kernel_library_new PROPERTIES CUDA_ARCHITECTURES "75-real;80-real;86-real;87-real;89-real;90-real;100-real;101-real;120-real")
+-  set_target_properties(kernel_library_new PROPERTIES CUDA_ARCHITECTURES "${CUDA_ARCHITECTURES}")
 -  set_target_properties(kernel_library_new PROPERTIES POSITION_INDEPENDENT_CODE ON)
 -  set_target_properties(kernel_library_new PROPERTIES LINKER_LANGUAGE CUDA)
 -  target_compile_features(kernel_library_new PUBLIC cxx_std_${TRITON_MIN_CXX_STANDARD})
@@ -73,11 +70,10 @@ index f5c3356..718a8b4 100644
 +  set_target_properties(triton-backend-cuda-utils PROPERTIES POSITION_INDEPENDENT_CODE ON)
 +  set_target_properties(triton-backend-cuda-utils PROPERTIES LINKER_LANGUAGE CUDA)
 +  target_compile_features(triton-backend-cuda-utils PUBLIC cxx_std_${TRITON_MIN_CXX_STANDARD})
-+  set_target_properties(triton-backend-cuda-utils PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
  
  endif() # TRITON_ENABLE_GPU
  
-@@ -133,6 +116,8 @@ add_library(
+@@ -134,6 +115,8 @@ add_library(
    TritonBackend::triton-backend-utils ALIAS triton-backend-utils
  )
  
@@ -86,7 +82,7 @@ index f5c3356..718a8b4 100644
  target_include_directories(
    triton-backend-utils
    PUBLIC
-@@ -191,7 +176,7 @@ set_target_properties(
+@@ -192,7 +175,7 @@ set_target_properties(
    triton-backend-utils PROPERTIES
    WINDOWS_EXPORT_ALL_SYMBOLS TRUE
    POSITION_INDEPENDENT_CODE ON
@@ -95,7 +91,7 @@ index f5c3356..718a8b4 100644
  )
  
  target_link_libraries(
-@@ -207,9 +192,9 @@ if(${TRITON_ENABLE_GPU})
+@@ -208,9 +191,9 @@ if(${TRITON_ENABLE_GPU})
    target_link_libraries(
      triton-backend-utils
      PUBLIC
@@ -107,7 +103,7 @@ index f5c3356..718a8b4 100644
    )
    if(${TRITON_ENABLE_MEMORY_TRACKER})
      target_link_libraries(
-@@ -238,7 +223,7 @@ install(
+@@ -239,7 +222,7 @@ install(
  if(${TRITON_ENABLE_GPU})
    install(
      TARGETS
@@ -117,5 +113,5 @@ index f5c3356..718a8b4 100644
        triton-backend-targets
      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 -- 
-2.34.1
+2.43.0
 

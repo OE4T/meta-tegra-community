@@ -1,4 +1,4 @@
-From 8a023dd5ed11dfdb7b4aeacc322b45ff2266030d Mon Sep 17 00:00:00 2001
+From f52679e92cf8ddeb1f973f38dc8272e38c32ba99 Mon Sep 17 00:00:00 2001
 From: Ilies CHERGUI <ichergui@nvidia.com>
 Date: Thu, 12 Jun 2025 12:40:43 +0100
 Subject: [PATCH] Build fixups
@@ -7,25 +7,15 @@ Upstream-Status: Inappropriate [OE-Specific]
 Signed-off-by: Roger Knecht <roger@norberthealth.com>
 Signed-off-by: Ilies CHERGUI <ichergui@nvidia.com>
 ---
- CMakeLists.txt          |  8 +++++++-
- protobuf/CMakeLists.txt |  2 +-
+ CMakeLists.txt          |  6 ++++++
  src/CMakeLists.txt      |  6 ++++++
  src/test/CMakeLists.txt | 11 +----------
- 4 files changed, 15 insertions(+), 12 deletions(-)
+ 3 files changed, 13 insertions(+), 10 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 61870a8..95ed3f6 100644
+index 128da4b..340d1d2 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -118,7 +118,7 @@ if(${TRITON_COMMON_ENABLE_PROTOBUF} OR ${TRITON_COMMON_ENABLE_GRPC})
-   add_subdirectory(protobuf)
- 
-   set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
--  find_package(Protobuf CONFIG REQUIRED)
-+  find_package(Protobuf REQUIRED)
-   message(STATUS "Using protobuf ${Protobuf_VERSION}")
- 
-   #
 @@ -129,6 +129,8 @@ if(${TRITON_COMMON_ENABLE_PROTOBUF} OR ${TRITON_COMMON_ENABLE_GRPC})
      src/model_config.cc
      )
@@ -51,19 +41,6 @@ index 61870a8..95ed3f6 100644
 +set_target_properties(triton-common-table-printer PROPERTIES ARCHIVE_OUTPUT_NAME triton-common-table-printer)
 +
  export(PACKAGE TritonCommon)
-diff --git a/protobuf/CMakeLists.txt b/protobuf/CMakeLists.txt
-index 34f8374..781a758 100644
---- a/protobuf/CMakeLists.txt
-+++ b/protobuf/CMakeLists.txt
-@@ -27,7 +27,7 @@
- cmake_minimum_required (VERSION 3.18)
- 
- set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
--find_package(Protobuf CONFIG REQUIRED)
-+find_package(Protobuf REQUIRED)
- message(STATUS "Using protobuf ${Protobuf_VERSION}")
- include_directories(${Protobuf_INCLUDE_DIRS})
- 
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
 index 4c98094..85d947d 100644
 --- a/src/CMakeLists.txt
@@ -96,12 +73,12 @@ index 4c98094..85d947d 100644
  # Table Printer
  #
 diff --git a/src/test/CMakeLists.txt b/src/test/CMakeLists.txt
-index dad48a5..f5fd907 100644
+index 8a9390e..b9eecd8 100644
 --- a/src/test/CMakeLists.txt
 +++ b/src/test/CMakeLists.txt
 @@ -26,16 +26,7 @@
  
- cmake_minimum_required (VERSION 3.18)
+ cmake_minimum_required (VERSION 3.31.8)
  
 -#
 -# Unit tests
@@ -118,5 +95,5 @@ index dad48a5..f5fd907 100644
  if (TRITON_COMMON_ENABLE_JSON)
      add_subdirectory(triton_json triton_json)
 -- 
-2.34.1
+2.43.0
 
