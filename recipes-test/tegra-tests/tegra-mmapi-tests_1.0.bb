@@ -20,4 +20,4 @@ do_install() {
 }
 
 PACKAGE_ARCH = "${TEGRA_PKGARCH}"
-RDEPENDS:${PN} = "tegra-mmapi-samples tegra-tools-jetson-clocks tensorrt-trtexec"
+RDEPENDS:${PN} = "tegra-mmapi-samples tegra-tools-jetson-clocks tensorrt-trtexec coreutils diffutils"

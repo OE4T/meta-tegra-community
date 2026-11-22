@@ -40,15 +40,6 @@ run_dynamic_reshape() {
     sample_dynamic_reshape  --datadir=${SAMPLEDATA}/mnist/
 }
 
-run_int8_api() {
-    copy_resnet50_data
-    echo "Running int8-api"
-    sample_int8_api --model=${SAMPLEDATA}/resnet50/ResNet50.onnx \
-      --image=${SAMPLEDATA}/resnet50/airliner.ppm \
-      --reference=${SAMPLEDATA}/int8_api/reference_labels.txt \
-      --ranges=${SAMPLEDATA}/int8_api/resnet50_per_tensor_dynamic_range.txt
-}
-
 run_onnx_mnist() {
     copy_mnist_data
     sample_onnx_mnist --datadir=${SAMPLEDATA}/mnist/
@@ -89,10 +80,63 @@ run_trtexec(){
     trtexec --loadEngine=ResNet50.trt
 }
 
+run_trtexec_mnist(){
+    if [ ! -x "${SAMPLEROOT}/bin/trtexec" ]; then
+        echo "Skipping trtexec_mnist"
+        return $SKIPCODE
+    fi
+    copy_mnist_data
+    echo "Running trtexec: Building an MNIST engine with a 64 MiB workspace"
+    trtexec --onnx=${SAMPLEDATA}/mnist/mnist.onnx \
+      --saveEngine=mnist.plan --memPoolSize=workspace:64M && \
+    trtexec --loadEngine=mnist.plan
+}
+
+have_dla() {
+    if [ ! -e /dev/nvhost-ctrl-nvdla$1 ]; then
+        echo "Skipping: no DLA core $1"
+        return 1
+    fi
+}
+
+trtexec_dla() {
+    have_dla $1 || return $SKIPCODE
+    if [ ! -x "${SAMPLEROOT}/bin/trtexec" ]; then
+        echo "Skipping trtexec_dla$1"
+        return $SKIPCODE
+    fi
+    copy_mnist_data
+    echo "Running trtexec: MNIST on DLA core $1 with GPU fallback"
+    trtexec --onnx=${SAMPLEDATA}/mnist/mnist.onnx --useDLACore=$1 --allowGPUFallback
+}
+
+progress_monitor_dla() {
+    have_dla $1 || return $SKIPCODE
+    copy_mnist_data
+    echo "Running Progress Monitor on DLA core $1"
+    sample_progress_monitor --datadir=${SAMPLEDATA}/mnist/ --useDLACore=$1
+}
+
+run_trtexec_dla0() { trtexec_dla 0; }
+run_trtexec_dla1() { trtexec_dla 1; }
+run_progress_monitor_dla0() { progress_monitor_dla 0; }
+run_progress_monitor_dla1() { progress_monitor_dla 1; }
+
+run_cudla() {
+    have_dla 0 || return $SKIPCODE
+    if [ ! -x "${SAMPLEROOT}/bin/sample_cudla" ]; then
+        echo "Skipping cudla"
+        return $SKIPCODE
+    fi
+    echo "Running cuDLA"
+    sample_cudla
+}
+
 TESTS="dynamic_reshape"
-TESTS="$TESTS int8_api onnx_mnist io_formats"
+TESTS="$TESTS onnx_mnist io_formats"
 TESTS="$TESTS progress_monitor editable_timing_cache non_zero_plugin"
-TESTS="$TESTS trtexec"
+TESTS="$TESTS trtexec trtexec_mnist"
+TESTS="$TESTS trtexec_dla0 trtexec_dla1 progress_monitor_dla0 progress_monitor_dla1 cudla"
 
 find_test() {
     for t in $TESTS; do

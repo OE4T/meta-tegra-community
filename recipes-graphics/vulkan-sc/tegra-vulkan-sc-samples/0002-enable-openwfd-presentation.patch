@@ -1,0 +1,43 @@
+Subject: [PATCH] Enable OpenWFD presentation in Vulkan SC samples
+
+The supplied binaries support presentation through NvSci and OpenWFD,
+but the source build omits the macro that enables those paths. Enable
+it for both Vulkan SC sample targets and include the triangle's missing
+swapchain implementation to retain the shipped functionality.
+
+Upstream-Status: Pending
+Signed-off-by: Kurt Kiefer <kkiefer@nvidia.com>
+AI-Generated: OpenAI Codex
+
+--- a/vksc_01tri/CMakeLists.txt
++++ b/vksc_01tri/CMakeLists.txt
+@@ -3,7 +3,8 @@
+ # VulkanSC binary is used to demo the VulkanSC APIs, and can only be ran on target.
+ set(SRC_FILES_COMMON "vksc_01tri.cpp"
+                      "../common/md5.c")
+-set(SRC_WFD_NVSCI "../common/wfd_nvsci.cpp")
++set(SRC_WFD_NVSCI "../common/wfd_nvsci.cpp"
++                  "../common/wfdSwapChain.cpp")
+ set(TARGET_NAME_VK "vk_01tri")
+ set(TARGET_NAME_VKSC "vksc_01tri")
+ 
+@@ -29,7 +30,7 @@
+     target_include_directories(${TARGET_NAME_VKSC}  PUBLIC ${NVSCI_HEADER_PATH})
+     target_include_directories(${TARGET_NAME_VKSC}  PUBLIC ${EXTERNAL_HEADERS_PATH})
+     target_include_directories(${TARGET_NAME_VKSC}  PUBLIC ${COMMON_HEADERS_PATH})
+-    set_target_properties(${TARGET_NAME_VKSC}  PROPERTIES COMPILE_DEFINITIONS VULKANSC)
++    set_target_properties(${TARGET_NAME_VKSC}  PROPERTIES COMPILE_DEFINITIONS "VULKANSC;WFD_INTEROP")
+ 
+     foreach (LIB ${VKSC_DEP_LIBS})
+         target_link_libraries(${TARGET_NAME_VKSC} ${LIB})
+--- a/computeparticles/CMakeLists.txt
++++ b/computeparticles/CMakeLists.txt
+@@ -44,7 +44,7 @@
+     target_include_directories(${TARGET_NAME_VKSC}  PUBLIC ${COMMON_HEADERS_PATH})
+     target_include_directories(${TARGET_NAME_VKSC}  PUBLIC ${NVSCI_HEADER_PATH})
+     target_include_directories(${TARGET_NAME_VKSC}  PUBLIC ${EXTERNAL_HEADERS_PATH})
+-    set_target_properties(${TARGET_NAME_VKSC}  PROPERTIES COMPILE_DEFINITIONS VULKANSC)
++    set_target_properties(${TARGET_NAME_VKSC}  PROPERTIES COMPILE_DEFINITIONS "VULKANSC;WFD_INTEROP")
+ 
+     foreach (LIB ${VKSC_DEP_LIBS})
+         target_link_libraries(${TARGET_NAME_VKSC} ${LIB})
